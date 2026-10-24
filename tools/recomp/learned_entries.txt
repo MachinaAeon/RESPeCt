@@ -1,0 +1,3 @@
+# Entry points the runtime found missing (written by port/src/rt.c when a call
+# lands on an unknown address inside a known module). One per line.
+conpau_e 800C3F58

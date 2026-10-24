@@ -1,0 +1,45 @@
+# TEST.BIN: the in-game module (despite the name).
+# Loaded whole at 0x8006C118 (KERNEL slot 0) -- confirmed from a DuckStation
+# RAM dump taken in the first area, which matched the file byte for byte.
+#
+# Layout:
+#   0x000  file count + paths of files this module loads, then a 35-entry
+#          table of function pointers and read-only data (file paths,
+#          lookup tables, debug strings)
+#   0x8E4  code (~210 KB), last return at 0x346BC
+#   0x346C4 data
+name: TEST.BIN
+sha1: 8c565566ddcdfc0a2e4d964f679ca857d5985f67
+options:
+  basename: test
+  target_path: disc/TEST.BIN
+  elf_path: build/test.elf
+  base_path: .
+  platform: psx
+  compiler: PSYQ
+  # Shares KERNEL's $gp (see tools/gen_overlay_yaml.py).
+  gp_value: 0x80062D1C
+  ld_script_path: test.ld
+  asm_path: asm/test
+  asset_path: assets/test
+  symbol_addrs_path: [symbol_addrs.txt]
+  undefined_funcs_auto_path: build/test_undefined_funcs_auto.txt
+  undefined_syms_auto_path: build/test_undefined_syms_auto.txt
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  ld_align_section_vram_end: False
+  ld_align_segment_vram_end: False
+  subalign: 2
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+segments:
+  - name: test
+    type: code
+    start: 0x0
+    vram: 0x8006C118
+    subsegments:
+      - [0x0, rodata, test_header]   # file list, entry table, read-only data
+      - [0x8E4, asm, test]
+      - [0x346C4, data, test_data]
+  - [0x57D30]

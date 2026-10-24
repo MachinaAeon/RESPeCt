@@ -1,0 +1,329 @@
+name: ENEMPROG.BIN
+sha1: 87a288413c7efe76e31867eb47ee0350d30e0825
+options:
+  basename: enemprog
+  target_path: disc/ENEMPROG.BIN
+  elf_path: build/enemprog.elf
+  base_path: .
+  platform: psx
+  compiler: PSYQ
+  # Overlays reach KERNEL's globals through its $gp. Without this the
+  # linker invents a GOT and the output grows by 8 bytes.
+  gp_value: 0x80062D1C
+  ld_script_path: enemprog.ld
+  asm_path: asm/enemprog
+  asset_path: assets/enemprog
+  symbol_addrs_path: [symbol_addrs.txt]
+  undefined_funcs_auto_path: build/enemprog_undefined_funcs_auto.txt
+  undefined_syms_auto_path: build/enemprog_undefined_syms_auto.txt
+  # Header (rodata) must come before code, as on disc.
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  ld_align_section_vram_end: False
+  ld_align_segment_vram_end: False
+  subalign: 2
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+segments:
+  - name: ovl34
+    type: code
+    start: 0x0
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x0, rodata, ovl34_header]   # overlay id + entry table
+      - [0xd0, asm, ovl34]
+      - [0x528c, data, ovl34_data]
+  - name: ovl35
+    type: code
+    start: 0x6000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x6000, rodata, ovl35_header]   # overlay id + entry table
+      - [0x601c, asm, ovl35]
+      - [0x9c88, data, ovl35_data]
+  - name: ovl36
+    type: code
+    start: 0xa800
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0xa800, rodata, ovl36_header]   # overlay id + entry table
+      - [0xa840, asm, ovl36]
+      - [0xe6ec, data, ovl36_data]
+  - name: ovl37
+    type: code
+    start: 0xf000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0xf000, rodata, ovl37_header]   # overlay id + entry table
+      - [0xf0b8, asm, ovl37]
+      - [0x16178, data, ovl37_data]
+  - name: ovl38
+    type: code
+    start: 0x17000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x17000, rodata, ovl38_header]   # overlay id + entry table
+      - [0x17018, asm, ovl38]
+      - [0x19ae0, data, ovl38_data]
+  - name: ovl39
+    type: code
+    start: 0x1a800
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x1a800, rodata, ovl39_header]   # overlay id + entry table
+      - [0x1a818, asm, ovl39]
+      - [0x1ff4c, data, ovl39_data]
+  - name: ovl40
+    type: code
+    start: 0x20800
+    vram: 0x800f8000   # load address only partly confirmed (8/15 calls fit)
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x20800, rodata, ovl40_header]   # overlay id + entry table
+      - [0x20830, asm, ovl40]
+      - [0x22414, data, ovl40_data]
+  - name: ovl41
+    type: code
+    start: 0x23000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x23000, rodata, ovl41_header]   # overlay id + entry table
+      - [0x23004, asm, ovl41]
+      - [0x28c8c, data, ovl41_data]
+  - name: ovl42
+    type: code
+    start: 0x2a000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x2a000, rodata, ovl42_header]   # overlay id + entry table
+      - [0x2a030, asm, ovl42]
+      - [0x2f5dc, data, ovl42_data]
+  - name: ovl43
+    type: code
+    start: 0x30800
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x30800, rodata, ovl43_header]   # overlay id + entry table
+      - [0x30818, asm, ovl43]
+      - [0x32a00, data, ovl43_data]
+  - name: ovl44
+    type: code
+    start: 0x33000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x33000, rodata, ovl44_header]   # overlay id + entry table
+      - [0x33048, asm, ovl44]
+      - [0x38590, data, ovl44_data]
+  - name: ovl45
+    type: code
+    start: 0x39000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x39000, rodata, ovl45_header]   # overlay id + entry table
+      - [0x39004, asm, ovl45]
+      - [0x3efa0, data, ovl45_data]
+  - name: ovl46
+    type: code
+    start: 0x3f800
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x3f800, rodata, ovl46_header]   # overlay id + entry table
+      - [0x3f804, asm, ovl46]
+      - [0x42768, data, ovl46_data]
+  - name: ovl47
+    type: code
+    start: 0x43000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x43000, rodata, ovl47_header]   # overlay id + entry table
+      - [0x43004, asm, ovl47]
+      - [0x45ff0, data, ovl47_data]
+  - name: ovl48
+    type: code
+    start: 0x47000
+    vram: 0x800f8000
+    exclusive_ram_id: enemy_slot_a
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x47000, rodata, ovl48_header]   # overlay id + entry table
+      - [0x47018, asm, ovl48]
+      - [0x4b434, data, ovl48_data]
+  - name: ovl50
+    type: code
+    start: 0x4c000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x4c000, rodata, ovl50_header]   # overlay id + entry table
+      - [0x4c0d0, asm, ovl50]
+      - [0x5128c, data, ovl50_data]
+  - name: ovl51
+    type: code
+    start: 0x52000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x52000, rodata, ovl51_header]   # overlay id + entry table
+      - [0x5201c, asm, ovl51]
+      - [0x55c88, data, ovl51_data]
+  - name: ovl52
+    type: code
+    start: 0x56800
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x56800, rodata, ovl52_header]   # overlay id + entry table
+      - [0x56840, asm, ovl52]
+      - [0x5a6ec, data, ovl52_data]
+  - name: ovl53
+    type: code
+    start: 0x5b000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x5b000, rodata, ovl53_header]   # overlay id + entry table
+      - [0x5b0b8, asm, ovl53]
+      - [0x62178, data, ovl53_data]
+  - name: ovl54
+    type: code
+    start: 0x63000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x63000, rodata, ovl54_header]   # overlay id + entry table
+      - [0x63018, asm, ovl54]
+      - [0x65ae0, data, ovl54_data]
+  - name: ovl55
+    type: code
+    start: 0x66800
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x66800, rodata, ovl55_header]   # overlay id + entry table
+      - [0x66818, asm, ovl55]
+      - [0x6bf4c, data, ovl55_data]
+  - name: ovl56
+    type: code
+    start: 0x6c800
+    vram: 0x80100000   # load address only partly confirmed (8/15 calls fit)
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x6c800, rodata, ovl56_header]   # overlay id + entry table
+      - [0x6c830, asm, ovl56]
+      - [0x6e414, data, ovl56_data]
+  - name: ovl57
+    type: code
+    start: 0x6f000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x6f000, rodata, ovl57_header]   # overlay id + entry table
+      - [0x6f004, asm, ovl57]
+      - [0x74c8c, data, ovl57_data]
+  - name: ovl58
+    type: code
+    start: 0x76000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x76000, rodata, ovl58_header]   # overlay id + entry table
+      - [0x76030, asm, ovl58]
+      - [0x7b5dc, data, ovl58_data]
+  - name: ovl59
+    type: code
+    start: 0x7c800
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x7c800, rodata, ovl59_header]   # overlay id + entry table
+      - [0x7c818, asm, ovl59]
+      - [0x7ea00, data, ovl59_data]
+  - name: ovl60
+    type: code
+    start: 0x7f000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x7f000, rodata, ovl60_header]   # overlay id + entry table
+      - [0x7f048, asm, ovl60]
+      - [0x84590, data, ovl60_data]
+  - name: ovl61
+    type: code
+    start: 0x85000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x85000, rodata, ovl61_header]   # overlay id + entry table
+      - [0x85004, asm, ovl61]
+      - [0x8afa0, data, ovl61_data]
+  - name: ovl62
+    type: code
+    start: 0x8b800
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x8b800, rodata, ovl62_header]   # overlay id + entry table
+      - [0x8b804, asm, ovl62]
+      - [0x8e768, data, ovl62_data]
+  - name: ovl63
+    type: code
+    start: 0x8f000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x8f000, rodata, ovl63_header]   # overlay id + entry table
+      - [0x8f004, asm, ovl63]
+      - [0x91ff0, data, ovl63_data]
+  - name: ovl64
+    type: code
+    start: 0x93000
+    vram: 0x80100000
+    exclusive_ram_id: enemy_slot_b
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x93000, rodata, ovl64_header]   # overlay id + entry table
+      - [0x93018, asm, ovl64]
+      - [0x97434, data, ovl64_data]
+  - [0x98000]

@@ -1,0 +1,203 @@
+name: STAGPROG.BIN
+sha1: 7182a396619f7c3ee04aad6876bf47a3f1267f0e
+options:
+  basename: stagprog
+  target_path: disc/STAGPROG.BIN
+  elf_path: build/stagprog.elf
+  base_path: .
+  platform: psx
+  compiler: PSYQ
+  # Overlays reach KERNEL's globals through its $gp. Without this the
+  # linker invents a GOT and the output grows by 8 bytes.
+  gp_value: 0x80062D1C
+  ld_script_path: stagprog.ld
+  asm_path: asm/stagprog
+  asset_path: assets/stagprog
+  symbol_addrs_path: [symbol_addrs.txt]
+  undefined_funcs_auto_path: build/stagprog_undefined_funcs_auto.txt
+  undefined_syms_auto_path: build/stagprog_undefined_syms_auto.txt
+  # Header (rodata) must come before code, as on disc.
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  ld_align_section_vram_end: False
+  ld_align_segment_vram_end: False
+  subalign: 2
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+segments:
+  - name: ovl15
+    type: code
+    start: 0x0
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x0, rodata, ovl15_header]   # overlay id + entry table
+      - [0x20, asm, ovl15]
+      - [0x211c, data, ovl15_data]
+  - name: ovl16
+    type: code
+    start: 0x2800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x2800, rodata, ovl16_header]   # overlay id + entry table
+      - [0x2804, asm, ovl16]
+      - [0x29f0, data, ovl16_data]
+  - name: ovl17
+    type: code
+    start: 0x3000
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x3000, rodata, ovl17_header]   # overlay id + entry table
+      - [0x3038, asm, ovl17]
+      - [0x5cac, data, ovl17_data]
+  - name: ovl18
+    type: code
+    start: 0x6800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x6800, rodata, ovl18_header]   # overlay id + entry table
+      - [0x6864, asm, ovl18]
+      - [0x7b54, data, ovl18_data]
+  - name: ovl19
+    type: code
+    start: 0x8800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x8800, rodata, ovl19_header]   # overlay id + entry table
+      - [0x8804, asm, ovl19]
+      - [0x93b8, data, ovl19_data]
+  - name: ovl20
+    type: code
+    start: 0x9800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x9800, rodata, ovl20_header]   # overlay id + entry table
+      - [0x9804, asm, ovl20]
+      - [0x9b58, data, ovl20_data]
+  - name: ovl21
+    type: code
+    start: 0xb000
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0xb000, rodata, ovl21_header]   # overlay id + entry table
+      - [0xb018, asm, ovl21]
+      - [0xb47c, data, ovl21_data]
+  - name: ovl22
+    type: code
+    start: 0xb800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0xb800, rodata, ovl22_header]   # overlay id + entry table
+      - [0xb818, asm, ovl22]
+      - [0xc9a0, data, ovl22_data]
+  - name: ovl23
+    type: code
+    start: 0xd000
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0xd000, rodata, ovl23_header]   # overlay id + entry table
+      - [0xd004, asm, ovl23]
+      - [0xeefc, data, ovl23_data]
+  - name: ovl24
+    type: code
+    start: 0xf800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0xf800, rodata, ovl24_header]   # overlay id + entry table
+      - [0xf804, asm, ovl24]
+      - [0x10a14, data, ovl24_data]
+  - name: ovl25
+    type: code
+    start: 0x11000
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x11000, rodata, ovl25_header]   # overlay id + entry table
+      - [0x11004, asm, ovl25]
+      - [0x11524, data, ovl25_data]
+  - name: ovl26
+    type: code
+    start: 0x12000
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x12000, rodata, ovl26_header]   # overlay id + entry table
+      - [0x12020, asm, ovl26]
+      - [0x144cc, data, ovl26_data]
+  - name: ovl27
+    type: code
+    start: 0x15800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x15800, rodata, ovl27_header]   # overlay id + entry table
+      - [0x15804, asm, ovl27]
+      - [0x17ae4, data, ovl27_data]
+  - name: ovl28
+    type: code
+    start: 0x18800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x18800, rodata, ovl28_header]   # overlay id + entry table
+      - [0x18820, asm, ovl28]
+      - [0x1a1b0, data, ovl28_data]
+  - name: ovl29
+    type: code
+    start: 0x1b000
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x1b000, rodata, ovl29_header]   # overlay id + entry table
+      - [0x1b004, asm, ovl29]
+      - [0x1b1dc, data, ovl29_data]
+  - name: ovl30
+    type: code
+    start: 0x1b800
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x1b800, rodata, ovl30_header]   # overlay id + entry table
+      - [0x1b804, asm, ovl30]
+      - [0x1d2f4, data, ovl30_data]
+  - name: ovl31
+    type: code
+    start: 0x1e000
+    vram: 0x800f2c50
+    exclusive_ram_id: stage_slot
+    symbol_name_format: "$VRAM_$SEG"
+    subsegments:
+      - [0x1e000, rodata, ovl31_header]   # overlay id + entry table
+      - [0x1e004, asm, ovl31]
+      - [0x1f860, data, ovl31_data]
+  - name: ovl32
+    type: bin
+    start: 0x20800
+    # different header format; load address not known yet
+  - [0x32000]

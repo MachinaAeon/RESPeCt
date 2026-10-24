@@ -1,0 +1,18 @@
+# Extra entry points for the recompiler: code reached other than by a call,
+# e.g. where a setjmp returns a second time. One per line: module address.
+# libetc interrupt handler: continues here after setjmp when an interrupt
+# arrives (HookEntryInt).
+kernel 80025A04
+# Stage start functions (TEST's table at 0x800A2698, indexed by stage; stage
+# s is ovl(15 + s)) and enemy functions (tables at 0x800A21AC / 0x800A3AF8)
+# reached only through those tables.
+ovl17 800F2D80
+ovl26 800F2C90
+ovl27 800F2CCC
+ovl31 800F2C88
+ovl41 800F9DB0
+ovl41 800FA270
+ovl57 80101DB0
+ovl57 80102270
+ovl32     800F2C88
+kernel    8002EC58    # an HMD driver: the model data points past its 16-byte header

@@ -1,0 +1,8 @@
+/* Hardware, BIOS and misdecoded addresses referenced by the game. */
+D_1F800004 = 0x1F800004;
+D_7FFFF = 0x7FFFF;
+D_A000DF80 = 0xA000DF80;
+D_A000DFAC = 0xA000DFAC;
+D_BFC00104 = 0xBFC00104;
+D_BFC7FF52 = 0xBFC7FF52;
+func_88E9D1D4 = 0x88E9D1D4;

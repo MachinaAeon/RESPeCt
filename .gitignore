@@ -1,0 +1,30 @@
+# Game files from the player's own disc. Never commit these.
+disc/
+
+# Generated from the disc by splat: disassembly of the game's code and data.
+# Regenerate locally with `python3 -m splat split kernel.bin.yaml`.
+asm/
+assets/
+build/
+
+# splat caches and auto-generated lists
+.splat_cache
+*.pyc
+__pycache__/
+undefined_funcs_auto.txt
+undefined_syms_auto.txt
+
+# splat dependency files
+*.d
+
+# RAM dumps from the emulator (contain game code)
+dumps/
+port/gen/
+port/build/
+port/run/
+port_skips.txt
+port/*.mcd
+port/*_dump.bin
+testdata/
+/memcard1.mcd
+/*_dump.bin

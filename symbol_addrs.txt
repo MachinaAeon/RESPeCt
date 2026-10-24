@@ -1,0 +1,131 @@
+// Psy-Q SDK functions, found by tools/name_sdk_funcs.py (debug-string references).
+CdInit = 0x800262E8; // type:func
+ClearImage = 0x800354F8; // type:func
+ClearImage2 = 0x80035588; // type:func
+ClearOTag = 0x80035798; // type:func
+ClearOTagR = 0x80035860; // type:func
+DrawOTagEnv = 0x80035A98; // type:func
+DrawSync = 0x80035374; // type:func
+DrawSyncCallback = 0x8003527C; // type:func
+LoadImage = 0x80035620; // type:func
+LoadImage2 = 0x80037AC0; // type:func
+PutDispEnv = 0x80035BA4; // type:func
+PutDrawEnv = 0x800359D8; // type:func
+ResetGraph = 0x80034FF8; // type:func
+SetDispMask = 0x800352DC; // type:func
+SetGraphDebug = 0x8003516C; // type:func
+SetGraphQue = 0x800351C8; // type:func
+// Resolved by position: base versions sit in libgpu sys.c order next to
+// LoadImage; the "2" variants sit beside LoadImage2.
+DrawOTag = 0x80035968; // type:func
+StoreImage = 0x80035680; // type:func
+MoveImage = 0x800356E0; // type:func
+StoreImage2 = 0x80037BAC; // type:func
+MoveImage2 = 0x80037C98; // type:func
+// 0x80037DDC also prints "DrawOTag(...)" -- left unnamed until confirmed.
+// BIOS B-table call stubs (found by tools: addiu t2,0xB0; jr t2; addiu t1,N)
+InitCARD = 0x80039138; // type:func
+StartCARD = 0x80039148; // type:func
+InitPAD = 0x8003A218; // type:func
+StartPAD = 0x8003A228; // type:func
+StopPAD = 0x8003A238; // type:func
+PAD_init = 0x8003A248; // type:func
+
+// ---- Controller input (KERNEL) ----
+// Game-side pad module. See README "Input".
+pad_Init = 0x80013260; // type:func
+// pad_Update: per-frame connect/type tracking
+pad_Update = 0x800136B0; // type:func
+// pad_GetButtons: bytes 2-3 of both ports, active-low
+pad_GetButtons = 0x80013A5C; // type:func
+// pad_GetAxes: pointer/axis data via type table
+pad_GetAxes = 0x80013D18; // type:func
+pad_GetAxesAsType = 0x80013D7C; // type:func
+// pad_AxesNone: digital pad: returns 0
+pad_AxesNone = 0x80013C30; // type:func
+// pad_AxesMouse: PS Mouse X/Y motion in top 16 bits
+pad_AxesMouse = 0x80013BB4; // type:func
+pad_AxesNegcon = 0x80013BE8; // type:func
+pad_AxesAnalogJoy = 0x80013C38; // type:func
+// pad_AxesGuncon: GunCon X/Y screen position
+pad_AxesGuncon = 0x80013C84; // type:func
+pad_AxesDualShock = 0x80013CCC; // type:func
+// g_padAxesHandlers: indexed by controller type (0-7)
+g_padAxesHandlers = 0x80059684;
+// g_padBuf1: receive buffer, port 1
+g_padBuf1 = 0x800633F8;
+// g_padBuf2: receive buffer, port 2
+g_padBuf2 = 0x80063420;
+g_padBuf1Ptr = 0x80062EBC;
+g_padBuf2Ptr = 0x80062EC0;
+// g_padActBuf1Ptr: vibration buffers
+g_padActBuf1Ptr = 0x80062EC4;
+g_padActBuf2Ptr = 0x80062EC8;
+// g_padState1: connection + controller-type bits, port 1
+g_padState1 = 0x80062ED0;
+g_padState2 = 0x80062ED4;
+g_padChangeCallback = 0x80062ED8;
+// Sony libpad, identified by call pattern (probable, not signature-matched)
+PadInitDirect = 0x8003C848; // type:func
+PadStartCom = 0x8003A3A8; // type:func
+PadSetAct = 0x8003A7F4; // type:func
+PadGetState = 0x8003A434; // type:func
+
+// ---- Controller input (TEST.BIN, in-game module) ----
+// input_SampleFrame: stores axes + mapped buttons each frame
+input_SampleFrame = 0x80071584; // type:func
+// player_Control: per-frame control dispatcher (walk/turn/aim), by controller type
+player_Control = 0x800771AC; // type:func
+g_inputAxes = 0x800A8840;
+g_inputAxesPrev = 0x800B3DF4;
+// g_buttons: mapped buttons this frame (low 16 bits of func_8001189C)
+g_buttons = 0x800B4B94;
+// g_buttonsHi: high 16 bits of the mapped value
+g_buttonsHi = 0x800B4B98;
+// g_buttonsPrev: g_buttons from last frame
+g_buttonsPrev = 0x800B3CC4;
+// g_inputLocked: when set, input_SampleFrame zeroes the buttons (probably cutscenes/events)
+g_inputLocked = 0x800B3D2C;
+// g_demoInput: recorded attract-demo input, 8 bytes per frame (buttons, axes)
+g_demoInput = 0x800AF574;
+g_demoFrame = 0x800B3D08;
+g_demoLength = 0x800B3CC8;
+// g_demoRealButtons: real pad read during demo playback (to skip the demo)
+g_demoRealButtons = 0x800B3E04;
+// input_MapButtons: applies the button configuration (probable)
+input_MapButtons = 0x8001189C; // type:func
+
+// ---- Player control and movement (TEST.BIN) ----
+// player_Update: runs player_Control, applies turning, movement, collision
+player_Update = 0x800785C0; // type:func
+// player_AimMode: 2D reticle on screen; fire calls fire_AtScreen(x, y)
+player_AimMode = 0x800779DC; // type:func
+// fire_AtScreen: probable: fires at a screen position
+fire_AtScreen = 0x8008DF08; // type:func
+// move_Collide: probable: collision check for a movement step
+move_Collide = 0x8007CB9C; // type:func
+// g_player: player record. yaw (12-bit, 4096 = 360 deg) at +0x46, position X/Y/Z at +0x18/+0x1C/+0x20
+g_player = 0x800A85C0;
+// g_playerMoveFlags: 1 forward, 2 back, 4 turn right, 8 turn left, 0x40 walking, 0x80 aiming
+g_playerMoveFlags = 0x800B6080;
+// g_playerMoveSpeed: negative = forward (-0x50 walk, -0x96 run), 0x3C backstep
+g_playerMoveSpeed = 0x800B3D48;
+// g_playerYawVel: added to g_player yaw each frame
+g_playerYawVel = 0x800B4DFA;
+// g_playerTurnRamp: turn acceleration counter, caps at 10
+g_playerTurnRamp = 0x800A12EC;
+// g_playerStick: analog stick snapshot (byte 0 forward/back, byte 1 turn)
+g_playerStick = 0x800B4E00;
+// g_playerFrozen: player_Update skips control while set
+g_playerFrozen = 0x800B6088;
+// g_padTypeBit: 0x80000 digital, 0x200000 GunCon, 0x400000 DualShock analog
+g_padTypeBit = 0x80062E38;
+g_reticleX = 0x80062DDC;
+g_reticleY = 0x80062DE0;
+// g_fireRequest: set to 1 when a shot is triggered
+g_fireRequest = 0x80062E40;
+g_weaponState = 0x80062E2E;
+// g_fireCooldown: low 15 bits count down by 2 per frame
+g_fireCooldown = 0x80062DBC;
+// g_currentWeapon: pointer; *g_currentWeapon is the weapon ID (13, 14 = hold-to-fire types)
+g_currentWeapon = 0x800A8580;

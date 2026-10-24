@@ -1,0 +1,5 @@
+# Code that only exists in RAM after the game unpacks it (no plain copy on
+# the disc). Images are captured from a RAM dump of the port with
+# tools/recomp/capture.py into disc/captured/<name>.bin (not in git).
+# name        load address   where it comes from
+conpau_e      800C3E48       # continue/pause menu (ID 13), unpacked from CONPAU.BIN into slot 4

@@ -1,0 +1,2 @@
+tools/recomp/native.txt merge=union
+port/decomp/game_vars.h merge=union

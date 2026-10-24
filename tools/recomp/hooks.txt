@@ -1,0 +1,6 @@
+# C functions the port calls when a translated function starts (see
+# port/src/savegame.c). module  address   function
+kernel    80012FF4  sg_hook_mode_switch
+test      80071CF4  sg_hook_restore
+title     8006C244  sg_hook_title
+title     8006CF24  sg_hook_title_frame
