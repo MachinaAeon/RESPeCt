@@ -39,7 +39,9 @@ recommend the **[RE Survivor HQ Texture Pack by Leigiboy](https://www.moddb.com/
 on ModDB. All credit for the pack goes to Leigiboy.
 
 > RESPeCt is not affiliated with Leigiboy or the texture pack in any way.
-> Please report problems with HD textures in RESPeCt here, not to them.
+> If HD textures look wrong in RESPeCt, please
+> [open an issue](../../issues) here. It's most likely something RESPeCt
+> needs to fix, so please don't contact Leigiboy about it.
 
 1. Download the pack and put the `.rar` in the same folder as `RESPeCt.exe`
    (a `.zip` or `.7z` works too).
