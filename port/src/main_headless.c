@@ -7,6 +7,7 @@
  */
 #include "rt.h"
 #include "render.h"
+#include "texpack.h"
 #include "savestate.h"
 
 #include <stdio.h>
@@ -359,5 +360,12 @@ int main(int argc, char **argv) {
     rt_set_log(stderr);
     { extern int g_audio_limiter; g_audio_limiter = getenv("RT_LIMITER") != NULL; }
     if (getenv("RT_NO_DEPTH")) g_depth_buffer = 0;
+    if (getenv("RT_NO_PERSP")) { extern int g_persp; g_persp = 0; }
+    if (getenv("RT_BRIGHTNESS")) { extern int g_brightness; g_brightness = atoi(getenv("RT_BRIGHTNESS")); }
+    {   /* RT_TEXPACK=dir: an HD texture pack; RT_TEXPACK_LIST=file: its file names only (matching stats) */
+        const char *tp = getenv("RT_TEXPACK"), *tl = getenv("RT_TEXPACK_LIST");
+        if (tl) texpack_open_listing(tl, tp);
+        else if (tp) texpack_open(tp);
+    }
     return rt_boot(argv[1]) ? 0 : 1;
 }

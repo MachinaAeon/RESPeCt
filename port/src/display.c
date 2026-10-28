@@ -181,7 +181,38 @@ static void close_cracks(uint32_t *out, const uint8_t *bare, int stride, int s, 
     }
 }
 
+/* Brightness (%): a gamma curve, 100 = as the PlayStation shows it. Above
+ * 100 lifts the dark parts most, as a TV's brightness does. */
+int g_brightness = 100;
+static int lut_for = -1;
+static uint8_t gamma8[256];
+static uint32_t lut15[32768];
+
+static void build_luts(void) {
+    if (lut_for == g_brightness) return;
+    lut_for = g_brightness;
+    double e = 100.0 / (g_brightness > 10 ? g_brightness : 10);
+    for (int i = 0; i < 256; i++) {
+        int v = (int)(pow(i / 255.0, e) * 255.0 + 0.5);
+        gamma8[i] = (uint8_t)(v > 255 ? 255 : v);
+    }
+    for (uint32_t p = 0; p < 32768; p++) {
+        uint32_t r = (p & 31) << 3, g = ((p >> 5) & 31) << 3, b = ((p >> 10) & 31) << 3;
+        r |= r >> 5; g |= g >> 5; b |= b >> 5;
+        lut15[p] = gamma8[b] | ((uint32_t)gamma8[g] << 8) | ((uint32_t)gamma8[r] << 16);
+    }
+}
+
+static void apply_gamma(uint32_t *out, size_t n) {
+    if (g_brightness == 100) return;
+    for (size_t i = 0; i < n; i++) {
+        uint32_t c = out[i];
+        out[i] = gamma8[c & 0xFF] | ((uint32_t)gamma8[(c >> 8) & 0xFF] << 8) | ((uint32_t)gamma8[(c >> 16) & 0xFF] << 16);
+    }
+}
+
 void display_grab_bgrx(uint32_t *out, int *w, int *h) {
+    build_luts();
     GpuDisplay d;
     gpu_display(&d);
     int s = render_scale();
@@ -192,6 +223,7 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
             movie_upscale(&d, f, out);
             *w = d.w * f;
             *h = d.h * f;
+            apply_gamma(out, (size_t)*w * *h);
             return;
         }
     }
@@ -204,6 +236,7 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
                 if (d.enabled) px_native(&d, x, y, &r, &g, &b);
                 out[y * d.w + x] = b | (g << 8) | (r << 16);
             }
+        apply_gamma(out, (size_t)d.w * d.h);
         return;
     }
     int stride;
@@ -218,10 +251,7 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
         uint32_t *o = out + (size_t)y * W;
         for (int x = 0; x < W; x++) {
             int sx = (X + x) % (1024 * s);
-            uint16_t p = row[sx];
-            uint32_t r = (p & 31) << 3, g = ((p >> 5) & 31) << 3, b = ((p >> 10) & 31) << 3;
-            r |= r >> 5; g |= g >> 5; b |= b >> 5;
-            o[x] = b | (g << 8) | (r << 16);
+            o[x] = lut15[row[sx] & 0x7FFF];
         }
     }
     if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);

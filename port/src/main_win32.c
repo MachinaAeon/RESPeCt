@@ -12,10 +12,12 @@
  */
 #include <windows.h>          /* before rt.h: its R macro clashes with winnt.h */
 #include <commdlg.h>
+#include <xinput.h>
 
 #include "rt.h"
 #include "config.h"
 #include "render.h"
+#include "texpack.h"
 #include "savestate.h"
 #include <ctype.h>
 #include <math.h>
@@ -119,6 +121,8 @@ void plat_ss_done(int ok, int was_load, const char *msg) {
     if (was_load && ok) next_frame.QuadPart = 0;   /* don't race to catch up */
 }
 static int menu_open, suppress_keys;
+static int ff_held(void);                  /* controller section */
+static int pad_ok;
 #include "../decomp/savegame.h"
 
 
@@ -344,7 +348,7 @@ static void paint(HDC dc) {
     {   /* saved games: the payphone prompt */
         const char *hint = NULL;
         if (!menu_open && sg_at_payphone()) hint = "Left click: save your game here";
-        if (!menu_open && cutscene_frames > 90 && !key_down(VK_SPACE)) hint = "Hold Space to fast-forward";
+        if (!menu_open && cutscene_frames > 90 && !ff_held()) hint = pad_ok ? "Hold A to fast-forward" : "Hold Space to fast-forward";
         if (hint) {
             int fh = ch / 26 < 14 ? 14 : ch / 26;
             HFONT f = CreateFontA(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, "Segoe UI");
@@ -395,6 +399,15 @@ static void games_dir(void) {
 void sg_save_done(int ok) { show_toast(ok ? "Game saved" : "Saving the game's progress failed"); }
 
 static void paint(HDC dc);
+static void save_settings(void);
+/* F2: HD textures on/off (remembered in resurv.ini). */
+static void toggle_hd_textures(void) {
+    if (!texpack_loaded()) { show_toast("No HD texture pack found next to the game"); return; }
+    g_cfg.hd_textures = !g_cfg.hd_textures;
+    g_hd_textures = g_cfg.hd_textures;
+    save_settings();
+    show_toast(g_hd_textures ? "HD textures on" : "HD textures off");
+}
 static int menu_message(UINT msg, WPARAM wp, LPARAM lp);
 static void menu_toggle(void);
 
@@ -431,6 +444,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (wp == VK_F6) step_slot(-1);
         if (wp == VK_F7) step_slot(1);
         if (wp == VK_F9) quick_load();
+        if (wp == VK_F2 && !(lp & (1 << 30))) toggle_hd_textures();
         break;
     case WM_MOUSEWHEEL:
         /* wheel up: previous weapon, down: next (as in most shooters) */
@@ -501,6 +515,148 @@ static uint16_t menu_taps(int dx, int dy) {
 }
 
 static int any_key_pressed;
+/* ------------------------------------------------------------ controller
+ * XInput (Xbox controllers; PlayStation and other controllers through
+ * Steam Input or similar). Left stick and d-pad: the d-pad (walk, strafe,
+ * menu cursor); right stick: look, as mouse motion; buttons as resurv.ini's
+ * [controller] section says. The XInput DLL is loaded when there is one. */
+typedef DWORD (WINAPI *XInputGetStateFn)(DWORD, XINPUT_STATE *);
+static XInputGetStateFn xinput_get;
+static int pad_slot = -1;
+static DWORD pad_next_scan;
+static double pad_fx, pad_fy;
+static uint32_t pad_prev;                  /* last frame's buttons (for presses) */
+static LARGE_INTEGER pad_last;
+
+static XINPUT_STATE pad_st;                /* this frame's controller state (pad_update) */
+static int pad_sprint;                     /* sprint toggled on (L3), until the player stops */
+static int menu_pad_fresh;                 /* the panel just opened: buttons held then don't count */
+
+static int pad_poll(XINPUT_STATE *st) {
+    if (!g_cfg.pad_enabled) { pad_slot = -1; return 0; }
+    if (!xinput_get) {
+        static int tried;
+        if (tried) return 0;
+        tried = 1;
+        const char *dlls[] = {"xinput1_4.dll", "xinput1_3.dll", "xinput9_1_0.dll"};
+        for (int i = 0; i < 3 && !xinput_get; i++) {
+            HMODULE m = LoadLibraryA(dlls[i]);
+            if (m) xinput_get = (XInputGetStateFn)(void (*)(void))GetProcAddress(m, "XInputGetState");
+        }
+        if (!xinput_get) return 0;
+    }
+    if (pad_slot >= 0) {
+        if (xinput_get((DWORD)pad_slot, st) == ERROR_SUCCESS) return 1;
+        pad_slot = -1;
+        show_toast("Controller disconnected");
+    }
+    DWORD now = GetTickCount();                 /* looking for one is slow: now and then */
+    if ((int32_t)(now - pad_next_scan) < 0) return 0;
+    pad_next_scan = now + 2000;
+    for (int i = 0; i < 4; i++)
+        if (xinput_get((DWORD)i, st) == ERROR_SUCCESS) {
+            pad_slot = i;
+            show_toast("Controller connected");
+            return 1;
+        }
+    return 0;
+}
+
+static void pad_update(void) {
+    pad_ok = GetForegroundWindow() == hwnd && pad_poll(&pad_st);
+    if (!pad_ok) memset(&pad_st, 0, sizeof pad_st);
+}
+
+static int pad_down(WORD b) { return pad_ok && (pad_st.Gamepad.wButtons & b) != 0; }
+
+/* Fast-forward held: Space, or the controller's A. */
+static int ff_held(void) {
+    return (GetForegroundWindow() == hwnd && key_down(VK_SPACE)) || pad_down(XINPUT_GAMEPAD_A);
+}
+
+/* A stick, -1..1 each way, past the dead zone (radial), with a curve for
+ * fine aiming near the centre. */
+static void pad_stick(int sx, int sy, double *ox, double *oy, int curve) {
+    double x = sx / 32767.0, y = sy / 32767.0;
+    double m = sqrt(x * x + y * y), dz = g_cfg.pad_deadzone / 100.0;
+    if (m <= dz) { *ox = *oy = 0; return; }
+    double k = (m > 1 ? 1 : m) - dz;
+    k /= 1 - dz;
+    if (curve) k = k * k;
+    *ox = x / m * k;
+    *oy = y / m * k;
+}
+
+/* Pad bits, look motion and actions from the controller this frame. */
+static uint16_t pad_input(int playing, int *fire, double *look_dx, double *look_dy) {
+    *fire = 0;
+    *look_dx = *look_dy = 0;
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+    double dt = pad_last.QuadPart ? (double)(now.QuadPart - pad_last.QuadPart) / (double)qpf.QuadPart : 0;
+    pad_last = now;
+    if (dt > 0.05) dt = 0.05;
+    if (!pad_ok) { pad_prev = 0; pad_sprint = 0; return 0; }
+    const XINPUT_GAMEPAD *g = &pad_st.Gamepad;
+    uint32_t down = 0;                          /* bit per PADB_ */
+    static const WORD xb[PADB_COUNT] = {XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_X, XINPUT_GAMEPAD_Y,
+                                        XINPUT_GAMEPAD_LEFT_SHOULDER, XINPUT_GAMEPAD_RIGHT_SHOULDER, 0, 0,
+                                        XINPUT_GAMEPAD_BACK, XINPUT_GAMEPAD_START, XINPUT_GAMEPAD_LEFT_THUMB,
+                                        XINPUT_GAMEPAD_RIGHT_THUMB};
+    for (int i = 0; i < PADB_COUNT; i++)
+        if (xb[i] && (g->wButtons & xb[i])) down |= 1u << i;
+    if (g->bLeftTrigger > 64) down |= 1u << PADB_LT;
+    if (g->bRightTrigger > 64) down |= 1u << PADB_RT;
+    uint32_t pressed = down & ~pad_prev;
+    pad_prev = down;
+    uint16_t b = 0;
+    if (g->wButtons & XINPUT_GAMEPAD_DPAD_UP) b |= PS_UP;
+    if (g->wButtons & XINPUT_GAMEPAD_DPAD_DOWN) b |= PS_DOWN;
+    if (g->wButtons & XINPUT_GAMEPAD_DPAD_LEFT) b |= PS_LEFT;
+    if (g->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) b |= PS_RIGHT;
+    double lx, ly, rx, ry;
+    pad_stick(g->sThumbLX, g->sThumbLY, &lx, &ly, 0);
+    if (ly > 0.45) b |= PS_UP;
+    if (ly < -0.45) b |= PS_DOWN;
+    if (lx < -0.45) b |= PS_LEFT;
+    if (lx > 0.45) b |= PS_RIGHT;
+    for (int i = 0; i < PADB_COUNT; i++) {
+        if (!(down & (1u << i))) continue;
+        const char *a = g_cfg.pad_bind[i];
+        int press = (pressed >> i) & 1;
+        if (!strcmp(a, "cross")) b |= PS_CROSS;
+        else if (!strcmp(a, "square")) b |= PS_SQUARE;
+        else if (!strcmp(a, "circle")) b |= PS_CIRCLE;
+        else if (!strcmp(a, "triangle")) b |= PS_TRIANGLE;
+        else if (!strcmp(a, "start")) b |= PS_START;
+        else if (!strcmp(a, "select")) b |= PS_SELECT;
+        else if (!strcmp(a, "r1")) b |= PS_R1;
+        else if (!strcmp(a, "l2")) b |= PS_L2;
+        else if (!strcmp(a, "r2")) b |= PS_R2;
+        else if (!strcmp(a, "quick_search")) b |= g_action_bits[ACT_QUICK_SEARCH];
+        else if (!strcmp(a, "sprint")) { if (press) pad_sprint = !pad_sprint; }
+        else if (!strcmp(a, "fire")) *fire = 1;
+        else if (!strcmp(a, "reload")) { if (press && playing) g_reload_request = 1; }
+        else if (!strcmp(a, "next_weapon")) { if (press && playing) g_weapon_request = 10; }
+        else if (!strcmp(a, "prev_weapon")) { if (press && playing) g_weapon_request = 11; }
+    }
+    /* sprint toggle: on until the player stops moving */
+    {
+        static int moved;
+        if (!pad_sprint) moved = 0;
+        else if (b & (PS_UP | PS_DOWN | PS_LEFT | PS_RIGHT)) { b |= g_action_bits[ACT_SPRINT]; moved = 1; }
+        else if (moved) pad_sprint = 0;
+    }
+    if (playing) {
+        pad_stick(g->sThumbRX, g->sThumbRY, &rx, &ry, 1);
+        double units = 4096.0 / 360.0 * dt;     /* game heading units per degree, this frame */
+        *look_dx = rx * g_cfg.pad_look_speed * units;
+        *look_dy = -ry * g_cfg.pad_look_speed_y * units * (g_cfg.pad_invert_y ? -1 : 1);
+    }
+    if (b || down) any_key_pressed = 1;
+    return b;
+}
+
 extern int g_cheat_god, g_cheat_infinite_ammo, g_cheat_no_reload;   /* decomp/cheats.c */
 static int reload_was_down, digit_was_down[10];
 
@@ -540,10 +696,14 @@ static void read_input(void) {
         if (down && !digit_was_down[d] && playing && !suppress_keys) g_weapon_request = d;
         digit_was_down[d] = down;
     }
-    if (suppress_keys) {                     /* keys still held from the settings panel */
-        if (b || key_down(VK_LBUTTON) || key_down(VK_RBUTTON)) { b = 0; dx = dy = 0; }
+    if (suppress_keys) {                     /* keys (or buttons) still held from the settings panel */
+        if (b || key_down(VK_LBUTTON) || key_down(VK_RBUTTON) || (pad_ok && (pad_st.Gamepad.wButtons || pad_st.Gamepad.bLeftTrigger > 64 ||
+                                                                            pad_st.Gamepad.bRightTrigger > 64))) { b = 0; dx = dy = 0; }
         else suppress_keys = 0;
     }
+    int pad_fire = 0;
+    double pad_dx = 0, pad_dy = 0;
+    if (focused && !suppress_keys) b |= pad_input(playing, &pad_fire, &pad_dx, &pad_dy);
     if (b) any_key_pressed = 1;
     g_input.mouse_present = 1;
     if (menu) {
@@ -557,7 +717,7 @@ static void read_input(void) {
         frac_x = frac_y = 0;
     } else {
         menu_acc_x = menu_acc_y = 0;
-        g_input.mouse_left = captured && !suppress_keys && key_down(VK_LBUTTON);
+        g_input.mouse_left = (captured && !suppress_keys && key_down(VK_LBUTTON)) || pad_fire;
         {   /* a click at a payphone uses it (savegame.c turns the shot off there) */
             static int was;
             if (g_input.mouse_left && !was && sg_at_payphone()) g_sg_use = 1;
@@ -566,6 +726,8 @@ static void read_input(void) {
         g_input.mouse_right = 0;
         g_input.mouse_dx += scaled(&frac_x, dx * 2.0 * g_cfg.sens_x);
         g_input.mouse_dy += scaled(&frac_y, dy * 2.0 * g_cfg.sens_y * (g_cfg.invert_y ? -1 : 1));
+        g_input.mouse_dx += scaled(&pad_fx, pad_dx);
+        g_input.mouse_dy += scaled(&pad_fy, pad_dy);
     }
     g_input.buttons = b;
     /* Don't build up a backlog of motion the game hasn't read. */
@@ -608,11 +770,11 @@ typedef struct {
 
 static const char *page_names[] = {"Mouse & game", "Video", "Audio", "Keys", "Saves", "Cheats"};
 #define NPAGES 6
-static MenuItem items[64];
+static MenuItem items[96];
 static int nitems;
 static int menu_page, menu_sel, menu_binding = -1, menu_bind_armed;
 static int was_captured;
-static RECT item_rect[64], tab_rect[NPAGES];
+static RECT item_rect[96], tab_rect[NPAGES];
 
 static const char *action_labels[ACT_COUNT] = {
     "Move forward", "Move back", "Strafe left", "Strafe right", "Sprint", "Quick search (L1)",
@@ -633,12 +795,20 @@ static void menu_build(void) {
              "The mouse moves menu cursors: left click = OK, right click = cancel.");
     add_item(0, IT_INT, "Menu cursor distance", &g_cfg.menu_mouse_step, 40, 800, 20,
              "Mouse movement per menu step. Lower = faster cursor.");
+    add_item(0, IT_BOOL, "Controller", &g_cfg.pad_enabled, 0, 1, 1,
+             "Xbox controllers (others through Steam). Buttons can be changed in resurv.ini, [controller].");
+    add_item(0, IT_INT, "Controller turn speed", &g_cfg.pad_look_speed, 50, 1000, 25, "Degrees per second with the right stick all the way over.");
+    add_item(0, IT_INT, "Controller look speed", &g_cfg.pad_look_speed_y, 50, 1000, 25, "Up and down, degrees per second at full tilt.");
+    add_item(0, IT_BOOL, "Controller invert look", &g_cfg.pad_invert_y, 0, 1, 1, "On: pushing the right stick up looks down.");
+    add_item(0, IT_INT, "Controller dead zone", &g_cfg.pad_deadzone, 0, 50, 1, "How much stick movement around the centre is ignored, in %.");
     add_item(0, IT_BOOL, "Skip intro", &g_cfg.skip_intro, 0, 1, 1, "Fast-forward the logos and warnings at startup.");
     add_item(1, IT_BOOL, "Fullscreen", &g_cfg.fullscreen, 0, 1, 1, "F11 or Alt+Enter also switches.");
     add_item(1, IT_SCALE, "Resolution", &g_cfg.resolution_scale, 1, 4, 1,
              "Internal rendering resolution. Higher is sharper and needs a faster PC.");
     add_item(1, IT_BOOL, "Widescreen (experimental)", &g_cfg.widescreen, 0, 1, 1,
              "16:9: a wider view of the 3D scene; the HUD keeps its shape. Some full-screen menus are stretched.");
+    add_item(1, IT_INT, "Brightness (%)", &g_cfg.brightness, 50, 200, 5,
+             "100 is as the PlayStation shows it. Higher lifts the dark parts of the picture.");
     add_item(1, IT_FOV, "Field of view", &g_cfg.field_of_view, 60, 110, 5,
              "How wide you see, across a 4:3 screen (widescreen adds more). Original is about 61 degrees.");
     add_item(2, IT_INT, "Master volume (%)", &g_cfg.volume, 0, 100, 5, "Everything: sound effects, voices and music.");
@@ -649,12 +819,17 @@ static void menu_build(void) {
              "Turns loud moments down smoothly instead of letting them distort (clip). Recommended.");
     add_item(2, IT_INT, "Same sound at once", &g_cfg.same_sound_limit, 0, 8, 1,
              "How many copies of one sound effect may play together (a swarm of bugs starts dozens). 0 = no limit, as on the PlayStation.");
+    add_item(1, IT_BOOL, "Perspective-correct textures", &g_cfg.perspective, 0, 1, 1,
+             "Textures stay straight on big walls and floors instead of bending and swimming as you move (the PlayStation can't do this).");
     add_item(1, IT_BOOL, "Steady 3D", &g_cfg.subpixel, 0, 1, 1, "Smoother geometry without the PlayStation wobble.");
     add_item(1, IT_BOOL, "Smooth scaling", &g_cfg.smooth_scaling, 0, 1, 1, "Smooth the picture when scaling it to the window.");
     add_item(1, IT_BOOL, "Depth fix", &g_cfg.depth_buffer, 0, 1, 1,
              "Keeps the back of a model from showing through its front (faces, legs), which shows at higher resolutions.");
     add_item(1, IT_BOOL, "Close model gaps", &g_cfg.gap_fill, 0, 1, 1,
              "Distant models show gaps between their parts at higher resolutions (flickering as they move): draw their small triangles a little larger.");
+    if (texpack_loaded())
+        add_item(1, IT_BOOL, "HD textures", &g_cfg.hd_textures, 0, 1, 1,
+                 "Draw the game's textures from the HD texture pack next to the game (shows at resolution 2x and up). F2 also switches.");
     add_item(1, IT_BOOL, "Upscale movies", &g_cfg.movie_upscaling, 0, 1, 1,
              "Movies are only 320x240: scale them up to the internal resolution smoothly, softening the compression blocks.");
     for (int a = 0; a < ACT_COUNT; a++)
@@ -690,7 +865,7 @@ static void apply_audio(void) {
 static void apply_settings(void) {
     apply_audio();
     g_opt_fov = g_cfg.field_of_view;
-    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; }
+    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
     rt_set_look_limit(g_cfg.look_limit);
     g_cheat_god = g_cfg.god_mode;
     g_cheat_infinite_ammo = g_cfg.infinite_ammo;
@@ -801,6 +976,7 @@ static void menu_toggle(void) {
     if (!menu_open) {
         menu_build();
         menu_open = 1;
+        menu_pad_fresh = 1;
         menu_sel = first_on_page(menu_page);
         menu_binding = -1;
         was_captured = captured;
@@ -890,6 +1066,7 @@ static int menu_message(UINT msg, WPARAM wp, LPARAM lp) {
         case VK_F11: return 0;
         case VK_F5: menu_toggle(); quick_save(); return 1;
         case VK_F9: menu_toggle(); quick_load(); return 1;
+        case VK_F2: toggle_hd_textures(); return 1;
         }
         return 1;
     case WM_MOUSEMOVE:
@@ -1004,9 +1181,50 @@ static void menu_draw(HDC dc) {
 }
 
 /* The game is paused in here while the panel is open. */
+static void menu_pad(void) {
+    static WORD prev;
+    static DWORD repeat_at;
+    pad_update();
+    WORD w = pad_ok ? pad_st.Gamepad.wButtons : 0;
+    if (pad_ok) {                                /* left stick as the d-pad */
+        double lx, ly;
+        pad_stick(pad_st.Gamepad.sThumbLX, pad_st.Gamepad.sThumbLY, &lx, &ly, 0);
+        if (ly > 0.5) w |= XINPUT_GAMEPAD_DPAD_UP;
+        if (ly < -0.5) w |= XINPUT_GAMEPAD_DPAD_DOWN;
+        if (lx < -0.5) w |= XINPUT_GAMEPAD_DPAD_LEFT;
+        if (lx > 0.5) w |= XINPUT_GAMEPAD_DPAD_RIGHT;
+    }
+    if (menu_pad_fresh) { prev = w; menu_pad_fresh = 0; return; }
+    WORD press = w & ~prev;
+    const WORD dirs = XINPUT_GAMEPAD_DPAD_UP | XINPUT_GAMEPAD_DPAD_DOWN | XINPUT_GAMEPAD_DPAD_LEFT | XINPUT_GAMEPAD_DPAD_RIGHT;
+    DWORD now = GetTickCount();
+    if (press & dirs) repeat_at = now + 350;
+    else if ((w & dirs) && (int32_t)(now - repeat_at) >= 0) { press |= w & dirs; repeat_at = now + 90; }
+    prev = w;
+    if (!press) return;
+    if (menu_binding >= 0) {                     /* picking a key: B cancels */
+        if (press & XINPUT_GAMEPAD_B) menu_binding = -1;
+        return;
+    }
+    int adjustable = items[menu_sel].type != IT_KEY && items[menu_sel].type != IT_ACTION;
+    if (press & XINPUT_GAMEPAD_DPAD_UP) menu_move(-1);
+    if (press & XINPUT_GAMEPAD_DPAD_DOWN) menu_move(1);
+    if ((press & XINPUT_GAMEPAD_DPAD_LEFT) && adjustable) change(menu_sel, -1);
+    if ((press & XINPUT_GAMEPAD_DPAD_RIGHT) && adjustable) change(menu_sel, 1);
+    if (press & XINPUT_GAMEPAD_A) change(menu_sel, 1);
+    if (press & XINPUT_GAMEPAD_LEFT_SHOULDER) menu_set_page(menu_page - 1);
+    if (press & XINPUT_GAMEPAD_RIGHT_SHOULDER) menu_set_page(menu_page + 1);
+    if ((press & (XINPUT_GAMEPAD_B | XINPUT_GAMEPAD_START)) ||
+        ((press & (XINPUT_GAMEPAD_LEFT_THUMB | XINPUT_GAMEPAD_RIGHT_THUMB)) &&
+         (w & XINPUT_GAMEPAD_LEFT_THUMB) && (w & XINPUT_GAMEPAD_RIGHT_THUMB)))
+        menu_toggle();
+}
+
 static void menu_run(void) {
     while (menu_open && !quit) {
         pump();
+        menu_pad();
+        if (!menu_open) break;
         if (menu_binding >= 0 && GetForegroundWindow() == hwnd) poll_binding();
         RECT cr;
         GetClientRect(hwnd, &cr);
@@ -1042,17 +1260,24 @@ void plat_frame(void) {
     /* Fast start: run the boot (disc check, logos, warnings) flat out until
      * just before the title screen, unless a key is pressed. The boot takes
      * the same number of frames on every machine. */
+    pad_update();
+    {   /* L3 + R3: the settings panel */
+        static int was;
+        int both = pad_down(XINPUT_GAMEPAD_LEFT_THUMB) && pad_down(XINPUT_GAMEPAD_RIGHT_THUMB);
+        if (both && !was && !menu_open) { menu_toggle(); pad_sprint = 0; }
+        was = both;
+    }
     int fast = g_cfg.skip_intro && g_frame < 1560 && !any_key_pressed;
     /* Space held during a door / room change: run it at full speed. The
      * room-change sequence (func_8009016C) keeps its step in 0x800B3D2C
      * (1-14) while it runs. */
     {
         int16_t step = (int16_t)MEM_R16(0x800B3D2C);
-        if (step >= 1 && step <= 14 && GetForegroundWindow() == hwnd && key_down(VK_SPACE)) fast = 1;
+        if (step >= 1 && step <= 14 && ff_held()) fast = 1;
     }
     /* Space held during a cutscene or a movie: fast-forward it. */
     cutscene_frames = in_cutscene() ? cutscene_frames + 1 : 0;
-    if (cutscene_frames && GetForegroundWindow() == hwnd && key_down(VK_SPACE)) fast = 1;
+    if (cutscene_frames && ff_held()) fast = 1;
     LARGE_INTEGER t0, t1;
     QueryPerformanceCounter(&t0);
     {   /* how long the game took since the last frame (for the log) */
@@ -1061,7 +1286,11 @@ void plat_frame(void) {
             if (ms > slow_frame_ms) slow_frame_ms = ms;
         }
     }
-    if (!fast || g_frame % 30 == 0) {
+    /* fast-forwarding: still shown 60 times a second (wall clock), however
+     * many game frames that is */
+    static LARGE_INTEGER last_paint;
+    if (!fast || t0.QuadPart - last_paint.QuadPart >= qpf.QuadPart / 60) {
+        last_paint = t0;
         display_grab_bgrx(frame_buf, &frame_w, &frame_h);
         HDC dc = GetDC(hwnd);
         paint(dc);
@@ -1118,6 +1347,14 @@ void plat_fatal(const char *msg) {
     MessageBoxA(hwnd, text, "RESPeCt", MB_ICONERROR);
 }
 
+/* HD texture pack: see setup_win32.c (a folder next to the exe, or the
+ * archive it came in, or where the texture_pack setting says). */
+int setup_texture_pack(HWND owner, const char *configured, char *out, size_t n);
+static void open_texture_pack(void) {
+    char dir[MAX_PATH * 2];
+    if (setup_texture_pack(hwnd, g_cfg.texture_pack, dir, sizeof dir)) texpack_open(dir);
+}
+
 /* Disc image: see setup_win32.c. */
 int setup_find_disc(HWND owner, const char *arg, const char *ini, char *path, size_t n);
 static int find_disc(char *path, size_t n, const char *cmdline_arg) {
@@ -1156,7 +1393,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         g_cheat_infinite_ammo = g_cfg.infinite_ammo;
         g_cheat_no_reload = g_cfg.no_reload;
         g_opt_fov = g_cfg.field_of_view;
-    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; }
+    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
         apply_audio();
         games_dir();
         pick_latest_slot();
@@ -1202,6 +1439,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         if (sl) sl[1] = 0;
         card_set_dir(dir);
     }
+    open_texture_pack();
     audio_init();
     if (!rt_boot(disc)) {
         char msg[512];

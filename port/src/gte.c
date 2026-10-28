@@ -684,19 +684,26 @@ int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z) {
         }
     }
     Precise *b = pcache[phash(word)];
+    /* The game may take several vblanks to build a frame (20 or 15 fps
+     * in busy scenes) before the GPU draws it, so entries stay valid for a
+     * few vblanks. The newest projection of the word wins; if another one
+     * at a different depth is about too, the corner isn't certain (its
+     * depth is left out of perspective texturing). */
+    int best = -1;
     for (int i = 0; i < PWAYS; i++) {
-        /* The game may take several vblanks to build a frame (20 or 15 fps
-         * in busy scenes) before the GPU draws it, so entries stay valid
-         * for a few vblanks; a newer projection of the same word replaces
-         * them. */
         if (b[i].word != word || !b[i].gen || b[i].gen + 6 < pgen) continue;
-        if (z) *z = b[i].z;
+        if (best < 0 || b[i].gen > b[best].gen) best = i;
+    }
+    if (best >= 0) {
+        if (z) *z = b[best].z;
         st_hash++;
-        for (int j = i + 1; j < PWAYS; j++)
-            if (b[j].word == word && b[j].gen && b[j].gen + 6 >= pgen && fabsf(b[j].z - b[i].z) > 16) { st_hash_amb++; break; }
-        *x = b[i].x;
-        *y = b[i].y;
-        return 2;
+        int amb = 0;
+        for (int j = 0; j < PWAYS; j++)
+            if (j != best && b[j].word == word && b[j].gen && b[j].gen + 6 >= pgen && fabsf(b[j].z - b[best].z) > 16) amb = 1;
+        st_hash_amb += amb;
+        *x = b[best].x;
+        *y = b[best].y;
+        return amb ? 1 : 2;
     }
     st_miss++;
     return 0;

@@ -48,8 +48,12 @@ static double g_overlap = 0.75;                 /* PS1 pixels (RT_OVERLAP) */
 static float g_depth_tol = 24;                  /* touching surfaces keep the PS1's order (RT_DEPTH_TOL) */
 static int g_fill_mark, g_sliver_mark;                          /* testing: RT_FILL_MARK fills the screen magenta (gaps show) */
 static int g_depth_any;                          /* testing: RT_DEPTH_ANY hides any model behind any */
+static int g_far_page = 1;                       /* RT_FAR_PAGE=0: off */
+static float g_cross_tol = 128;                  /* another object: hidden this far behind (RT_CROSS_TOL; 0 = never) */
 static double g_margin_len = 6;                  /* longest edge (PS1 pixels) of a triangle given the gap margin; RT_MARGIN_LEN */
-int g_gap_fill = 1;                             /* Close model gaps (setting) */                                 /* testing: RT_TEX_EDGE samples the far texel edge too */
+int g_gap_fill = 1; 
+int g_persp = 1;                                /* Perspective-correct textures (setting) */
+                            /* Close model gaps (setting) */                                 /* testing: RT_TEX_EDGE samples the far texel edge too */
 static float *zbuf;
 /* What wrote each depth: the texture page and CLUT (a model part and its
  * own triangles share both). The Depth fix hides a model's own back behind
@@ -135,6 +139,80 @@ static inline void shade(const RPrim *p, uint16_t *d, int x, int y, int r, int g
         }
         put(d, (uint16_t)((r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10)), p->semi, p);
     }
+}
+
+/* HD texture pack image at texel position (U, V) (texture page texels,
+ * fractions included): bilinear between the opaque and semi-transparent
+ * pixels around it; the nearest one says transparent or not (alpha
+ * under 1/4) and semi-transparent or not (under 3/4: the STP bit).
+ * 0: transparent. */
+/* lo/hi: the texels the polygon maps (hi one past the last); filtering
+ * stays inside them, as a PS1 texture's tiles are cut from a sheet of
+ * others (a neighbour's dark edge would show as lines along every tile). */
+static inline int hd_texel(const RPrim *p, float U, float V, const float *lo, float *rgb, int *stp) {
+    const HdImg *im = p->hd;
+    float fx = p->hd_ox + U * p->hd_kx, fy = p->hd_oy + V * p->hd_ky;
+    int w = im->w, h = im->h;
+    int nx = (int)fx, ny = (int)fy;
+    nx = nx < 0 ? 0 : nx >= w ? w - 1 : nx;
+    ny = ny < 0 ? 0 : ny >= h ? h - 1 : ny;
+    uint32_t c = im->px[(size_t)ny * w + nx];
+    int a = (int)(c >> 24);
+    if (a < 64) return 0;
+    {
+        float x_lo = p->hd_ox + lo[0] * p->hd_kx + 0.5f, x_hi = p->hd_ox + lo[1] * p->hd_kx - 0.5f;
+        float y_lo = p->hd_oy + lo[2] * p->hd_ky + 0.5f, y_hi = p->hd_oy + lo[3] * p->hd_ky - 0.5f;
+        if (x_hi >= x_lo) fx = fx < x_lo ? x_lo : fx > x_hi ? x_hi : fx;
+        if (y_hi >= y_lo) fy = fy < y_lo ? y_lo : fy > y_hi ? y_hi : fy;
+    }
+    fx -= 0.5f; fy -= 0.5f;
+    int x0 = (int)floorf(fx), y0 = (int)floorf(fy);
+    float ax = fx - (float)x0, ay = fy - (float)y0;
+    int xa = x0 < 0 ? 0 : x0 >= w ? w - 1 : x0, xb = x0 + 1 < 0 ? 0 : x0 + 1 >= w ? w - 1 : x0 + 1;
+    int ya = y0 < 0 ? 0 : y0 >= h ? h - 1 : y0, yb = y0 + 1 < 0 ? 0 : y0 + 1 >= h ? h - 1 : y0 + 1;
+    uint32_t q[4] = {im->px[(size_t)ya * w + xa], im->px[(size_t)ya * w + xb], im->px[(size_t)yb * w + xa], im->px[(size_t)yb * w + xb]};
+    float wt[4] = {(1 - ax) * (1 - ay), ax * (1 - ay), (1 - ax) * ay, ax * ay};
+    float r = 0, g = 0, b = 0, sum = 0;
+    for (int i = 0; i < 4; i++) {
+        if ((q[i] >> 24) < 64) continue;
+        r += wt[i] * (float)(q[i] & 0xFF);
+        g += wt[i] * (float)((q[i] >> 8) & 0xFF);
+        b += wt[i] * (float)((q[i] >> 16) & 0xFF);
+        sum += wt[i];
+    }
+    if (sum <= 0) { r = (float)(c & 0xFF); g = (float)((c >> 8) & 0xFF); b = (float)((c >> 16) & 0xFF); sum = 1; }
+    rgb[0] = r / sum; rgb[1] = g / sum; rgb[2] = b / sum;
+    *stp = a < 192;
+    return 1;
+}
+
+/* 4x4 ordered dither, in 1/16ths of a 5-bit step */
+static const uint8_t bayer4[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+
+/* An HD texel, lit, to the 15-bit picture. The light is applied to the
+ * image's full 8-bit colour and the result dithered down (finely, at the
+ * high resolution): rounded to the PS1's 5 bits first, a smooth HD
+ * texture under the game's shading shows hard bands, dark contour lines
+ * that crawl as the light on a surface changes. */
+static inline void shade_hd(const RPrim *p, uint16_t *d, int r, int g, int b, float U, float V, const float *lo, int x, int y) {
+    float c[3];
+    int stp;
+    if (!hd_texel(p, U, V, lo, c, &stp)) return;
+    /* blended where the game's own texel is (its STP bit): packs made for
+     * Beetle PSX mostly leave alpha at 255, which would make a game's
+     * see-through glows and glass solid */
+    if (p->semi && !stp && (texel(p, (int)U, (int)V) & 0x8000)) stp = 1;
+    if (!p->raw) {
+        c[0] *= (float)r * (1.0f / 128); c[1] *= (float)g * (1.0f / 128); c[2] *= (float)b * (1.0f / 128);
+    }
+    /* 0..255 to 0..31 with the dither's fraction added */
+    float dt = ((float)bayer4[y & 3][x & 3] + 0.5f) * (1.0f / 16);
+    int o[3];
+    for (int i = 0; i < 3; i++) {
+        int v = (int)(c[i] * (31.0f / 255.0f) + dt);
+        o[i] = v < 0 ? 0 : v > 31 ? 31 : v;
+    }
+    put(d, (uint16_t)((stp ? 0x8000 : 0) | o[0] | (o[1] << 5) | (o[2] << 10)), p->semi && stp, p);
 }
 
 /* ------------------------------------------------------------ triangles */
@@ -277,6 +355,25 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                               : 0xFFFFFFFFu;
     Plane pw = {0};
     if (zuse) pw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
+    /* Perspective-correct textures (a 3D polygon, every corner's depth
+     * known): the PS1 interpolates u and v straight across the screen,
+     * which bends a texture's straight lines across big polygons and makes
+     * them swim as the view moves; sharp HD textures show it most. */
+    int persp = g_persp && p->textured && p->zt == 2 && v[0].z > 0 && v[1].z > 0 && v[2].z > 0;
+    Plane qw = {0}, qu = {0}, qv = {0};
+    if (persp) {
+        qw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
+        qu = plane(Xd, Yd, v[0].u / v[0].z, v[1].u / v[1].z, v[2].u / v[2].z);
+        qv = plane(Xd, Yd, v[0].v / v[0].z, v[1].v / v[1].z, v[2].v / v[2].z);
+        static int pl = -1;
+        if (pl < 0) pl = getenv("RT_PERSP_LOG") != NULL;
+        if (pl) {
+            double zmin = fmin(v[0].z, fmin(v[1].z, v[2].z)), zmax = fmax(v[0].z, fmax(v[1].z, v[2].z));
+            if (zmax > zmin * 1.5)
+                rt_log("persp: tp %d,%d z %.0f %.0f %.0f xy (%.1f,%.1f) (%.1f,%.1f) (%.1f,%.1f) uv (%d,%d) (%d,%d) (%d,%d)", p->tx, p->ty, v[0].z, v[1].z, v[2].z,
+                       v[0].x, v[0].y, v[1].x, v[1].y, v[2].x, v[2].y, v[0].u, v[0].v, v[1].u, v[1].v, v[2].u, v[2].v);
+        }
+    }
     const int32_t one = 65536;
     int32_t dr = (int32_t)(pr.a * one), dg = (int32_t)(pg.a * one), db = (int32_t)(pb.a * one);
     int32_t du = (int32_t)(pu.a * one), dv = (int32_t)(pv.a * one);
@@ -301,7 +398,17 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
         float *zrow = zuse ? zbuf + (size_t)y * t->stride : NULL;
         uint32_t *idrow = zuse ? zid + (size_t)y * t->stride : NULL;
         double wz = zuse ? pw.a * x0 + pw.b * y + pw.c : 0;
-        for (int x = x0; x <= x1; x++, wz += pw.a) {
+        double qwv = 0, quv = 0, qvv = 0;
+        if (persp) {
+            /* sampled at the pixel's centre, as the affine values are */
+            qwv = qw.a * x0 + qw.b * y + qw.c; quv = qu.a * x0 + qu.b * y + qu.c; qvv = qv.a * x0 + qv.b * y + qv.c;
+        }
+        for (int x = x0; x <= x1; x++, wz += pw.a, qwv += qw.a, quv += qu.a, qvv += qv.a) {
+            if (persp && qwv > 0) {
+                double iz = 1.0 / qwv;
+                u = (int32_t)(quv * iz * one) + one / 1024;
+                vv = (int32_t)(qvv * iz * one) + one / 1024;
+            }
             int core = w[0] + bias[0] >= 0 && w[1] + bias[1] >= 0 && w[2] + bias[2] >= 0;
             if (g_margin_log && !core && margin > 0 && w[0] + mbias[0] >= 0 && w[1] + mbias[1] >= 0 && w[2] + mbias[2] >= 0) {
                 float r = zrow[x] / (float)wz;
@@ -312,7 +419,7 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                 (!guarded || g_margin_any || zrow[x] == 0 || 1.0f / zrow[x] - 1.0f / (float)wz > g_margin_depth))
                 core = 2;                                 /* margin, over something well behind */
             if (g_zp_on && x == g_zp_x && (y == g_zp_y || y == g_zp_y + 256 * s) && g_frame >= g_zp_f)
-                rt_log("zprobe: tp %d,%d clut %d,%d semi %d core %d zt %d z %.1f zs %.1f zwrite %d v (%.1f,%.1f %.0f) (%.1f,%.1f %.0f) (%.1f,%.1f %.0f)", p->tx, p->ty, p->clut_x, p->clut_y, p->semi, core, ztest,
+                rt_log("zprobe: [pzt %d zb %d hr %d s %d] tp %d,%d clut %d,%d semi %d core %d zt %d z %.1f zs %.1f zwrite %d v (%.1f,%.1f %.0f) (%.1f,%.1f %.0f) (%.1f,%.1f %.0f)", p->zt, zbuf != NULL, t->buf == hires, s, p->tx, p->ty, p->clut_x, p->clut_y, p->semi, core, ztest,
                        zuse ? 1.0 / wz : 0.0, zuse && zrow[x] ? 1.0 / zrow[x] : 0.0, zwrite, v[0].x, v[0].y, v[0].z, v[1].x, v[1].y, v[1].z, v[2].x, v[2].y, v[2].z);
             if (core) {
                 int tu = u >> 16, tv = vv >> 16;
@@ -327,11 +434,25 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                      * the game drew on top on purpose (reflections in
                      * water are models under the floor). */
                     float zs = zrow[x];
-                    if ((float)wz > zs * 0.88f && (float)wz < zs && (idrow[x] == id || g_depth_any)) {
+                    if ((float)wz > zs * 0.88f && (float)wz < zs) {
                         float behind = 1.0f / (float)wz - 1.0f / zs;   /* in GTE depth units */
                         float tol = 0.004f / zs;
                         if (tol < g_depth_tol) tol = g_depth_tol;
-                        if (behind > tol) goto next;
+                        if (behind > tol && (idrow[x] == id || g_depth_any)) goto next;
+                        /* Another object's surface well in front (the
+                         * PS1 sorts whole polygons, so a stair rail can
+                         * come after the ceiling it's behind): hidden
+                         * too. Not translucent things (shadows, glows)
+                         * or decals a little into their wall. */
+                        if (g_cross_tol > 0 && !p->semi && behind > g_cross_tol && behind > tol) goto next;
+                    } else if (g_far_page && (float)wz <= zs * 0.88f && !p->semi && id != 0xFFFFFFFFu &&
+                               idrow[x] != 0xFFFFFFFFu && ((idrow[x] ^ id) & 0x1F) == 0) {
+                        /* Far behind a surface on the same texture page:
+                         * the room's own walls and ceiling, with more of
+                         * the room behind them (a stair rail on the floor
+                         * above). Models under the floor (reflections)
+                         * have their own pages and are still drawn. */
+                        goto next;
                     }
                     if (zwrite && core == 1 && !p->semi && (!p->textured || texel(p, tu, tv))) { zrow[x] = (float)wz; idrow[x] = id; }
                 }
@@ -343,7 +464,15 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                     cb = cb < 0 ? 0 : cb > 255 ? 255 : cb;
                 }
                 if (g_sliver_mark && zuse && !zwrite) { row[x] = core == 2 ? 0x03E0 : 0x001F; goto next; }
-                shade(p, row + x, x, y, cr, cg, cb, tu, tv, dith);
+                if (p->hd) {
+                    float U = (float)u * (1.0f / 65536), V = (float)vv * (1.0f / 65536);
+                    float ulo = (float)umin, uhi = (float)umax + 0.999f, vlo = (float)vmin, vhi = (float)vmax + 0.999f;
+                    U = U < ulo ? ulo : U > uhi ? uhi : U;
+                    V = V < vlo ? vlo : V > vhi ? vhi : V;
+                    const float lo[4] = {ulo, (float)umax + 1, vlo, (float)vmax + 1};
+                    shade_hd(p, row + x, cr, cg, cb, U, V, lo, x, y);
+                } else
+                    shade(p, row + x, x, y, cr, cg, cb, tu, tv, dith);
             }
         next:
             w[0] += sx[0]; w[1] += sx[1]; w[2] += sx[2];
@@ -385,7 +514,16 @@ static void raster_rect(const Target *t, int band0, int band1, const RPrim *p) {
             if (sqk > 0 && (i < 0 || i >= p->w)) continue;
             int u = p->flipx ? p->v[0].u - i : p->v[0].u + i;
             int v = p->flipy ? p->v[0].v - j : p->v[0].v + j;
-            shade(p, row + x, x, y, r, g, b, u, v, 0);
+            if (p->hd) {
+                float fi = sqk > 0 ? (float)((x + 0.5 - sq0) * sqk) : (float)(x - x0 + 0.5f) / (float)s;
+                float fj = (float)(y - y0 + 0.5f) / (float)s;
+                fi -= (float)i; fj -= (float)j;                          /* within the texel */
+                int u0 = p->v[0].u, v0 = p->v[0].v;
+                const float lo[4] = {(float)(p->flipx ? u0 - p->w + 1 : u0), (float)(p->flipx ? u0 + 1 : u0 + p->w),
+                                     (float)(p->flipy ? v0 - p->h + 1 : v0), (float)(p->flipy ? v0 + 1 : v0 + p->h)};
+                shade_hd(p, row + x, r, g, b, (float)u + (p->flipx ? 1 - fi : fi), (float)v + (p->flipy ? 1 - fj : fj), lo, x, y);
+            } else
+                shade(p, row + x, x, y, r, g, b, u, v, 0);
         }
     }
 }
@@ -598,6 +736,7 @@ void render_sync(void) {
     nq = 0;
     memset(tex_tiles, 0, sizeof tex_tiles);
     memset(drawn_tiles, 0, sizeof drawn_tiles);
+    texpack_frame();
 }
 
 /* ------------------------------------------------------------ API */
@@ -623,6 +762,8 @@ void render_init(int scale, int threads) {
     g_margin_any = getenv("RT_MARGIN_ANY") != NULL;
     if (getenv("RT_NO_GAP_FILL")) g_gap_fill = 0;
     if (getenv("RT_DEPTH_TOL")) g_depth_tol = (float)atof(getenv("RT_DEPTH_TOL"));
+    if (getenv("RT_FAR_PAGE")) g_far_page = atoi(getenv("RT_FAR_PAGE"));
+    if (getenv("RT_CROSS_TOL")) g_cross_tol = (float)atof(getenv("RT_CROSS_TOL"));
     g_margin_log = getenv("RT_MARGIN_LOG") != NULL;
     if (getenv("RT_MARGIN_DEPTH")) g_margin_depth = (float)atof(getenv("RT_MARGIN_DEPTH"));
     if (getenv("RT_MARGIN_AREA")) g_margin_area = atof(getenv("RT_MARGIN_AREA"));
@@ -655,6 +796,7 @@ static void upscale_from_native(void) {
 /* After loading a save: the high-res VRAM starts again from the PS1's. */
 void render_reload(void) {
     render_sync();
+    texpack_reload();
     if (S > 1) upscale_from_native();
     if (zbuf) memset(zbuf, 0, (size_t)1024 * S * 512 * S * sizeof *zbuf);
     if (bare) memset(bare, 0, hires_n);
@@ -805,6 +947,38 @@ void render_prim(const RPrim *p) {
         Op *o = push_op();
         o->op = OP_PRIM;
         o->prim = *p;
+        if (p->textured) {
+            /* the texels drawn: a triangle's largest u and v aren't (see
+             * raster_tri), so they don't count when finding the upload */
+            RPrim q = *p;
+            if (q.kind == RP_TRI) {
+                int um = 0, vm = 0, un = 255, vn = 255;
+                for (int i = 0; i < 3; i++) {
+                    um = q.v[i].u > um ? q.v[i].u : um; un = q.v[i].u < un ? q.v[i].u : un;
+                    vm = q.v[i].v > vm ? q.v[i].v : vm; vn = q.v[i].v < vn ? q.v[i].v : vn;
+                }
+                for (int i = 0; i < 3; i++) {
+                    if (um > un && q.v[i].u == um) q.v[i].u--;
+                    if (vm > vn && q.v[i].v == vm) q.v[i].v--;
+                }
+            }
+            int ax, ay, aw, ah;
+            tex_area(&q, &ax, &ay, &aw, &ah);
+            if (aw == 1024 || ah == 512) {           /* past the edge of VRAM: what's left of it */
+                int sh = q.depth == 0 ? 2 : q.depth == 1 ? 1 : 0, un = 255, um = 0, vn = 255, vm = 0;
+                int n = q.kind == RP_RECT ? 1 : 3;
+                for (int i = 0; i < n; i++) {
+                    un = q.v[i].u < un ? q.v[i].u : un; um = q.v[i].u > um ? q.v[i].u : um;
+                    vn = q.v[i].v < vn ? q.v[i].v : vn; vm = q.v[i].v > vm ? q.v[i].v : vm;
+                }
+                if (q.kind == RP_RECT) { um = un + q.w - 1; vm = vn + q.h - 1; }
+                if (!q.twmx && !q.twmy && un >= 0 && vn >= 0 && um <= 255 && vm <= 255) {
+                    ax = q.tx + (un >> sh); aw = (q.tx + (um >> sh) > 1023 ? 1023 : q.tx + (um >> sh)) - ax + 1;
+                    ay = q.ty + vn; ah = (q.ty + vm > 511 ? 511 : q.ty + vm) - ay + 1;
+                }
+            }
+            texpack_attach(&o->prim, ax, ay, aw, ah);
+        }
         static int sync_each = -1;
         if (sync_each < 0) sync_each = getenv("RT_SYNC_EACH") != NULL;
         if (sync_each) { render_sync(); return; }
@@ -818,6 +992,7 @@ void render_prim(const RPrim *p) {
 }
 
 void render_fill(int x, int y, int w, int h, uint16_t color) {
+    texpack_fill(x, y, w, h);
     if (S > 1 && tiles_hit(x, y, w, h)) render_sync();
     for (int j = 0; j < h; j++)
         for (int i = 0; i < w; i++) g_vram[(y + j) & 511][(x + i) & 1023] = g_fill_mark && S == 1 && w >= 256 ? 0x7C1F : color;
@@ -833,6 +1008,7 @@ void render_copy(int sx, int sy, int dx, int dy, int w, int h, int mask_set, int
     static uint16_t tmp[1024];
     { static int cl = -1; if (cl < 0) cl = getenv("RT_COPYLOG") != NULL; if (cl) rt_log("copy %d,%d -> %d,%d %dx%d", sx, sy, dx, dy, w, h); }
     render_sync();
+    texpack_copy(sx, sy, dx, dy, w, h);
     for (int j = 0; j < h; j++) {
         for (int i = 0; i < w; i++) tmp[i] = g_vram[(sy + j) & 511][(sx + i) & 1023];
         for (int i = 0; i < w; i++) {
@@ -872,6 +1048,7 @@ void render_before_write(int x, int y, int w, int h) {
 }
 
 void render_uploaded(int x, int y, int w, int h) {
+    texpack_upload(x, y, w, h);
     if (S == 1) return;
     drawn_mark(x & 1023, y & 511, w, h);
     Op *o = push_op();

@@ -113,6 +113,7 @@ static void visit_all(StateIO *io) {
     card_state(io);
     thread_state(io);
     decomp_state(io);
+    { void texpack_state(StateIO *io); texpack_state(io); }
 }
 
 /* ------------------------------------------------------------ requests */

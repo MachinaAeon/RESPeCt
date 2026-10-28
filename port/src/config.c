@@ -64,6 +64,10 @@ static const char *default_ini =
     "; Field of view in degrees across a 4:3 screen (widescreen adds to it).\n"
     "; 0 = the game's own, about 61. Wider shows more but makes things smaller.\n"
     "field_of_view = 0\n"
+    "; Brightness in % (50-200; 100 = as on the PlayStation). Higher lifts dark areas.\n"
+    "brightness = 100\n"
+    "; Perspective-correct textures: no bending or swimming across big polygons.\n"
+    "perspective = 1\n"
     "; Smoother, steadier 3D geometry (less PlayStation wobble).\n"
     "subpixel = 1\n"
     "; Smooth the picture when scaling it to the window (0 = sharp pixels).\n"
@@ -76,6 +80,15 @@ static const char *default_ini =
     "; Close the gaps distant models show at higher resolutions (they open and shut\n"
     "; as models move: flicker) by drawing their small triangles a little larger.\n"
     "gap_fill = 1\n"
+    "; HD texture pack (Beetle PSX HW format: <hash>-<hash>.png images): use it if\n"
+    "; there is one. Put the pack's folder, or the .rar/.zip/.7z it came in, next to\n"
+    "; the exe (an archive is unpacked into a \"textures\" folder the first time).\n"
+    "hd_textures = 1\n"
+    "; Where the pack is, if it's somewhere else: a folder (such as RetroArch's copy)\n"
+    "; or an archive. Empty = look next to the exe.\n"
+    "texture_pack =\n"
+    "; Memory kept for HD textures, in MB.\n"
+    "hd_texture_memory = 1536\n"
     "\n"
     "[audio]\n"
     "; Volumes, 0-100 (%): everything, music and speech from the disc, sound effects.\n"
@@ -86,6 +99,36 @@ static const char *default_ini =
     "limiter = 1\n"
     "; At most this many copies of one sound effect at a time (0 = no limit).\n"
     "same_sound_limit = 3\n"
+    "\n"
+    "[controller]\n"
+    "; Xbox-style controllers (and others through Steam Input). Left stick or\n"
+    "; d-pad: move and strafe (menus: move the cursor); right stick: look.\n"
+    "controller = 1\n"
+    "; Turning and looking speed at full tilt, in degrees per second.\n"
+    "look_speed = 400\n"
+    "look_speed_y = 280\n"
+    "; 1 = pushing the right stick up looks down.\n"
+    "pad_invert_y = 0\n"
+    "; How much of the sticks' travel is ignored around the centre, in %.\n"
+    "deadzone = 20\n"
+    "; L3 + R3 opens the settings (LB/RB: pages, d-pad: choose and change,\n"
+    "; A: change, B: close). Hold A to fast-forward cutscenes and doors.\n"
+    "; What each button does: cross (OK, run), square (cancel), circle, triangle,\n"
+    "; start, select, r1, l2, r2, quick_search, sprint, reload, fire,\n"
+    "; next_weapon, prev_weapon, or none. sprint is a toggle: it stays on\n"
+    "; until you stop moving.\n"
+    "button_a = cross\n"
+    "button_b = square\n"
+    "button_x = reload\n"
+    "button_y = triangle\n"
+    "button_lb = prev_weapon\n"
+    "button_rb = next_weapon\n"
+    "button_lt = quick_search\n"
+    "button_rt = fire\n"
+    "button_back = select\n"
+    "button_start = start\n"
+    "button_l3 = sprint\n"
+    "button_r3 = circle\n"
     "\n"
     "[game]\n"
     "; Fast-forward the logos, warnings and disc check at startup.\n"
@@ -107,6 +150,8 @@ static const char *action_names[ACT_COUNT] = {
 static void set_defaults(void) {
     memset(&g_cfg, 0, sizeof g_cfg);
     g_cfg.sens_x = g_cfg.sens_y = 1.0f;
+    g_cfg.brightness = 100;
+    g_cfg.perspective = 1;
     g_cfg.look_limit = 67;
     g_cfg.menu_mouse = 1;
     g_cfg.menu_mouse_step = 240;
@@ -117,13 +162,25 @@ static void set_defaults(void) {
     g_cfg.movie_upscaling = 1;
     g_cfg.depth_buffer = 1;
     g_cfg.gap_fill = 1;
+    g_cfg.hd_textures = 1;
+    g_cfg.hd_texture_memory = 1536;
     g_cfg.skip_intro = 0;
     g_cfg.volume = 100;
     g_cfg.music_volume = 100;
     g_cfg.sfx_volume = 100;
     g_cfg.limiter = 1;
     g_cfg.same_sound_limit = 3;
+    g_cfg.pad_enabled = 1;
+    g_cfg.pad_look_speed = 400;
+    g_cfg.pad_look_speed_y = 280;
+    g_cfg.pad_deadzone = 20;
+    static const char *def[PADB_COUNT] = {"cross", "square", "reload", "triangle", "prev_weapon", "next_weapon",
+                                          "quick_search", "fire", "select", "start", "sprint", "circle"};
+    for (int i = 0; i < PADB_COUNT; i++) snprintf(g_cfg.pad_bind[i], sizeof g_cfg.pad_bind[i], "%s", def[i]);
 }
+
+const char *g_pad_button_names[PADB_COUNT] = {"button_a", "button_b", "button_x", "button_y", "button_lb", "button_rb",
+                                              "button_lt", "button_rt", "button_back", "button_start", "button_l3", "button_r3"};
 
 /* Split off the next piece of *s up to sep (portable strtok_r). */
 static char *next_tok(char **s, char sep) {
@@ -156,9 +213,23 @@ static void parse_line(const char *section, char *key, char *val) {
         }
         return;
     }
+    if (!strcmp(key, "texture_pack")) {
+        char *v = trim(val);
+        size_t n = strlen(v);
+        if (n >= 2 && v[0] == '"' && v[n - 1] == '"') { v[n - 1] = 0; v++; }
+        snprintf(g_cfg.texture_pack, sizeof g_cfg.texture_pack, "%s", v);
+        return;
+    }
     double d = atof(val);
     int i = atoi(val);
-    if (!strcmp(key, "sensitivity_x")) g_cfg.sens_x = (float)d;
+    for (int b = 0; b < PADB_COUNT; b++)
+        if (!strcmp(key, g_pad_button_names[b])) { snprintf(g_cfg.pad_bind[b], sizeof g_cfg.pad_bind[b], "%s", trim(val)); return; }
+    if (!strcmp(key, "controller")) g_cfg.pad_enabled = i;
+    else if (!strcmp(key, "look_speed")) g_cfg.pad_look_speed = i == 200 ? 400 : i;      /* 200/140: the first test build's */
+    else if (!strcmp(key, "look_speed_y")) g_cfg.pad_look_speed_y = i == 140 ? 280 : i;
+    else if (!strcmp(key, "pad_invert_y")) g_cfg.pad_invert_y = i;
+    else if (!strcmp(key, "deadzone")) g_cfg.pad_deadzone = i < 0 ? 0 : i > 90 ? 90 : i;
+    else if (!strcmp(key, "sensitivity_x")) g_cfg.sens_x = (float)d;
     else if (!strcmp(key, "sensitivity_y")) g_cfg.sens_y = (float)d;
     else if (!strcmp(key, "invert_y")) g_cfg.invert_y = i;
     else if (!strcmp(key, "look_limit")) g_cfg.look_limit = i;
@@ -172,11 +243,15 @@ static void parse_line(const char *section, char *key, char *val) {
     else if (!strcmp(key, "movie_upscaling")) g_cfg.movie_upscaling = i;
     else if (!strcmp(key, "depth_buffer")) g_cfg.depth_buffer = i;
     else if (!strcmp(key, "gap_fill")) g_cfg.gap_fill = i;
+    else if (!strcmp(key, "hd_textures")) g_cfg.hd_textures = i;
+    else if (!strcmp(key, "hd_texture_memory")) g_cfg.hd_texture_memory = i < 256 ? 256 : i;
     else if (!strcmp(key, "skip_intro")) g_cfg.skip_intro = i;
     else if (!strcmp(key, "god_mode")) g_cfg.god_mode = i;
     else if (!strcmp(key, "infinite_ammo")) g_cfg.infinite_ammo = i;
     else if (!strcmp(key, "no_reload")) g_cfg.no_reload = i;
     else if (!strcmp(key, "field_of_view")) g_cfg.field_of_view = i;
+    else if (!strcmp(key, "perspective")) g_cfg.perspective = i;
+    else if (!strcmp(key, "brightness")) g_cfg.brightness = i < 50 ? 50 : i > 200 ? 200 : i;
     else if (!strcmp(key, "volume")) g_cfg.volume = i;
     else if (!strcmp(key, "music_volume")) g_cfg.music_volume = i;
     else if (!strcmp(key, "sfx_volume")) g_cfg.sfx_volume = i;
@@ -284,7 +359,15 @@ static int format_value(const char *section, const char *key, char *out, size_t 
         }
         return 0;
     }
-    if (!strcmp(key, "sensitivity_x")) snprintf(out, n, "%.2f", g_cfg.sens_x);
+    for (int b = 0; b < PADB_COUNT; b++)
+        if (!strcmp(key, g_pad_button_names[b])) { snprintf(out, n, "%s", g_cfg.pad_bind[b]); return 1; }
+    if (!strcmp(key, "texture_pack")) snprintf(out, n, "%s", g_cfg.texture_pack);
+    else if (!strcmp(key, "controller")) snprintf(out, n, "%d", g_cfg.pad_enabled);
+    else if (!strcmp(key, "look_speed")) snprintf(out, n, "%d", g_cfg.pad_look_speed);
+    else if (!strcmp(key, "look_speed_y")) snprintf(out, n, "%d", g_cfg.pad_look_speed_y);
+    else if (!strcmp(key, "pad_invert_y")) snprintf(out, n, "%d", g_cfg.pad_invert_y);
+    else if (!strcmp(key, "deadzone")) snprintf(out, n, "%d", g_cfg.pad_deadzone);
+    else if (!strcmp(key, "sensitivity_x")) snprintf(out, n, "%.2f", g_cfg.sens_x);
     else if (!strcmp(key, "sensitivity_y")) snprintf(out, n, "%.2f", g_cfg.sens_y);
     else if (!strcmp(key, "invert_y")) snprintf(out, n, "%d", g_cfg.invert_y);
     else if (!strcmp(key, "look_limit")) snprintf(out, n, "%d", g_cfg.look_limit);
@@ -298,11 +381,15 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "movie_upscaling")) snprintf(out, n, "%d", g_cfg.movie_upscaling);
     else if (!strcmp(key, "depth_buffer")) snprintf(out, n, "%d", g_cfg.depth_buffer);
     else if (!strcmp(key, "gap_fill")) snprintf(out, n, "%d", g_cfg.gap_fill);
+    else if (!strcmp(key, "hd_textures")) snprintf(out, n, "%d", g_cfg.hd_textures);
+    else if (!strcmp(key, "hd_texture_memory")) snprintf(out, n, "%d", g_cfg.hd_texture_memory);
     else if (!strcmp(key, "skip_intro")) snprintf(out, n, "%d", g_cfg.skip_intro);
     else if (!strcmp(key, "god_mode")) snprintf(out, n, "%d", g_cfg.god_mode);
     else if (!strcmp(key, "infinite_ammo")) snprintf(out, n, "%d", g_cfg.infinite_ammo);
     else if (!strcmp(key, "no_reload")) snprintf(out, n, "%d", g_cfg.no_reload);
     else if (!strcmp(key, "field_of_view")) snprintf(out, n, "%d", g_cfg.field_of_view);
+    else if (!strcmp(key, "brightness")) snprintf(out, n, "%d", g_cfg.brightness);
+    else if (!strcmp(key, "perspective")) snprintf(out, n, "%d", g_cfg.perspective);
     else if (!strcmp(key, "volume")) snprintf(out, n, "%d", g_cfg.volume);
     else if (!strcmp(key, "music_volume")) snprintf(out, n, "%d", g_cfg.music_volume);
     else if (!strcmp(key, "sfx_volume")) snprintf(out, n, "%d", g_cfg.sfx_volume);

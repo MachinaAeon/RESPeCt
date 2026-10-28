@@ -1,7 +1,7 @@
 # PC port build (Linux, headless runner). Generated code: tools/recomp/recomp.py
 CC ?= clang
 GEN_CFLAGS = -O1 -w -Iinclude -fno-strict-aliasing
-SRC_CFLAGS = -O2 -g -Wall -Wextra -Wno-unused-parameter -Iinclude -Isrc -Ithird_party/libchdr/include -fno-strict-aliasing
+SRC_CFLAGS = -O2 -g -Wall -Wextra -Wno-unused-parameter -Iinclude -Isrc -Ithird_party -Ithird_party/libchdr/include -fno-strict-aliasing
 # libchdr (CHD disc images; BSD) with its zlib (miniz, also used for .zip), LZMA, zstd and FLAC
 CHDR = third_party/libchdr
 CHDR_CFLAGS = -O2 -w -I$(CHDR)/include -I$(CHDR) -Ithird_party -I$(CHDR)/deps/lzma-26.02/include -I$(CHDR)/deps/zstd-1.5.7 -I$(CHDR)/deps/miniz-3.1.2 -DMINIZ_ARCHIVE_APIS -DMINIZ_STDIO
@@ -20,7 +20,7 @@ $(BUILD)/gen/%.o: gen/%.c include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(GEN_CFLAGS) -c $< -o $@
 
-$(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/config.h src/disc_ids.h include/recomp.h
+$(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -c $< -o $@
 
@@ -53,7 +53,7 @@ $(WBUILD)/gen/%.o: gen/%.c include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(GEN_CFLAGS) -c $< -o $@
 
-$(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/config.h src/disc_ids.h include/recomp.h
+$(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -c $< -o $@
 
@@ -80,7 +80,7 @@ DMETA_O = $(META:meta/%.c=$(DBUILD)/meta/%.o)
 
 dist: $(DBUILD)/resurv_headless
 
-$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/config.h src/disc_ids.h include/recomp.h
+$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -DRT_DIST -c $< -o $@
 
@@ -106,7 +106,7 @@ WDMETA_O = $(META:meta/%.c=$(WDBUILD)/meta/%.o)
 
 windist: $(WDBUILD)/RESPeCt.exe
 
-$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/config.h src/disc_ids.h include/recomp.h
+$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -DRT_DIST -c $< -o $@
 
@@ -122,7 +122,12 @@ $(WDBUILD)/chdr.o: $(wildcard $(CHDR)/src/*.c) third_party/chdr_all.c
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(CHDR_CFLAGS) -c third_party/chdr_all.c -o $@
 
-$(WDBUILD)/RESPeCt.exe: $(WDSRC_O) $(WDDECOMP_O) $(WDMETA_O) $(WDBUILD)/src/main_win32.o $(WDBUILD)/chdr.o
+WINDRES ?= $(firstword $(wildcard /usr/lib/llvm-*/bin/llvm-windres) llvm-windres)
+$(WDBUILD)/respect_res.o: res/respect.rc res/respect.ico
+	@mkdir -p $(dir $@)
+	$(WINDRES) --target=x86_64-w64-mingw32 -I res -i res/respect.rc -o $@
+
+$(WDBUILD)/RESPeCt.exe: $(WDSRC_O) $(WDDECOMP_O) $(WDMETA_O) $(WDBUILD)/src/main_win32.o $(WDBUILD)/chdr.o $(WDBUILD)/respect_res.o
 	$(WIN_CC) -fuse-ld=lld -s -mwindows -static-libgcc -Wl,--stack,8388608 -o $@ $^ -lgdi32 -luser32 -lwinmm -lcomdlg32 -lshell32
 .PHONY: dist windist
 

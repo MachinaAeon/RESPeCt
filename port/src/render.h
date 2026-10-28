@@ -11,6 +11,8 @@
 
 #include <stdint.h>
 
+#include "texpack.h"
+
 typedef struct {
     float x, y;                /* VRAM coordinates (drawing offset applied) */
     int r, g, b, u, v;
@@ -19,7 +21,7 @@ typedef struct {
 
 enum { RP_TRI, RP_RECT, RP_LINE };
 
-typedef struct {
+typedef struct RPrim {
     int kind;
     RVtx v[3];
     int gouraud, textured, raw, semi, abr, dither;
@@ -30,7 +32,10 @@ typedef struct {
     int w, h, flipx, flipy;                  /* rectangles */
     int zt;                                  /* 3D with depth: depth-test it */
     float sqx0, sqx1;                        /* widescreen: a rectangle squeezed to x sqx0..sqx1 (if sqx1 > sqx0) */
+    const HdImg *hd;                         /* HD texture pack image to draw from (texpack.c), high-res only: */
+    float hd_ox, hd_oy, hd_kx, hd_ky;        /*   its pixel = (hd_ox + u * hd_kx, hd_oy + v * hd_ky) */
 } RPrim;
+void texpack_attach(RPrim *p, int ax, int ay, int aw, int ah);   /* texpack.c */
 
 void render_init(int scale, int threads);
 int render_scale(void);
