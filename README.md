@@ -2,7 +2,8 @@
 
 **RESPeCt** is a free, unofficial PC version of *Resident Evil Survivor*
 (PlayStation, USA, `SLUS-01087`). It adds full mouse-and-keyboard aiming,
-widescreen and high resolutions, and quick saves.
+widescreen and high resolutions, controller support, HD texture pack
+support, and quick saves.
 
 It contains **no code or data from the game**. You supply your own copy of
 the disc, and RESPeCt installs what it needs from it.
@@ -31,15 +32,43 @@ memory card and the installed data. To uninstall, delete the folder (back up
 Windows may warn that the program is from an unknown publisher, because it
 isn't code-signed. Click **More info → Run anyway**.
 
+### HD textures (optional)
+
+RESPeCt can use HD texture packs made for the Beetle PSX HW emulator. We
+recommend the **[RE Survivor HQ Texture Pack by Leigiboy](https://www.moddb.com/mods/re-survivor-hq-texture-pack/downloads/re-survivor-hq-textures)**
+on ModDB. All credit for the pack goes to Leigiboy.
+
+> RESPeCt is not affiliated with Leigiboy or the texture pack in any way.
+> Please report problems with HD textures in RESPeCt here, not to them.
+
+1. Download the pack and put the `.rar` in the same folder as `RESPeCt.exe`
+   (a `.zip` or `.7z` works too).
+2. Start RESPeCt. The first time, it unpacks the pack into a `textures`
+   folder (about a minute) and offers to move the archive to the Recycle Bin.
+
+Windows 11 can unpack `.rar` and `.7z` by itself. On Windows 10, unpack the
+archive into the RESPeCt folder with 7-Zip or WinRAR first. An unpacked pack
+folder works anywhere in the RESPeCt folder, and `texture_pack =` in
+`resurv.ini` can point to one somewhere else (such as RetroArch's copy).
+
+**F2** turns HD textures on and off. They show at resolution 2x and higher.
+
 ### Controls
 
 | | |
 |---|---|
 | Mouse | aim; left button fires. In menus it moves the cursor (left = OK, right = cancel) |
-| F1 | settings: video, sound, keys, cheats |
+| F1 | settings: video (resolution, widescreen, brightness...), sound, keys, controller, cheats |
+| F2 | HD textures on/off (with a texture pack) |
 | F5 / F9 | quick save / quick load (F6 / F7 pick the slot) |
 | F11 or Alt+Enter | fullscreen |
 | Esc | release the mouse |
+
+**Controller:** Xbox controllers work out of the box (PlayStation and others
+through Steam Input). Left stick moves, right stick aims, RT fires, LT quick
+search, A OK/run, B cancel, X reload, LB/RB change weapon, L3 sprint. Hold A
+to fast-forward cutscenes. L3 + R3 opens the settings. Buttons can be changed
+in `resurv.ini`.
 
 The game's own saves (typewriters and payphones) go on a memory card file
 next to the exe.
@@ -72,6 +101,11 @@ make -C port dist        # Linux headless runner, for testing
 ```
 
 `WIN_SYSROOT` points at the sysroot (default `~/toolchain/sysroot`).
+
+## Credits
+
+- HD texture pack: [RE Survivor HQ Texture Pack](https://www.moddb.com/mods/re-survivor-hq-texture-pack/downloads/re-survivor-hq-textures)
+  by **Leigiboy** (separate download; not affiliated with RESPeCt).
 
 ## Legal
 
