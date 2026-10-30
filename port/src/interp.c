@@ -129,6 +129,8 @@ static int in_delay(const RtModule *m, const InFunc *f, uint32_t pc) {
 static void run_func(const RtModule *m, const InFunc *f);
 
 void interp_call(const RtModule *m, const RtFunc *f) {
+    extern void gte_call_hook(uint32_t addr);
+    gte_call_hook(f->addr);                     /* gte.c: precise matrices */
     if (f->fn) f->fn();
     else run_func(m, f->meta);
 }

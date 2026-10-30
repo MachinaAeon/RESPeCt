@@ -41,6 +41,9 @@ static uint32_t pack(int16_t lo, int16_t hi) { return (uint16_t)lo | ((uint32_t)
 static int clamp5(int16_t v) { int x = v >> 7; return x < 0 ? 0 : x > 31 ? 31 : x; }
 
 static void moving_push(uint32_t word, float x, float y, float z);   /* precision, below */
+static void matrix_written(int r, uint32_t v);                        /* precise matrices, below */
+static int prec_rot, prec_trans;
+static int precise_view(const int64_t m[3], int16_t vx, int16_t vy, int16_t vz, double out[3]);
 static void moving_frac(uint32_t word, float *x, float *y);
 
 uint32_t gte_read_data(int r) {
@@ -147,8 +150,8 @@ uint32_t gte_read_ctrl(int r) {
 }
 
 void gte_write_ctrl(int r, uint32_t v) {
-    if (r < 5) { set_mat(G.rt, r, v); return; }
-    if (r < 8) { G.tr[r - 5] = (int32_t)v; return; }
+    if (r < 5) { set_mat(G.rt, r, v); matrix_written(r, v); return; }
+    if (r < 8) { G.tr[r - 5] = (int32_t)v; matrix_written(r, v); return; }
     if (r < 13) { set_mat(G.llm, r - 8, v); return; }
     if (r < 16) { G.bk[r - 13] = (int32_t)v; return; }
     if (r < 21) { set_mat(G.lcm, r - 16, v); return; }
@@ -330,7 +333,15 @@ static void rtp(int i, int last) {
     int64_t y = (int64_t)n * G.ir[2] + G.ofy;
     chk_mac(0, x);
     chk_mac(0, y);
-    push_sxy((int32_t)(x >> 16), (int32_t)(y >> 16), (float)((double)x / 65536.0), (float)((double)y / 65536.0));
+    float fx = (float)((double)x / 65536.0), fy = (float)((double)y / 65536.0);
+    double pv[3];
+    if (sf_shift == 12 && precise_view(m, v.x, v.y, v.z, pv) && pv[2] >= 1.0) {
+        /* the corner from the model's matrix in full precision (below) */
+        double k = projection_h() / pv[2];
+        fx = (float)(pv[0] * k * (g_widescreen ? 0.75 : 1.0) + G.ofx / 65536.0);
+        fy = (float)(pv[1] * k + G.ofy / 65536.0);
+    }
+    push_sxy((int32_t)(x >> 16), (int32_t)(y >> 16), fx, fy);
     if (last) {
         int64_t d = (int64_t)n * G.dqa + G.dqb;
         chk_mac(0, d);
@@ -699,6 +710,143 @@ void sxy_scratch_store(uint32_t p, uint32_t v) {
     sc_sxy[i].x = moving[k].x;
     sc_sxy[i].y = moving[k].y;
     sc_sxy[i].z = moving[k].z;
+}
+
+/* ------------------------------------------------------------ precise matrices
+ * Each part of a model (a zombie's torso, upper arm, forearm...) is drawn
+ * with its own matrix: libgs's GsGetLs multiplies the camera's matrix and
+ * every parent's along the chain, through the GTE, cutting the result to
+ * whole units and 1/4096ths at each step. The cuts differ from part to
+ * part and change as the camera moves, so the parts slide against each
+ * other by a fraction of a PS1 pixel (a few pixels at a higher
+ * resolution): models' joints open and shut and their faces shift. Here
+ * the same chain is also multiplied out in double precision when the game
+ * asks for it, and when the game then loads that matrix into the GTE
+ * (SetRotMatrix, SetTransMatrix) the precise one goes with it, for the
+ * high-resolution picture only: everything the game reads stays the
+ * GTE's own integers. */
+#define F_GS_GET_LS     0x800339E8u              /* (coord, ls) */
+#define F_GS_GET_LWS    0x80033CB8u              /* (coord, lw, ls) */
+#define F_SET_ROT_M     0x8002A778u              /* (matrix) */
+#define F_SET_TRANS_M   0x8002A7A8u              /* (matrix) */
+#define GS_WS_MATRIX    0x80065BB0u              /* GsWSMATRIX: world to screen */
+#define COORD_SUPER     0x4C                     /* GsCOORDINATE2: parent */
+
+typedef struct { double r[9], t[3]; } DMat;     /* rotation in 1.0 = 4096 units, translation */
+#define SHADOWS 64
+static struct { uint32_t addr, gen; DMat m; } shadow[SHADOWS];
+static int shadow_at;
+static DMat prec, pend;                          /* the precise matrix in the GTE; the one about to be loaded */
+/* prec_rot, prec_trans (declared at the top): RT / TR hold it */
+static uint32_t snap_rot[5], snap_trans[3];      /* the words it was loaded as */
+static uint32_t want_rot[5], want_trans[3];
+static int arm_rot, arm_trans, have_rot, have_trans;
+
+static void dmat_read(uint32_t a, DMat *d) {
+    for (int i = 0; i < 9; i++) d->r[i] = (int16_t)MEM_R16(a + 2 * i) / 4096.0;
+    for (int i = 0; i < 3; i++) d->t[i] = (int32_t)MEM_R32(a + 0x14 + 4 * i);
+}
+
+static void dmat_mul(const DMat *a, const DMat *b, DMat *o) {
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++)
+            o->r[i * 3 + j] = a->r[i * 3] * b->r[j] + a->r[i * 3 + 1] * b->r[3 + j] + a->r[i * 3 + 2] * b->r[6 + j];
+        o->t[i] = a->r[i * 3] * b->t[0] + a->r[i * 3 + 1] * b->t[1] + a->r[i * 3 + 2] * b->t[2] + a->t[i];
+    }
+}
+
+/* GsGetLs / GsGetLws: local to screen = world to screen x root ... x coord. */
+static void shadow_ls(uint32_t coord, uint32_t dest) {
+    uint32_t chain[100];
+    int n = 0;
+    for (uint32_t c = coord; c && n < 100; c = MEM_R32(c + COORD_SUPER)) chain[n++] = c;
+    if (!n) return;
+    DMat w, t, cm, ws, ls;
+    dmat_read(chain[n - 1] + 4, &w);
+    for (int k = n - 2; k >= 0; k--) { dmat_read(chain[k] + 4, &cm); dmat_mul(&w, &cm, &t); w = t; }
+    dmat_read(GS_WS_MATRIX, &ws);
+    dmat_mul(&ws, &w, &ls);
+    shadow_at = (shadow_at + 1) % SHADOWS;
+    shadow[shadow_at].addr = dest;
+    shadow[shadow_at].gen = pgen;
+    shadow[shadow_at].m = ls;
+}
+
+static const DMat *shadow_of(uint32_t a) {
+    for (int n = 0; n < SHADOWS; n++) {
+        int k = (shadow_at - n + SHADOWS) % SHADOWS;
+        if (shadow[k].addr == a && shadow[k].gen && shadow[k].gen + 2 >= pgen) return &shadow[k].m;
+    }
+    return NULL;
+}
+
+/* interp.c: a call to game code. */
+void gte_call_hook(uint32_t addr) {
+    if (addr != F_GS_GET_LS && addr != F_GS_GET_LWS && addr != F_SET_ROT_M && addr != F_SET_TRANS_M) return;
+    if (!g_subpixel) return;
+    if (addr == F_GS_GET_LS) { shadow_ls(R[4], R[5]); return; }
+    if (addr == F_GS_GET_LWS) { shadow_ls(R[4], R[6]); return; }
+    uint32_t a = R[4];
+    const DMat *d = shadow_of(a);
+    if (addr == F_SET_ROT_M) {
+        arm_rot = 0;
+        if (!d) return;
+        for (int i = 0; i < 9; i++)                  /* the game's result: the same matrix, give or take its cuts */
+            if (fabs(d->r[i] * 4096.0 - (int16_t)MEM_R16(a + 2 * i)) > 4) return;
+        for (int i = 0; i < 5; i++) want_rot[i] = MEM_R32(a + 4 * i);
+        want_rot[4] &= 0xFFFF;
+        memcpy(pend.r, d->r, sizeof pend.r);
+        arm_rot = 1;
+    } else {
+        arm_trans = 0;
+        if (!d) return;
+        for (int i = 0; i < 3; i++)
+            if (fabs(d->t[i] - (int32_t)MEM_R32(a + 0x14 + 4 * i)) > 4) return;
+        for (int i = 0; i < 3; i++) want_trans[i] = MEM_R32(a + 0x14 + 4 * i);
+        memcpy(pend.t, d->t, sizeof pend.t);
+        arm_trans = 1;
+    }
+}
+
+/* RT/TR written: the precise matrix holds while they hold the words it was
+ * loaded as (SetRotMatrix / SetTransMatrix from it), also after the game
+ * saved and restored them (PushMatrix / PopMatrix) or loaded them again. */
+static void matrix_written(int r, uint32_t v) {
+    (void)v;
+    if (r < 5) {
+        uint32_t cur[5];
+        for (int k = 0; k < 4; k++) cur[k] = gte_read_ctrl(k);
+        cur[4] = gte_read_ctrl(4) & 0xFFFF;
+        if (arm_rot && !memcmp(cur, want_rot, sizeof cur)) {
+            memcpy(prec.r, pend.r, sizeof prec.r);
+            memcpy(snap_rot, want_rot, sizeof snap_rot);
+            have_rot = 1;
+            arm_rot = 0;
+        }
+        prec_rot = have_rot && !memcmp(cur, snap_rot, sizeof cur);
+    } else {
+        uint32_t cur[3] = {(uint32_t)G.tr[0], (uint32_t)G.tr[1], (uint32_t)G.tr[2]};
+        if (arm_trans && !memcmp(cur, want_trans, sizeof cur)) {
+            memcpy(prec.t, pend.t, sizeof prec.t);
+            memcpy(snap_trans, want_trans, sizeof snap_trans);
+            have_trans = 1;
+            arm_trans = 0;
+        }
+        prec_trans = have_trans && !memcmp(cur, snap_trans, sizeof cur);
+    }
+}
+
+/* A corner through the precise matrix (view space), if the GTE holds one
+ * and it agrees with the GTE's own result. */
+static int precise_view(const int64_t m[3], int16_t vx, int16_t vy, int16_t vz, double out[3]) {
+    static int off = -1;                         /* RT_INT_MATRIX: the GTE's own matrices, for comparisons */
+    if (off < 0) off = getenv("RT_INT_MATRIX") != NULL;
+    if (off || !prec_rot || !prec_trans) return 0;
+    for (int i = 0; i < 3; i++) {
+        out[i] = prec.r[i * 3] * vx + prec.r[i * 3 + 1] * vy + prec.r[i * 3 + 2] * vz + prec.t[i];
+        if (fabs(out[i] - m[i] / 4096.0) > 8) return 0;
+    }
+    return 1;
 }
 
 void gte_swc2(uint32_t addr, int reg) {
