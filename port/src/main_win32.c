@@ -744,6 +744,24 @@ static void read_input(void) {
     if (g_input.look_dy < -1024) g_input.look_dy = -1024;
 }
 
+/* FPS turning, when the game takes the mouse's motion for its frame: raw
+ * input that came in since this vblank's read_input, so a movement doesn't
+ * wait up to a vblank for the next one. */
+void plat_poll_look(void) {
+    if (!captured || menu_open || suppress_keys) return;
+    MSG m;
+    while (PeekMessage(&m, hwnd, WM_INPUT, WM_INPUT, PM_REMOVE)) DispatchMessage(&m);
+    long dx = pending_dx, dy = pending_dy;
+    if (!dx && !dy) return;
+    pending_dx = pending_dy = 0;
+    int mx = scaled(&frac_x, dx * 2.0 * g_cfg.sens_x);
+    int my = scaled(&frac_y, dy * 2.0 * g_cfg.sens_y * (g_cfg.invert_y ? -1 : 1));
+    g_input.mouse_dx += mx;
+    g_input.mouse_dy += my;
+    g_input.look_dx += mx;
+    g_input.look_dy += my;
+}
+
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS *ep) {
     HMODULE base = GetModuleHandleA(NULL);
     uintptr_t at = (uintptr_t)ep->ExceptionRecord->ExceptionAddress;
@@ -839,7 +857,7 @@ static void menu_build(void) {
     add_item(1, IT_BOOL, "Depth fix", &g_cfg.depth_buffer, 0, 1, 1,
              "Keeps the back of a model from showing through its front (faces, legs), which shows at higher resolutions.");
     add_item(1, IT_BOOL, "Close model gaps", &g_cfg.gap_fill, 0, 1, 1,
-             "Distant models show gaps between their parts at higher resolutions (flickering as they move): draw their small triangles a little larger.");
+             "Close the hair-thin gaps between models' parts and where walls meet, which flicker as things move at higher resolutions. Outlines stay as they are.");
     if (texpack_loaded())
         add_item(1, IT_BOOL, "HD textures", &g_cfg.hd_textures, 0, 1, 1,
                  "Draw the game's textures from the HD texture pack next to the game (shows at resolution 2x and up). F2 also switches.");

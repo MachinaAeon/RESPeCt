@@ -146,6 +146,7 @@ void input_take_look(int *dx, int *dy);   /* sio.c: the motion for this game fra
 int game_player_in_control(void);
 void rt_set_look_limit(int degrees);
 void plat_frame(void);      /* called once per vblank */
+void plat_poll_look(void);  /* mouse motion that came in since, for FPS turning (input_take_look) */
 int plat_quit(void);
 void plat_fatal(const char *msg);   /* show the error before exiting */
 

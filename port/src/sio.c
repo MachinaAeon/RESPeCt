@@ -12,6 +12,7 @@ InputState g_input;
  * 30 frames a second every other vblank's motion was overwritten before
  * the game saw it: half of every movement lost, unevenly. */
 void input_take_look(int *dx, int *dy) {
+    plat_poll_look();                       /* up to the moment the game takes it */
     *dx = g_input.look_dx;
     *dy = g_input.look_dy;
     g_input.look_dx = g_input.look_dy = 0;

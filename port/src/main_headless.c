@@ -324,6 +324,7 @@ void plat_frame(void) {
 }
 
 int plat_quit(void) { return 0; }
+void plat_poll_look(void) {}
 void plat_fatal(const char *msg) { (void)msg; }
 
 void sg_save_done(int ok) { rt_log("savegame: save %s", ok ? "ok" : "FAILED"); }
