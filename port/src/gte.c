@@ -736,11 +736,15 @@ typedef struct { double r[9], t[3]; } DMat;     /* rotation in 1.0 = 4096 units,
 #define SHADOWS 64
 static struct { uint32_t addr, gen; DMat m; } shadow[SHADOWS];
 static int shadow_at;
-static DMat prec, pend;                          /* the precise matrix in the GTE; the one about to be loaded */
+static DMat prec;                                /* the precise matrix in the GTE */
 /* prec_rot, prec_trans (declared at the top): RT / TR hold it */
-static uint32_t snap_rot[5], snap_trans[3];      /* the words it was loaded as */
-static uint32_t want_rot[5], want_trans[3];
-static int arm_rot, arm_trans, have_rot, have_trans;
+/* Precise rotations and translations the game loaded lately, by the words
+ * they were loaded as: drawing code saves and restores matrices
+ * (PushMatrix / PopMatrix) part after part, so any of them can come back. */
+#define KNOWN 64
+static struct { uint32_t w[5], gen; double r[9]; } known_rot[KNOWN];
+static struct { uint32_t w[3], gen; double t[3]; } known_trans[KNOWN];
+static int known_rot_at, known_trans_at;
 
 static void dmat_read(uint32_t a, DMat *d) {
     for (int i = 0; i < 9; i++) d->r[i] = (int16_t)MEM_R16(a + 2 * i) / 4096.0;
@@ -788,51 +792,56 @@ void gte_call_hook(uint32_t addr) {
     if (addr == F_GS_GET_LWS) { shadow_ls(R[4], R[6]); return; }
     uint32_t a = R[4];
     const DMat *d = shadow_of(a);
+    if (!d) return;
     if (addr == F_SET_ROT_M) {
-        arm_rot = 0;
-        if (!d) return;
-        for (int i = 0; i < 9; i++)                  /* the game's result: the same matrix, give or take its cuts */
-            if (fabs(d->r[i] * 4096.0 - (int16_t)MEM_R16(a + 2 * i)) > 4) return;
-        for (int i = 0; i < 5; i++) want_rot[i] = MEM_R32(a + 4 * i);
-        want_rot[4] &= 0xFFFF;
-        memcpy(pend.r, d->r, sizeof pend.r);
-        arm_rot = 1;
+        /* the game's result: the same matrix, give or take its cuts (which
+         * add up along a model's chain: a few units) */
+        for (int i = 0; i < 9; i++)
+            if (fabs(d->r[i] * 4096.0 - (int16_t)MEM_R16(a + 2 * i)) > 16) return;
+        known_rot_at = (known_rot_at + 1) % KNOWN;
+        for (int i = 0; i < 5; i++) known_rot[known_rot_at].w[i] = MEM_R32(a + 4 * i);
+        known_rot[known_rot_at].w[4] &= 0xFFFF;
+        known_rot[known_rot_at].gen = pgen;
+        memcpy(known_rot[known_rot_at].r, d->r, sizeof d->r);
     } else {
-        arm_trans = 0;
-        if (!d) return;
         for (int i = 0; i < 3; i++)
-            if (fabs(d->t[i] - (int32_t)MEM_R32(a + 0x14 + 4 * i)) > 4) return;
-        for (int i = 0; i < 3; i++) want_trans[i] = MEM_R32(a + 0x14 + 4 * i);
-        memcpy(pend.t, d->t, sizeof pend.t);
-        arm_trans = 1;
+            if (fabs(d->t[i] - (int32_t)MEM_R32(a + 0x14 + 4 * i)) > 16) return;
+        known_trans_at = (known_trans_at + 1) % KNOWN;
+        for (int i = 0; i < 3; i++) known_trans[known_trans_at].w[i] = MEM_R32(a + 0x14 + 4 * i);
+        known_trans[known_trans_at].gen = pgen;
+        memcpy(known_trans[known_trans_at].t, d->t, sizeof d->t);
     }
 }
 
-/* RT/TR written: the precise matrix holds while they hold the words it was
- * loaded as (SetRotMatrix / SetTransMatrix from it), also after the game
- * saved and restored them (PushMatrix / PopMatrix) or loaded them again. */
+/* RT/TR written: precise while they hold the words of a precise matrix the
+ * game loaded lately (SetRotMatrix / SetTransMatrix), however they got
+ * there again (PopMatrix, another load). */
 static void matrix_written(int r, uint32_t v) {
     (void)v;
     if (r < 5) {
         uint32_t cur[5];
         for (int k = 0; k < 4; k++) cur[k] = gte_read_ctrl(k);
         cur[4] = gte_read_ctrl(4) & 0xFFFF;
-        if (arm_rot && !memcmp(cur, want_rot, sizeof cur)) {
-            memcpy(prec.r, pend.r, sizeof prec.r);
-            memcpy(snap_rot, want_rot, sizeof snap_rot);
-            have_rot = 1;
-            arm_rot = 0;
+        prec_rot = 0;
+        for (int n = 0; n < KNOWN; n++) {
+            int k = (known_rot_at - n + KNOWN) % KNOWN;
+            if (known_rot[k].gen && known_rot[k].gen + 2 >= pgen && !memcmp(cur, known_rot[k].w, sizeof cur)) {
+                memcpy(prec.r, known_rot[k].r, sizeof prec.r);
+                prec_rot = 1;
+                break;
+            }
         }
-        prec_rot = have_rot && !memcmp(cur, snap_rot, sizeof cur);
     } else {
         uint32_t cur[3] = {(uint32_t)G.tr[0], (uint32_t)G.tr[1], (uint32_t)G.tr[2]};
-        if (arm_trans && !memcmp(cur, want_trans, sizeof cur)) {
-            memcpy(prec.t, pend.t, sizeof prec.t);
-            memcpy(snap_trans, want_trans, sizeof snap_trans);
-            have_trans = 1;
-            arm_trans = 0;
+        prec_trans = 0;
+        for (int n = 0; n < KNOWN; n++) {
+            int k = (known_trans_at - n + KNOWN) % KNOWN;
+            if (known_trans[k].gen && known_trans[k].gen + 2 >= pgen && !memcmp(cur, known_trans[k].w, sizeof cur)) {
+                memcpy(prec.t, known_trans[k].t, sizeof prec.t);
+                prec_trans = 1;
+                break;
+            }
         }
-        prec_trans = have_trans && !memcmp(cur, snap_trans, sizeof cur);
     }
 }
 
@@ -844,7 +853,7 @@ static int precise_view(const int64_t m[3], int16_t vx, int16_t vy, int16_t vz, 
     if (off || !prec_rot || !prec_trans) return 0;
     for (int i = 0; i < 3; i++) {
         out[i] = prec.r[i * 3] * vx + prec.r[i * 3 + 1] * vy + prec.r[i * 3 + 2] * vz + prec.t[i];
-        if (fabs(out[i] - m[i] / 4096.0) > 8) return 0;
+        if (fabs(out[i] - m[i] / 4096.0) > 24) return 0;
     }
     return 1;
 }
