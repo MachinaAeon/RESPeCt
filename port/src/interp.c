@@ -224,7 +224,13 @@ static inline void exec(uint32_t pc, uint32_t w) {
         if (((w >> 21) & 31) == 16 && (w & 63) == 16) { rt_rfe(); return; }
         break;
     case 18:                                        /* COP2 */
-        if ((w >> 21) & 16) { gte_command(w & 0x1FFFFFF); return; }
+        if ((w >> 21) & 16) {
+            extern uint32_t g_gte_pc;
+            g_gte_pc = pc;                          /* gte.c: who's projecting */
+            gte_command(w & 0x1FFFFFF);
+            g_gte_pc = 0;
+            return;
+        }
         switch ((w >> 21) & 31) {
         case 0: SET(RTN, gte_read_data((int)RDN)); return;
         case 2: SET(RTN, gte_read_ctrl((int)RDN)); return;

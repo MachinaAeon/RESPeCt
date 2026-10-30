@@ -231,11 +231,28 @@ static void push_sz(int64_t v) {
 
 static void precise_record(int16_t sx, int16_t sy, float fx, float fy, float fz);
 
+/* Close-up polygons drawn whole (rt.c: the game's distance split is off).
+ * A polygon drawn by the game's drivers whose corners land off the screen
+ * is split by them all the same, as the GPU can't draw one that large; the
+ * high-resolution picture can, so there the corner keeps its true position
+ * (the screen position stays clamped, as the hardware's) and the driver
+ * isn't told: the polygon stays whole and doesn't jump as you approach.
+ * Corners too close or behind (the division overflowing, depth clamped)
+ * are still reported, and those polygons are still split. */
+uint32_t g_gte_pc;                                /* interp.c: the GTE command's address */
+int g_whole_polys;                                /* rt.c */
+extern int g_subpixel;
+static int whole_corner(void) {
+    return g_whole_polys && g_subpixel && g_gte_pc >= 0x8003DF90u && g_gte_pc < 0x80058600u &&
+           !(G.flag & (3u << 17));
+}
+
 static void push_sxy(int32_t x, int32_t y, float fx, float fy) {
-    if (x < -0x400) { G.flag |= 1u << 14; x = -0x400; fx = -1024.0f; }
-    else if (x > 0x3FF) { G.flag |= 1u << 14; x = 0x3FF; fx = 1023.0f; }
-    if (y < -0x400) { G.flag |= 1u << 13; y = -0x400; fy = -1024.0f; }
-    else if (y > 0x3FF) { G.flag |= 1u << 13; y = 0x3FF; fy = 1023.0f; }
+    int whole = whole_corner();
+    if (x < -0x400) { if (!whole) { G.flag |= 1u << 14; fx = -1024.0f; } x = -0x400; }
+    else if (x > 0x3FF) { if (!whole) { G.flag |= 1u << 14; fx = 1023.0f; } x = 0x3FF; }
+    if (y < -0x400) { if (!whole) { G.flag |= 1u << 13; fy = -1024.0f; } y = -0x400; }
+    else if (y > 0x3FF) { if (!whole) { G.flag |= 1u << 13; fy = 1023.0f; } y = 0x3FF; }
     G.sx[0] = G.sx[1]; G.sy[0] = G.sy[1]; G.fx[0] = G.fx[1]; G.fy[0] = G.fy[1];
     G.sx[1] = G.sx[2]; G.sy[1] = G.sy[2]; G.fx[1] = G.fx[2]; G.fy[1] = G.fy[2];
     G.sx[2] = (int16_t)x; G.sy[2] = (int16_t)y; G.fx[2] = fx; G.fy[2] = fy;

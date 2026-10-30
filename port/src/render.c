@@ -342,10 +342,14 @@ int g_zp_on, g_zp_x, g_zp_y; unsigned g_zp_f;
 static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     const RVtx *v = p->v;
     int s = t->scale;
-    /* hardware limit: polygons this large aren't drawn */
+    /* hardware limit: polygons this large aren't drawn. Not for 3D drawn
+     * in perspective at a higher resolution: there the game no longer
+     * splits close polygons (rt.c), and a wall right in front of you is
+     * one polygon far wider than the screen. */
     float minxf = fminf(v[0].x, fminf(v[1].x, v[2].x)), maxxf = fmaxf(v[0].x, fmaxf(v[1].x, v[2].x));
     float minyf = fminf(v[0].y, fminf(v[1].y, v[2].y)), maxyf = fmaxf(v[0].y, fmaxf(v[1].y, v[2].y));
-    if (maxxf - minxf >= 1024 || maxyf - minyf >= 512) return;
+    int whole = g_persp && p->zt == 2 && t->buf == hires && t->scale > 1;
+    if ((maxxf - minxf >= 1024 || maxyf - minyf >= 512) && !whole) return;
     int64_t X[3], Y[3];
     double Xd[3], Yd[3];
     for (int i = 0; i < 3; i++) {

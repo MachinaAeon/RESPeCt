@@ -847,7 +847,7 @@ static void menu_build(void) {
     add_item(1, IT_BOOL, "Auto resolution", &g_cfg.auto_resolution, 0, 1, 1,
              "Lower the resolution by itself when this PC can't keep the game at full speed (it's drawn by the CPU, not the graphics card).");
     add_item(1, IT_BOOL, "Perspective-correct textures", &g_cfg.perspective, 0, 1, 1,
-             "Textures stay straight on big walls and floors instead of bending and swimming as you move (the PlayStation can't do this).");
+             "Textures stay straight on big walls and floors instead of bending and swimming as you move (the PlayStation can't do this). At 2x and higher, close floors and walls also stay whole instead of jumping as the game splits them.");
     add_item(1, IT_BOOL, "Smooth textures", &g_cfg.smooth_textures, 0, 1, 1,
              "Smooth the game's own textures on 3D surfaces at 2x and higher, as the PC version draws them, instead of square texels.");
     add_item(1, IT_BOOL, "24-bit colour", &g_cfg.true_color, 0, 1, 1,
