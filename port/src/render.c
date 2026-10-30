@@ -466,10 +466,22 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
      * known): the PS1 interpolates u and v straight across the screen,
      * which bends a texture's straight lines across big polygons and makes
      * them swim as the view moves; sharp HD textures show it most. */
-    int persp = g_persp && p->textured && p->zt == 2 && v[0].z > 0 && v[1].z > 0 && v[2].z > 0;
-    Plane qw = {0}, qu = {0}, qv = {0};
+    int pz = g_persp && p->zt == 2 && v[0].z > 0 && v[1].z > 0 && v[2].z > 0;
+    int persp = pz && p->textured;
+    /* The same for the colours at the corners (the game's lighting and
+     * depth fog): spread straight across the screen, the light and shadow
+     * on a wall slide over it as you walk, most where the game splits
+     * close polygons into smaller ones. Direct3D (the PC version) spreads
+     * them in perspective. */
+    int pcol = pz && gour;
+    Plane qw = {0}, qu = {0}, qv = {0}, qr = {0}, qg = {0}, qb = {0};
+    if (persp || pcol) qw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
+    if (pcol) {
+        qr = plane(Xd, Yd, v[0].r / v[0].z, v[1].r / v[1].z, v[2].r / v[2].z);
+        qg = plane(Xd, Yd, v[0].g / v[0].z, v[1].g / v[1].z, v[2].g / v[2].z);
+        qb = plane(Xd, Yd, v[0].b / v[0].z, v[1].b / v[1].z, v[2].b / v[2].z);
+    }
     if (persp) {
-        qw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
         qu = plane(Xd, Yd, v[0].u / v[0].z, v[1].u / v[1].z, v[2].u / v[2].z);
         qv = plane(Xd, Yd, v[0].v / v[0].z, v[1].v / v[1].z, v[2].v / v[2].z);
         static int pl = -1;
@@ -505,14 +517,14 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
         float *zrow = zuse ? zbuf + (size_t)y * t->stride : NULL;
         uint32_t *idrow = zuse ? zid + (size_t)y * t->stride : NULL;
         double wz = zuse ? pw.a * x0 + pw.b * y + pw.c : 0;
-        double qwv = 0, quv = 0, qvv = 0;
-        if (persp) {
-            /* sampled at the pixel's centre, as the affine values are */
-            qwv = qw.a * x0 + qw.b * y + qw.c; quv = qu.a * x0 + qu.b * y + qu.c; qvv = qv.a * x0 + qv.b * y + qv.c;
-        }
-        for (int x = x0; x <= x1; x++, wz += pw.a, qwv += qw.a, quv += qu.a, qvv += qv.a) {
+        double qwv = 0, quv = 0, qvv = 0, qrv = 0, qgv = 0, qbv = 0;
+        /* sampled at the pixel's centre, as the affine values are */
+        if (persp || pcol) qwv = qw.a * x0 + qw.b * y + qw.c;
+        if (persp) { quv = qu.a * x0 + qu.b * y + qu.c; qvv = qv.a * x0 + qv.b * y + qv.c; }
+        if (pcol) { qrv = qr.a * x0 + qr.b * y + qr.c; qgv = qg.a * x0 + qg.b * y + qg.c; qbv = qb.a * x0 + qb.b * y + qb.c; }
+        for (int x = x0; x <= x1; x++, wz += pw.a, qwv += qw.a, quv += qu.a, qvv += qv.a, qrv += qr.a, qgv += qg.a, qbv += qb.a) {
+            double iz = (persp || pcol) && qwv > 0 ? 1.0 / qwv : 0;
             if (persp && qwv > 0) {
-                double iz = 1.0 / qwv;
                 u = (int32_t)(quv * iz * one) + one / 1024;
                 vv = (int32_t)(qvv * iz * one) + one / 1024;
             }
@@ -564,7 +576,12 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                     if (zwrite && core == 1 && !p->semi && (!p->textured || texel(p, tu, tv))) { zrow[x] = (float)wz; idrow[x] = id; }
                 }
                 int cr = v[0].r, cg = v[0].g, cb = v[0].b;
-                if (gour) {
+                if (pcol && qwv > 0) {
+                    cr = (int)(qrv * iz + 0.5); cg = (int)(qgv * iz + 0.5); cb = (int)(qbv * iz + 0.5);
+                    cr = cr < 0 ? 0 : cr > 255 ? 255 : cr;
+                    cg = cg < 0 ? 0 : cg > 255 ? 255 : cg;
+                    cb = cb < 0 ? 0 : cb > 255 ? 255 : cb;
+                } else if (gour) {
                     cr = r >> 16; cg = g >> 16; cb = b >> 16;
                     cr = cr < 0 ? 0 : cr > 255 ? 255 : cr;
                     cg = cg < 0 ? 0 : cg > 255 ? 255 : cg;

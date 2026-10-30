@@ -40,6 +40,9 @@ static uint32_t pack(int16_t lo, int16_t hi) { return (uint16_t)lo | ((uint32_t)
 
 static int clamp5(int16_t v) { int x = v >> 7; return x < 0 ? 0 : x > 31 ? 31 : x; }
 
+static void moving_push(uint32_t word, float x, float y, float z);   /* precision, below */
+static void moving_frac(uint32_t word, float *x, float *y);
+
 uint32_t gte_read_data(int r) {
     switch (r) {
     case 0: return pack(G.v[0].x, G.v[0].y);
@@ -51,8 +54,12 @@ uint32_t gte_read_data(int r) {
     case 6: return G.rgbc;
     case 7: return G.otz;
     case 8: case 9: case 10: case 11: return (uint32_t)(int32_t)G.ir[r - 8];
-    case 12: case 13: case 14: return pack(G.sx[r - 12], G.sy[r - 12]);
-    case 15: return pack(G.sx[2], G.sy[2]);
+    case 12: case 13: case 14: case 15: {
+        int k = r == 15 ? 2 : r - 12;
+        uint32_t w = pack(G.sx[k], G.sy[k]);
+        moving_push(w, G.fx[k], G.fy[k], (float)G.sz[k + 1]);
+        return w;
+    }
     case 16: case 17: case 18: case 19: return G.sz[r - 16];
     case 20: case 21: case 22: return G.rgb[r - 20];
     case 23: return G.res1;
@@ -77,11 +84,15 @@ void gte_write_data(int r, uint32_t v) {
     case 6: G.rgbc = v; break;
     case 7: G.otz = (uint16_t)v; break;
     case 8: case 9: case 10: case 11: G.ir[r - 8] = lo; break;
-    case 12: case 13: case 14: G.sx[r - 12] = lo; G.sy[r - 12] = hi; G.fx[r - 12] = lo; G.fy[r - 12] = hi; break;
+    case 12: case 13: case 14:
+        G.sx[r - 12] = lo; G.sy[r - 12] = hi; G.fx[r - 12] = lo; G.fy[r - 12] = hi;
+        moving_frac(v, &G.fx[r - 12], &G.fy[r - 12]);     /* a point read back: its fractions too */
+        break;
     case 15:
         G.sx[0] = G.sx[1]; G.sy[0] = G.sy[1]; G.fx[0] = G.fx[1]; G.fy[0] = G.fy[1];
         G.sx[1] = G.sx[2]; G.sy[1] = G.sy[2]; G.fx[1] = G.fx[2]; G.fy[1] = G.fy[2];
         G.sx[2] = lo; G.sy[2] = hi; G.fx[2] = lo; G.fy[2] = hi;
+        moving_frac(v, &G.fx[2], &G.fy[2]);
         break;
     case 16: case 17: case 18: case 19: G.sz[r - 16] = (uint16_t)v; break;
     case 20: case 21: case 22: G.rgb[r - 20] = v; break;
@@ -588,18 +599,94 @@ static void precise_record(int16_t sx, int16_t sy, float fx, float fy, float fz)
 static uint32_t sxy_word[0x80000], sxy_gen[0x80000];
 static float sxy_px[0x80000], sxy_py[0x80000], sxy_pz[0x80000];   /* that corner's exact position, depth */
 
-void gte_swc2(uint32_t addr, int reg) {
-    uint32_t v = gte_read_data(reg);
-    if (reg >= 12 && reg <= 15 && (addr & 0x1FFFFFFF) < 0x00800000) {
-        uint32_t i = (addr & 0x1FFFFF) >> 2;
-        sxy_word[i] = v;
-        sxy_gen[i] = pgen;
-        int k = reg == 15 ? 2 : reg - 12;
-        sxy_px[i] = G.fx[k];
-        sxy_py[i] = G.fy[k];
-        sxy_pz[i] = (float)G.sz[k + 1];
+uint8_t g_sxy_mark[0x80000];
+uint32_t g_sxy_filter[8];
+static int g_sxy_moving;
+
+/* The game's code also moves projected points itself: read from the GTE
+ * (MFC2) or from where it stored them, then written into a drawing packet
+ * or a buffer of its own. Found by value alone, a corner that stays on the
+ * same pixel can take another frame's or another corner's position, and
+ * polygons jump as the view moves. Points just read are kept here, and a
+ * store of the same value soon after takes the point along to its new
+ * address, which the GPU then finds by address (as PGXP follows copies). */
+#define MOVING 16
+static struct { uint32_t word, gen; float x, y, z; } moving[MOVING];
+static int moving_at;
+
+static void moving_push(uint32_t word, float x, float y, float z) {
+    moving_at = (moving_at + 1) % MOVING;
+    moving[moving_at].word = word;
+    moving[moving_at].gen = pgen;
+    moving[moving_at].x = x;
+    moving[moving_at].y = y;
+    moving[moving_at].z = z;
+    g_sxy_moving = 1;
+    memset(g_sxy_filter, 0, sizeof g_sxy_filter);
+    for (int k = 0; k < MOVING; k++) {
+        uint32_t h = (moving[k].word * 0x9E3779B1u) >> 24;
+        if (moving[k].gen) g_sxy_filter[h >> 5] |= 1u << (h & 31);
     }
-    MEM_W32(addr, v);
+}
+
+/* The newest point just read with this value, or -1. */
+static int moving_find(uint32_t word) {
+    for (int n = 0; n < MOVING; n++) {
+        int k = (moving_at - n + MOVING) % MOVING;
+        if (moving[k].word == word && moving[k].gen && moving[k].gen + 2 >= pgen) return k;
+    }
+    return -1;
+}
+
+static void moving_frac(uint32_t word, float *x, float *y) {
+    int k = g_sxy_moving ? moving_find(word) : -1;
+    if (k >= 0) { *x = moving[k].x; *y = moving[k].y; }
+}
+
+static void sxy_set(uint32_t i, uint32_t word, float x, float y, float z) {
+    sxy_word[i] = word;
+    sxy_gen[i] = pgen;
+    sxy_px[i] = x;
+    sxy_py[i] = y;
+    sxy_pz[i] = z;
+    g_sxy_mark[i] = 1;
+}
+
+void sxy_load(uint32_t p, uint32_t v) {
+    uint32_t i = p >> 2;
+    if (sxy_word[i] == v && sxy_gen[i] + 6 >= pgen) moving_push(v, sxy_px[i], sxy_py[i], sxy_pz[i]);
+    else g_sxy_mark[i] = 0;
+}
+
+void sxy_store(uint32_t p, uint32_t v) {
+    uint32_t i = p >> 2;
+    int k = g_sxy_moving ? moving_find(v) : -1;
+    if (k >= 0) sxy_set(i, v, moving[k].x, moving[k].y, moving[k].z);
+    else g_sxy_mark[i] = 0;
+}
+
+/* The scratchpad, where the game's drawing code keeps points too. */
+static struct { uint32_t word, gen; float x, y, z; } sc_sxy[256];
+
+void sxy_scratch_load(uint32_t p, uint32_t v) {
+    uint32_t i = (p & 0x3FC) >> 2;
+    if (sc_sxy[i].word == v && sc_sxy[i].gen && sc_sxy[i].gen + 6 >= pgen) moving_push(v, sc_sxy[i].x, sc_sxy[i].y, sc_sxy[i].z);
+}
+
+void sxy_scratch_store(uint32_t p, uint32_t v) {
+    uint32_t i = (p & 0x3FC) >> 2;
+    int k = g_sxy_moving ? moving_find(v) : -1;
+    if (k < 0) { sc_sxy[i].gen = 0; return; }
+    sc_sxy[i].word = v;
+    sc_sxy[i].gen = pgen;
+    sc_sxy[i].x = moving[k].x;
+    sc_sxy[i].y = moving[k].y;
+    sc_sxy[i].z = moving[k].z;
+}
+
+void gte_swc2(uint32_t addr, int reg) {
+    uint32_t v = gte_read_data(reg);         /* an SXY: now among the points just read */
+    MEM_W32(addr, v);                        /* (RAM or scratchpad: takes the point along) */
 }
 
 int gte_stored_sxy(uint32_t addr, uint32_t word) {
