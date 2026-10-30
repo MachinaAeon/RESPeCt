@@ -53,6 +53,7 @@ static float g_cross_tol = 128;                  /* another object: hidden this 
 static double g_margin_len = 6;                  /* longest edge (PS1 pixels) of a triangle given the gap margin; RT_MARGIN_LEN */
 int g_gap_fill = 1; 
 int g_persp = 1;                                /* Perspective-correct textures (setting) */
+int g_smooth_tex = 1;                           /* Smooth textures (setting) */
                             /* Close model gaps (setting) */                                 /* testing: RT_TEX_EDGE samples the far texel edge too */
 static float *zbuf;
 /* What wrote each depth: the texture page and CLUT (a model part and its
@@ -189,15 +190,50 @@ static inline int hd_texel(const RPrim *p, float U, float V, const float *lo, fl
 /* 4x4 ordered dither, in 1/16ths of a 5-bit step */
 static const uint8_t bayer4[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 
-/* An HD texel, lit, to the 15-bit picture. The light is applied to the
- * image's full 8-bit colour and the result dithered down (finely, at the
- * high resolution): rounded to the PS1's 5 bits first, a smooth HD
- * texture under the game's shading shows hard bands, dark contour lines
- * that crawl as the light on a surface changes. */
+/* The game's own texture at texel position (U, V), fractions included,
+ * filtered as the PC version's Direct3D draws it: bilinear between the
+ * four texels around, leaving out the transparent ones (colour 0), so a
+ * cut-out edge doesn't darken. The nearest texel says transparent or not,
+ * and semi-transparent or not (its STP bit), as at 1x. lo: as hd_texel,
+ * the texels the polygon maps, which filtering stays inside. 0:
+ * transparent. Colours to 0..255. */
+static inline int smooth_texel(const RPrim *p, float U, float V, const float *lo, float *rgb, int *stp) {
+    uint16_t n = texel(p, (int)U, (int)V);
+    if (!n) return 0;
+    float x_lo = lo[0] + 0.5f, x_hi = lo[1] - 0.5f, y_lo = lo[2] + 0.5f, y_hi = lo[3] - 0.5f;
+    if (x_hi >= x_lo) U = U < x_lo ? x_lo : U > x_hi ? x_hi : U;
+    if (y_hi >= y_lo) V = V < y_lo ? y_lo : V > y_hi ? y_hi : V;
+    U -= 0.5f; V -= 0.5f;
+    int u0 = (int)floorf(U), v0 = (int)floorf(V);
+    float au = U - (float)u0, av = V - (float)v0;
+    uint16_t q[4] = {texel(p, u0, v0), texel(p, u0 + 1, v0), texel(p, u0, v0 + 1), texel(p, u0 + 1, v0 + 1)};
+    float wt[4] = {(1 - au) * (1 - av), au * (1 - av), (1 - au) * av, au * av};
+    float r = 0, g = 0, b = 0, sum = 0;
+    for (int i = 0; i < 4; i++) {
+        if (!q[i]) continue;
+        r += wt[i] * (float)(q[i] & 31);
+        g += wt[i] * (float)((q[i] >> 5) & 31);
+        b += wt[i] * (float)((q[i] >> 10) & 31);
+        sum += wt[i];
+    }
+    if (sum <= 0) { r = (float)(n & 31); g = (float)((n >> 5) & 31); b = (float)((n >> 10) & 31); sum = 1; }
+    const float k = 255.0f / 31.0f;
+    rgb[0] = r / sum * k; rgb[1] = g / sum * k; rgb[2] = b / sum * k;
+    *stp = (n & 0x8000) != 0;
+    return 1;
+}
+
+/* An HD texel or a smoothed game texel, lit, to the 15-bit picture. The
+ * light is applied to the full 8-bit colour and the result dithered down
+ * (finely, at the high resolution): rounded to the PS1's 5 bits first, a
+ * smooth texture under the game's shading shows hard bands, dark contour
+ * lines that crawl as the light on a surface changes. */
 static inline void shade_hd(const RPrim *p, uint16_t *d, int r, int g, int b, float U, float V, const float *lo, int x, int y) {
     float c[3];
     int stp;
-    if (!hd_texel(p, U, V, lo, c, &stp)) return;
+    if (!p->hd) {
+        if (!smooth_texel(p, U, V, lo, c, &stp)) return;
+    } else if (!hd_texel(p, U, V, lo, c, &stp)) return;
     /* blended where the game's own texel is (its STP bit): packs made for
      * Beetle PSX mostly leave alpha at 255, which would make a game's
      * see-through glows and glass solid */
@@ -205,8 +241,10 @@ static inline void shade_hd(const RPrim *p, uint16_t *d, int r, int g, int b, fl
     if (!p->raw) {
         c[0] *= (float)r * (1.0f / 128); c[1] *= (float)g * (1.0f / 128); c[2] *= (float)b * (1.0f / 128);
     }
-    /* 0..255 to 0..31 with the dither's fraction added */
-    float dt = ((float)bayer4[y & 3][x & 3] + 0.5f) * (1.0f / 16);
+    /* 0..255 to 0..31 with the dither's fraction added. A smoothed game
+     * texel keeps the PS1's brightness on average: its shading truncates
+     * (shade), so the dither is centred on 0 instead of 1/2. */
+    float dt = ((float)bayer4[y & 3][x & 3] + 0.5f) * (1.0f / 16) - (p->hd ? 0.0f : 0.5f);
     int o[3];
     for (int i = 0; i < 3; i++) {
         int v = (int)(c[i] * (31.0f / 255.0f) + dt);
@@ -327,6 +365,10 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
         pv = plane(Xd, Yd, v[0].v, v[1].v, v[2].v);
     }
     int dith = p->dither && s == 1 && (gour || (p->textured && !p->raw));
+    /* Smooth textures: the game's own textures on 3D surfaces (every corner
+     * from the GTE) in the high-resolution picture; 2D (menus, the HUD,
+     * text) keeps its sharp texels. */
+    int smooth = g_smooth_tex && p->textured && p->zt && s > 1 && t->buf == hires;
     /* Texture coordinates stay off the far edge of the triangle's texture
      * area (its largest u and v), as on the PS1: it never draws a
      * triangle's right and bottom edge, so at 1x the texel column and row
@@ -464,7 +506,7 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                     cb = cb < 0 ? 0 : cb > 255 ? 255 : cb;
                 }
                 if (g_sliver_mark && zuse && !zwrite) { row[x] = core == 2 ? 0x03E0 : 0x001F; goto next; }
-                if (p->hd) {
+                if (p->hd || smooth) {
                     float U = (float)u * (1.0f / 65536), V = (float)vv * (1.0f / 65536);
                     float ulo = (float)umin, uhi = (float)umax + 0.999f, vlo = (float)vmin, vhi = (float)vmax + 0.999f;
                     U = U < ulo ? ulo : U > uhi ? uhi : U;

@@ -38,6 +38,7 @@ typedef struct {
     int god_mode, infinite_ammo, no_reload;
     int auto_resolution;       /* lower the resolution when falling behind */
     int perspective;           /* perspective-correct textures */
+    int smooth_textures;       /* bilinear filtering of the game's 3D textures at 2x and higher */
     int brightness;            /* %, 100 = the PlayStation's */
     int field_of_view;         /* degrees across 4:3; 0 = the game's own (61) */
     int volume;                /* master, 0-100 % */
