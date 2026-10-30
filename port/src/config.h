@@ -36,6 +36,7 @@ typedef struct {
     int depth_buffer;              /* depth-test 3D at high resolution */           /* bicubic, deblocked movies at the internal resolution */
     int skip_intro;
     int god_mode, infinite_ammo, no_reload;
+    int auto_resolution;       /* lower the resolution when falling behind */
     int perspective;           /* perspective-correct textures */
     int brightness;            /* %, 100 = the PlayStation's */
     int field_of_view;         /* degrees across 4:3; 0 = the game's own (61) */

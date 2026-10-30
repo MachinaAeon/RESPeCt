@@ -32,6 +32,14 @@ memory card and the installed data. To uninstall, delete the folder (back up
 Windows may warn that the program is from an unknown publisher, because it
 isn't code-signed. Click **More info → Run anyway**.
 
+### Running slowly?
+
+RESPeCt draws the game with your CPU, not your graphics card, so a fast
+graphics card doesn't help: the resolution setting matters most. The first
+start picks a resolution to suit your CPU, and if the game still can't keep
+up it lowers it by itself (with a message). You can change it any time in
+**F1 › Video › Resolution**.
+
 ### HD textures (optional)
 
 RESPeCt can use HD texture packs made for the Beetle PSX HW emulator. We

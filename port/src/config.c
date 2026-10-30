@@ -68,6 +68,8 @@ static const char *default_ini =
     "brightness = 100\n"
     "; Perspective-correct textures: no bending or swimming across big polygons.\n"
     "perspective = 1\n"
+    "; Lower the resolution by itself when this PC can't keep the game at full speed.\n"
+    "auto_resolution = 1\n"
     "; Smoother, steadier 3D geometry (less PlayStation wobble).\n"
     "subpixel = 1\n"
     "; Smooth the picture when scaling it to the window (0 = sharp pixels).\n"
@@ -152,6 +154,7 @@ static void set_defaults(void) {
     g_cfg.sens_x = g_cfg.sens_y = 1.0f;
     g_cfg.brightness = 100;
     g_cfg.perspective = 1;
+    g_cfg.auto_resolution = 1;
     g_cfg.look_limit = 67;
     g_cfg.menu_mouse = 1;
     g_cfg.menu_mouse_step = 240;
@@ -251,6 +254,7 @@ static void parse_line(const char *section, char *key, char *val) {
     else if (!strcmp(key, "no_reload")) g_cfg.no_reload = i;
     else if (!strcmp(key, "field_of_view")) g_cfg.field_of_view = i;
     else if (!strcmp(key, "perspective")) g_cfg.perspective = i;
+    else if (!strcmp(key, "auto_resolution")) g_cfg.auto_resolution = i;
     else if (!strcmp(key, "brightness")) g_cfg.brightness = i < 50 ? 50 : i > 200 ? 200 : i;
     else if (!strcmp(key, "volume")) g_cfg.volume = i;
     else if (!strcmp(key, "music_volume")) g_cfg.music_volume = i;
@@ -390,6 +394,7 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "field_of_view")) snprintf(out, n, "%d", g_cfg.field_of_view);
     else if (!strcmp(key, "brightness")) snprintf(out, n, "%d", g_cfg.brightness);
     else if (!strcmp(key, "perspective")) snprintf(out, n, "%d", g_cfg.perspective);
+    else if (!strcmp(key, "auto_resolution")) snprintf(out, n, "%d", g_cfg.auto_resolution);
     else if (!strcmp(key, "volume")) snprintf(out, n, "%d", g_cfg.volume);
     else if (!strcmp(key, "music_volume")) snprintf(out, n, "%d", g_cfg.music_volume);
     else if (!strcmp(key, "sfx_volume")) snprintf(out, n, "%d", g_cfg.sfx_volume);

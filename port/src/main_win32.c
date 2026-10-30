@@ -819,6 +819,8 @@ static void menu_build(void) {
              "Turns loud moments down smoothly instead of letting them distort (clip). Recommended.");
     add_item(2, IT_INT, "Same sound at once", &g_cfg.same_sound_limit, 0, 8, 1,
              "How many copies of one sound effect may play together (a swarm of bugs starts dozens). 0 = no limit, as on the PlayStation.");
+    add_item(1, IT_BOOL, "Auto resolution", &g_cfg.auto_resolution, 0, 1, 1,
+             "Lower the resolution by itself when this PC can't keep the game at full speed (it's drawn by the CPU, not the graphics card).");
     add_item(1, IT_BOOL, "Perspective-correct textures", &g_cfg.perspective, 0, 1, 1,
              "Textures stay straight on big walls and floors instead of bending and swimming as you move (the PlayStation can't do this).");
     add_item(1, IT_BOOL, "Steady 3D", &g_cfg.subpixel, 0, 1, 1, "Smoother geometry without the PlayStation wobble.");
@@ -1252,6 +1254,31 @@ static int in_cutscene(void) {
             MEM_R32(0x800BB19C) != 3);
 }
 
+/* Auto resolution: the game falling behind (most frames of the last few
+ * seconds finished late) at a resolution above 1x: one step lower, with a
+ * message. Never raised again by itself; F1 > Video sets it back. */
+static void auto_resolution(int late) {
+    static int frames, lates, quiet = 300;
+    if (!g_cfg.auto_resolution || menu_open || render_scale() <= 1) { frames = lates = 0; return; }
+    if (quiet > 0) { quiet--; return; }                 /* just started or changed */
+    frames++;
+    lates += late;
+    if (frames < 240) return;
+    int drop = lates * 10 >= frames * 6;
+    rt_log("auto resolution: %d of %d frames late at %dx", lates, frames, render_scale());
+    frames = lates = 0;
+    if (!drop) return;
+    int s = render_scale() - 1;
+    g_cfg.resolution_scale = s;
+    render_set_scale(s);
+    display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+    save_settings();
+    char m[160];
+    snprintf(m, sizeof m, "Resolution lowered to %dx to keep the game at full speed (F1 > Video)", s);
+    show_toast(m);
+    quiet = 600;
+}
+
 /* Called by the runtime at every vblank: show the frame, read input, and
  * wait for the next 1/59.94 s tick. */
 void plat_frame(void) {
@@ -1321,6 +1348,7 @@ void plat_frame(void) {
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
     LONGLONG period = qpf.QuadPart * (263LL * 2152) / CPU_HZ;
+    auto_resolution(next_frame.QuadPart && now.QuadPart > next_frame.QuadPart + period / 8);
     int q = audio_queued();
     if (wave && q > AUDIO_TARGET + 2) period += period / 50;
     else if (wave && q < AUDIO_TARGET - 2) period -= period / 50;
@@ -1386,7 +1414,18 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         char *sl = strrchr(ini, '\\');
         if (sl) strcpy(sl + 1, "resurv.ini");
         snprintf(ini_path, sizeof ini_path, "%s", ini);
+        int fresh = GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES;
         config_load(ini);
+        if (fresh) {
+            /* First start: a resolution this CPU can draw (it draws every
+             * frame; the graphics card doesn't help). */
+            SYSTEM_INFO si0;
+            GetSystemInfo(&si0);
+            int n = (int)si0.dwNumberOfProcessors;
+            g_cfg.resolution_scale = n >= 16 ? 4 : n >= 8 ? 3 : n >= 4 ? 2 : 1;
+            rt_log("settings: first start, %d threads: resolution %dx", n, g_cfg.resolution_scale);
+            save_settings();
+        }
         load_bindings();
         rt_set_look_limit(g_cfg.look_limit);
         g_cheat_god = g_cfg.god_mode;

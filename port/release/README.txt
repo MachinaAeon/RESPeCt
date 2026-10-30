@@ -47,6 +47,15 @@ F2 turns HD textures on or off (also F1 > Video). They show at resolution
 2x and higher. Entering a new room, a texture can show at its original
 resolution for a moment while its HD image loads.
 
+RUNNING SLOWLY?
+---------------
+RESPeCt draws the game with your CPU, not your graphics card, so a fast
+graphics card doesn't help and the resolution setting matters most. The
+first start picks a resolution to suit your CPU, and if the game still
+can't keep up it lowers it by itself (with a message). You can change it
+any time in F1 > Video > Resolution: 1x is the PlayStation's own, 2x is
+four times the work, 4x sixteen. HD textures add a little more.
+
 CONTROLS
 --------
 Mouse: aim and shoot (left button). In menus the mouse moves the cursor
