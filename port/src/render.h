@@ -51,6 +51,7 @@ extern int g_depth_buffer;                         /* setting */                
 const uint16_t *render_hires(int *stride);
 const uint16_t *render_low(void);                 /* 24-bit colour: the low bits of the high-res VRAM (render.c) */
 const uint8_t *render_bare(void);                 /* pixels still bare from the screen clear (render.c) */         /* high-res VRAM (scale x 1024 wide) */
+const float *render_depth(void);                  /* 1/z per high-res pixel, -1 under 2D (render.c) */
 
 extern int g_gap_fill;                     /* Close model gaps (margins on distant models' triangles) */
 

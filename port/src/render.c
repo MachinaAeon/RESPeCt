@@ -115,7 +115,11 @@ static inline void put(uint16_t *d, uint16_t c, int semi, const RPrim *p) {
     *d = c | (p->mask_set ? 0x8000 : 0);
     if (hires) {
         size_t i = (size_t)(d - hires);
-        if (i < hires_n) { if (!semi) bare[i] = 0; low[i] = 0; }
+        if (i < hires_n) {
+            if (!semi) bare[i] = 0;
+            low[i] = 0;
+            if (!p->zt) zbuf[i] = -1;            /* 2D over it (see render_depth) */
+        }
     }
 }
 
@@ -150,6 +154,7 @@ static inline void put8(uint16_t *d, uint16_t *lp, int r, int g, int b, int stp,
     *d = (uint16_t)((stp ? 0x8000 : 0) | (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10) | (p->mask_set ? 0x8000 : 0));
     *lp = (uint16_t)(0x8000 | (r & 7) | ((g & 7) << 3) | ((b & 7) << 6));
     if (!semi) bare[lp - low] = 0;
+    if (!p->zt) zbuf[lp - low] = -1;
 }
 
 /* 5-bit channel to 8 bits, as the picture shows it */
@@ -356,12 +361,11 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     /* edges: e opposite vertex o[e], from o[e+1] to o[e+2] */
     int64_t ex[3], ey[3], ec[3];
     int64_t bias[3], mbias[3];
-    /* Opaque 3D at a higher resolution gets a margin, up to a PS1 pixel
-     * wide, drawn only over what lies well behind it (the depth buffer
-     * says): the PS1's whole pixels close the gaps a model's tiny
-     * triangles and its parts leave between them, gaps that a sharper
-     * picture shows (and that open and shut as models move: flicker). The
-     * model's own triangles, at its own depth, are never drawn over. */
+    /* Opaque 3D at a higher resolution gets a hairline margin (half a
+     * pixel) against the cracks between a model's own triangles. The gaps
+     * between its parts, which the PS1's whole pixels close and a sharper
+     * picture shows, are filled when the picture is shown (Close model
+     * gaps, display.c), so outlines keep their size. */
     int zuse = p->zt && zbuf && t->buf == hires && s > 1;
     double margin = 0;                           /* high-res pixels */
     int guarded = 0;                             /* only over what lies well behind */
@@ -379,7 +383,9 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     int sliver = cross2 * cross2 < 0.0625 * len2;     /* height = cross / length < 1/4 */
     if (zuse && !p->semi && !g_no_overlap && !sliver) {
         margin = 0.5;                            /* hairlines between a model's triangles */
-        if (g_gap_fill) {                        /* Close model gaps: small triangles (distant models) */
+        static int grow = -1;                    /* RT_GAP_GROW: the old Close model gaps, for comparisons */
+        if (grow < 0) grow = getenv("RT_GAP_GROW") != NULL;
+        if (g_gap_fill && grow) {                /* small triangles (distant models) drawn larger */
             double a = fabs((double)(v[1].x - v[0].x) * (v[2].y - v[0].y) - (double)(v[2].x - v[0].x) * (v[1].y - v[0].y)) / 2;
             double m = g_overlap * s;
             /* small in every direction: long thin slivers (the game's
@@ -775,6 +781,7 @@ static void run_ops(int band0, int band1) {
                     hires[i] = src[x / S];
                     low[i] = 0;
                     bare[i] = 0;
+                    zbuf[i] = -1;
                 }
             }
             break;
@@ -968,6 +975,10 @@ int render_scale(void) { return S; }
 /* The high-res VRAM's bare-pixel map (NULL at 1x or with Close model
  * gaps off), same layout as render_hires. */
 const uint8_t *render_bare(void) { return S > 1 && g_gap_fill ? bare : NULL; }
+
+/* The high-res depth (1/z per pixel; 0: no 3D there, -1: 2D drawn over the
+ * 3D), NULL at 1x or with Close model gaps off; same layout as render_hires. */
+const float *render_depth(void) { return S > 1 && g_gap_fill ? zbuf : NULL; }
 
 const uint16_t *render_hires(int *stride) {
     render_sync();
@@ -1168,6 +1179,7 @@ void render_copy(int sx, int sy, int dx, int dy, int w, int h, int mask_set, int
                 *d = row[i] | (mask_set ? 0x8000 : 0);
                 bare[(size_t)(d - hires)] = 0;
                 low[(size_t)(d - hires)] = lrow[i];
+                zbuf[(size_t)(d - hires)] = -1;
             }
         }
         free(row);

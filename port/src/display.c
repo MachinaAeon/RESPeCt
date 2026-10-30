@@ -181,6 +181,71 @@ static void close_cracks(uint32_t *out, const uint8_t *bare, int stride, int s, 
     }
 }
 
+/* Close model gaps, in models: hair-thin holes where the background shows
+ * between a model's parts (their seam's corners a fraction of a PS1 pixel
+ * apart, which the PS1's whole pixels shut; at a higher resolution they
+ * open and close as the model moves). A run under one PS1 pixel long of
+ * pixels well behind, or with no 3D, between two pixels of 3D at about the
+ * same depth, across or down, shows the pixel before it. A model's outline
+ * has 3D on one side only, so it's never widened; 2D drawn over the 3D
+ * (depth -1) is never touched. */
+#define HOLE_BEHIND 64.0f                       /* GTE depth units */
+static void close_holes(uint32_t *out, const float *depth, int stride, int s, int X, int Y, int W, int H) {
+    static float *last_z;
+    static int *last_y, *run_y;
+    static size_t col_n;
+    if ((size_t)W > col_n) {
+        free(last_z); free(last_y); free(run_y);
+        col_n = (size_t)W;
+        last_z = malloc(col_n * sizeof *last_z); last_y = malloc(col_n * sizeof *last_y); run_y = malloc(col_n * sizeof *run_y);
+    }
+    if (!last_z || !last_y || !run_y) return;
+    int mw = 1024 * s, mh = 512 * s, maxrun = s - 1;
+    for (int x = 0; x < W; x++) last_y[x] = run_y[x] = -1;
+    for (int y = 0; y < H; y++) {
+        const float *zr = depth + (size_t)((Y + y) % mh) * stride;
+        uint32_t *o = out + (size_t)y * W;
+        /* across */
+        for (int x = 0; x < W - 1; ) {
+            float z = zr[(X + x) % mw];
+            if (z <= 0) { x++; continue; }
+            float iz = 1.0f / z, far = 1.0f / (iz + HOLE_BEHIND);    /* 1/z below this: well behind */
+            int j = x + 1;
+            while (j < W && j - x - 1 < maxrun) {
+                float zj = zr[(X + j) % mw];
+                if (zj < 0 || zj >= far) break;
+                j++;
+            }
+            if (j > x + 1 && j < W) {
+                float ze = zr[(X + j) % mw];
+                if (ze > 0 && fabsf(1.0f / ze - iz) < HOLE_BEHIND) {
+                    for (int k = x + 1; k < j; k++) o[k] = o[x];
+                    x = j;
+                    continue;
+                }
+            }
+            x++;
+        }
+        /* down: per column, the last 3D pixel and the run behind it */
+        for (int x = 0; x < W; x++) {
+            float z = zr[(X + x) % mw];
+            if (z < 0) { last_y[x] = run_y[x] = -1; continue; }   /* 2D over the 3D */
+            if (last_y[x] >= 0 && (z == 0 || 1.0f / z - 1.0f / last_z[x] > HOLE_BEHIND)) {
+                if (run_y[x] < 0) run_y[x] = y;                     /* behind the last 3D pixel */
+                if (y - run_y[x] + 1 > maxrun) last_y[x] = run_y[x] = -1;
+                continue;
+            }
+            if (z == 0) continue;
+            int r = run_y[x];
+            if (r >= 0 && fabsf(1.0f / z - 1.0f / last_z[x]) < HOLE_BEHIND) {
+                uint32_t c = out[(size_t)(r - 1) * W + x];
+                for (int k = r; k < y; k++) out[(size_t)k * W + x] = c;
+            }
+            last_z[x] = z; last_y[x] = y; run_y[x] = -1;
+        }
+    }
+}
+
 /* Brightness (%): a gamma curve, 100 = as the PlayStation shows it. Above
  * 100 lifts the dark parts most, as a TV's brightness does. */
 int g_brightness = 100;
@@ -260,5 +325,7 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
                 o[x] = lut15[c & 0x7FFF];
         }
     }
+    const float *depth = render_depth();
+    if (depth) close_holes(out, depth, stride, s, X, Y, W, H);
     if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);
 }
