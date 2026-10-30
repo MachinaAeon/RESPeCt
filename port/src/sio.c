@@ -7,6 +7,16 @@
 
 InputState g_input;
 
+/* FPS turning takes the mouse's motion once per game frame, all of it. The
+ * pad buffer the game would read it from is refilled at every vblank, so at
+ * 30 frames a second every other vblank's motion was overwritten before
+ * the game saw it: half of every movement lost, unevenly. */
+void input_take_look(int *dx, int *dy) {
+    *dx = g_input.look_dx;
+    *dy = g_input.look_dy;
+    g_input.look_dx = g_input.look_dy = 0;
+}
+
 static struct {
     uint8_t rx[8];
     int rxn;

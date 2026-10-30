@@ -137,8 +137,10 @@ typedef struct {
     int mouse_present;
     int mouse_dx, mouse_dy;  /* accumulated since last poll */
     int mouse_left, mouse_right;
+    int look_dx, look_dy;    /* the same motion, since the game's last player frame (FPS turning) */
 } InputState;
 extern InputState g_input;
+void input_take_look(int *dx, int *dy);   /* sio.c: the motion for this game frame */
 
 /* platform hooks (headless or SDL) */
 int game_player_in_control(void);

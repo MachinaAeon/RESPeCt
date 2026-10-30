@@ -233,15 +233,17 @@ void plat_frame(void) {
                      MEM_R32(0x800B4BA0), MEM_R32(0x800B3E20));
             if (strcmp(now, last)) { rt_log("flags: %s", now); strcpy(last, now); }
         }
-        /* RT_WATCH=addr: log the 8 bytes there every 10 frames */
+        /* RT_WATCH=addr: log the 8 bytes there every 10 frames (RT_WATCH_EVERY=n: every n) */
         const char *wa = getenv("RT_WATCH");
-        if (wa && g_frame % 10 == 0) {
+        if (wa && g_frame % (getenv("RT_WATCH_EVERY") ? atoi(getenv("RT_WATCH_EVERY")) : 10) == 0) {
             uint32_t a = (uint32_t)strtoul(wa, NULL, 16);
             rt_log("watch %08X: %04X %04X %04X %04X", a, MEM_R16(a), MEM_R16(a + 2), MEM_R16(a + 4), MEM_R16(a + 6));
         }
         if (g_input.mouse_present && g_frame >= (uint32_t)mfrom && g_frame < (uint32_t)mto) {
             g_input.mouse_dx += mdx;
             g_input.mouse_dy += mdy;
+            g_input.look_dx += mdx;
+            g_input.look_dy += mdy;
         }
     }
     {

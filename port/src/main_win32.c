@@ -714,6 +714,7 @@ static void read_input(void) {
         }
         g_input.mouse_left = g_input.mouse_right = 0;
         g_input.mouse_dx = g_input.mouse_dy = 0;
+        g_input.look_dx = g_input.look_dy = 0;
         frac_x = frac_y = 0;
     } else {
         menu_acc_x = menu_acc_y = 0;
@@ -724,10 +725,12 @@ static void read_input(void) {
             was = g_input.mouse_left;
         }
         g_input.mouse_right = 0;
-        g_input.mouse_dx += scaled(&frac_x, dx * 2.0 * g_cfg.sens_x);
-        g_input.mouse_dy += scaled(&frac_y, dy * 2.0 * g_cfg.sens_y * (g_cfg.invert_y ? -1 : 1));
-        g_input.mouse_dx += scaled(&pad_fx, pad_dx);
-        g_input.mouse_dy += scaled(&pad_fy, pad_dy);
+        int mx = scaled(&frac_x, dx * 2.0 * g_cfg.sens_x) + scaled(&pad_fx, pad_dx);
+        int my = scaled(&frac_y, dy * 2.0 * g_cfg.sens_y * (g_cfg.invert_y ? -1 : 1)) + scaled(&pad_fy, pad_dy);
+        g_input.mouse_dx += mx;
+        g_input.mouse_dy += my;
+        g_input.look_dx += mx;
+        g_input.look_dy += my;
     }
     g_input.buttons = b;
     /* Don't build up a backlog of motion the game hasn't read. */
@@ -735,6 +738,10 @@ static void read_input(void) {
     if (g_input.mouse_dx < -512) g_input.mouse_dx = -512;
     if (g_input.mouse_dy > 512) g_input.mouse_dy = 512;
     if (g_input.mouse_dy < -512) g_input.mouse_dy = -512;
+    if (g_input.look_dx > 1024) g_input.look_dx = 1024;
+    if (g_input.look_dx < -1024) g_input.look_dx = -1024;
+    if (g_input.look_dy > 1024) g_input.look_dy = 1024;
+    if (g_input.look_dy < -1024) g_input.look_dy = -1024;
 }
 
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS *ep) {
