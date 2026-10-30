@@ -49,6 +49,7 @@ void render_sync(void);
 void render_zclear(int x, int y, int w, int h);    /* a new frame starts drawing here */
 extern int g_depth_buffer;                         /* setting */                            /* finish queued high-res drawing */
 const uint16_t *render_hires(int *stride);
+const uint16_t *render_low(void);                 /* 24-bit colour: the low bits of the high-res VRAM (render.c) */
 const uint8_t *render_bare(void);                 /* pixels still bare from the screen clear (render.c) */         /* high-res VRAM (scale x 1024 wide) */
 
 extern int g_gap_fill;                     /* Close model gaps (margins on distant models' triangles) */

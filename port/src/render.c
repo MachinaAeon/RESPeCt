@@ -32,6 +32,11 @@ static uint16_t *hires;                      /* (1024*S) x (512*S) */
  * which the PS1's whole pixels shut). The picture shown fills them from
  * the neighbouring pixels (Close model gaps). */
 static uint8_t *bare;
+/* 24-bit colour: the 3 bits of each 8-bit channel that the 15-bit picture
+ * drops (red in bits 0-2, green 3-5, blue 6-8), bit 15 set while they
+ * belong to the pixel there. The PS1's VRAM keeps its 15 bits; this only
+ * makes the picture shown finer. */
+static uint16_t *low;
 static size_t hires_n;
 /* Depth buffer for the high-resolution picture (1/z per pixel, 0 = far).
  * The PS1 has none: it draws a frame's polygons back to front in buckets
@@ -54,6 +59,7 @@ static double g_margin_len = 6;                  /* longest edge (PS1 pixels) of
 int g_gap_fill = 1; 
 int g_persp = 1;                                /* Perspective-correct textures (setting) */
 int g_smooth_tex = 1;                           /* Smooth textures (setting) */
+int g_true_color = 1;                           /* 24-bit colour (setting) */
                             /* Close model gaps (setting) */                                 /* testing: RT_TEX_EDGE samples the far texel edge too */
 static float *zbuf;
 /* What wrote each depth: the texture page and CLUT (a model part and its
@@ -107,11 +113,65 @@ static inline void put(uint16_t *d, uint16_t c, int semi, const RPrim *p) {
         c = (uint16_t)((c & 0x8000) | r | (g << 5) | (b << 10));
     }
     *d = c | (p->mask_set ? 0x8000 : 0);
-    if (bare && !semi) { size_t i = (size_t)(d - hires); if (i < hires_n) bare[i] = 0; }
+    if (hires) {
+        size_t i = (size_t)(d - hires);
+        if (i < hires_n) { if (!semi) bare[i] = 0; low[i] = 0; }
+    }
 }
+
+/* The 24-bit colour plane's entry for a pixel of the high-resolution
+ * picture with 24-bit colour on; NULL otherwise (the PS1's VRAM). */
+static inline uint16_t *low_of(uint16_t *d) {
+    if (!g_true_color || !hires) return NULL;
+    size_t i = (size_t)(d - hires);
+    return i < hires_n ? &low[i] : NULL;
+}
+
+static inline int clamp8(int v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+/* put for 24-bit colour: 8-bit channels, blended in 8 bits (with the pixel
+ * there at its full precision), the top 5 bits to the picture and the rest
+ * to the low plane. */
+static inline void put8(uint16_t *d, uint16_t *lp, int r, int g, int b, int stp, int semi, const RPrim *p) {
+    if (p->mask_check && (*d & 0x8000)) return;
+    r = clamp8(r); g = clamp8(g); b = clamp8(b);
+    if (semi) {
+        int c5[3] = {*d & 31, (*d >> 5) & 31, (*d >> 10) & 31}, bk[3];
+        for (int k = 0; k < 3; k++)
+            bk[k] = (*lp & 0x8000) ? (c5[k] << 3) | ((*lp >> (3 * k)) & 7) : (c5[k] << 3) | (c5[k] >> 2);
+        switch (p->abr) {
+        case 0: r = (bk[0] + r) >> 1; g = (bk[1] + g) >> 1; b = (bk[2] + b) >> 1; break;
+        case 1: r = bk[0] + r; g = bk[1] + g; b = bk[2] + b; break;
+        case 2: r = bk[0] - r; g = bk[1] - g; b = bk[2] - b; break;
+        default: r = bk[0] + (r >> 2); g = bk[1] + (g >> 2); b = bk[2] + (b >> 2); break;
+        }
+        r = clamp8(r); g = clamp8(g); b = clamp8(b);
+    }
+    *d = (uint16_t)((stp ? 0x8000 : 0) | (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10) | (p->mask_set ? 0x8000 : 0));
+    *lp = (uint16_t)(0x8000 | (r & 7) | ((g & 7) << 3) | ((b & 7) << 6));
+    if (!semi) bare[lp - low] = 0;
+}
+
+/* 5-bit channel to 8 bits, as the picture shows it */
+static inline int expand5(int c) { return (c << 3) | (c >> 2); }
 
 /* Shade one pixel: texture and/or colour, dithering, blending. */
 static inline void shade(const RPrim *p, uint16_t *d, int x, int y, int r, int g, int b, int u, int v, int dith) {
+    uint16_t *lp = low_of(d);
+    if (lp) {
+        /* 24-bit colour: lit in full precision, no dither (the PC
+         * version's Direct3D draws so). The game's colour 128 leaves a
+         * texel as it is, as on the PS1. */
+        if (p->textured) {
+            uint16_t t = texel(p, u, v);
+            if (!t) return;
+            int tr = expand5(t & 31), tg = expand5((t >> 5) & 31), tb = expand5((t >> 10) & 31);
+            if (!p->raw) { tr = (tr * r + 64) >> 7; tg = (tg * g + 64) >> 7; tb = (tb * b + 64) >> 7; }
+            put8(d, lp, tr, tg, tb, t & 0x8000, p->semi && (t & 0x8000), p);
+        } else
+            put8(d, lp, r, g, b, 0, p->semi, p);
+        return;
+    }
     if (p->textured) {
         uint16_t t = texel(p, u, v);
         if (!t) return;
@@ -240,6 +300,11 @@ static inline void shade_hd(const RPrim *p, uint16_t *d, int r, int g, int b, fl
     if (p->semi && !stp && (texel(p, (int)U, (int)V) & 0x8000)) stp = 1;
     if (!p->raw) {
         c[0] *= (float)r * (1.0f / 128); c[1] *= (float)g * (1.0f / 128); c[2] *= (float)b * (1.0f / 128);
+    }
+    uint16_t *lp = low_of(d);
+    if (lp) {                                  /* 24-bit colour: as it is */
+        put8(d, lp, (int)(c[0] + 0.5f), (int)(c[1] + 0.5f), (int)(c[2] + 0.5f), stp, p->semi && stp, p);
+        return;
     }
     /* 0..255 to 0..31 with the dither's fraction added. A smoothed game
      * texel keeps the PS1's brightness on average: its shading truncates
@@ -670,6 +735,7 @@ static void run_ops(int band0, int band1) {
                 for (int x = o->x * S; x < (o->x + o->w) * S; x++) {
                     size_t i = (size_t)yy * hires_t.stride + (x % (1024 * S));
                     hires[i] = g_fill_mark && o->w >= 256 ? 0x7C1F : o->color;
+                    low[i] = 0;
                     zbuf[i] = 0;
                     bare[i] = o->w >= 256 && o->h >= 128;
                 }
@@ -690,6 +756,7 @@ static void run_ops(int band0, int band1) {
                 for (int x = 0; x < o->w * S; x++) {
                     size_t i = (size_t)yy * hires_t.stride + ((o->x * S + x) % (1024 * S));
                     hires[i] = src[x / S];
+                    low[i] = 0;
                     bare[i] = 0;
                 }
             }
@@ -815,6 +882,7 @@ void render_init(int scale, int threads) {
         zbuf = calloc((size_t)1024 * S * 512 * S, sizeof *zbuf);
         zid = calloc((size_t)1024 * S * 512 * S, sizeof *zid);
         bare = calloc((size_t)1024 * S * 512 * S, 1);
+        low = calloc((size_t)1024 * S * 512 * S, sizeof *low);
         hires_n = (size_t)1024 * S * 512 * S;
         hires_t = (Target){hires, 1024 * S, S, 512 * S};
     }
@@ -842,6 +910,7 @@ void render_reload(void) {
     if (S > 1) upscale_from_native();
     if (zbuf) memset(zbuf, 0, (size_t)1024 * S * 512 * S * sizeof *zbuf);
     if (bare) memset(bare, 0, hires_n);
+    if (low) memset(low, 0, hires_n * sizeof *low);
 }
 
 void render_set_scale(int scale) {
@@ -852,7 +921,9 @@ void render_set_scale(int scale) {
     free(zbuf);
     free(zid);
     free(bare);
+    free(low);
     bare = NULL;
+    low = NULL;
     hires_n = 0;
     hires = NULL;
     zbuf = NULL;
@@ -864,6 +935,7 @@ void render_set_scale(int scale) {
         zbuf = calloc((size_t)W * 512 * S, sizeof *zbuf);
         zid = calloc((size_t)W * 512 * S, sizeof *zid);
         bare = calloc((size_t)W * 512 * S, 1);
+        low = calloc((size_t)W * 512 * S, sizeof *low);
         hires_n = (size_t)W * 512 * S;
         for (int y = 0; y < 512 * S; y++)
             for (int x = 0; x < W; x++) hires[(size_t)y * W + x] = g_vram[y / S][x / S];
@@ -885,6 +957,10 @@ const uint16_t *render_hires(int *stride) {
     *stride = S > 1 ? 1024 * S : 1024;
     return S > 1 ? hires : &g_vram[0][0];
 }
+
+/* The high-res VRAM's 24-bit colour plane (NULL at 1x), same layout as
+ * render_hires. */
+const uint16_t *render_low(void) { return S > 1 ? low : NULL; }
 
 
 /* The VRAM a textured primitive reads: its texture coordinates' bounds in
@@ -1061,15 +1137,20 @@ void render_copy(int sx, int sy, int dx, int dy, int w, int h, int mask_set, int
     }
     if (S > 1) {
         int W = 1024 * S, H = 512 * S;
-        uint16_t *row = malloc((size_t)w * S * sizeof *row);
+        uint16_t *row = malloc((size_t)w * S * 2 * sizeof *row), *lrow = row + (size_t)w * S;
         for (int j = 0; j < h * S; j++) {
             int ys = (sy * S + j) % H, yd = (dy * S + j) % H;
-            for (int i = 0; i < w * S; i++) row[i] = hires[(size_t)ys * W + (sx * S + i) % W];
+            for (int i = 0; i < w * S; i++) {
+                size_t k = (size_t)ys * W + (sx * S + i) % W;
+                row[i] = hires[k];
+                lrow[i] = low[k];
+            }
             for (int i = 0; i < w * S; i++) {
                 uint16_t *d = &hires[(size_t)yd * W + (dx * S + i) % W];
                 if (mask_check && (*d & 0x8000)) continue;
                 *d = row[i] | (mask_set ? 0x8000 : 0);
                 bare[(size_t)(d - hires)] = 0;
+                low[(size_t)(d - hires)] = lrow[i];
             }
         }
         free(row);

@@ -71,6 +71,9 @@ static const char *default_ini =
     "; Smooth the game's own textures on 3D surfaces at 2x and higher (as the PC\n"
     "; version draws them) instead of the PlayStation's square texels.\n"
     "smooth_textures = 1\n"
+    "; Shade and blend the picture in 24-bit colour at 2x and higher (as the PC\n"
+    "; version does) instead of the PlayStation's 15 bits: no banding in the dark.\n"
+    "true_color = 1\n"
     "; Lower the resolution by itself when this PC can't keep the game at full speed.\n"
     "auto_resolution = 1\n"
     "; Smoother, steadier 3D geometry (less PlayStation wobble).\n"
@@ -158,6 +161,7 @@ static void set_defaults(void) {
     g_cfg.brightness = 100;
     g_cfg.perspective = 1;
     g_cfg.smooth_textures = 1;
+    g_cfg.true_color = 1;
     g_cfg.auto_resolution = 1;
     g_cfg.look_limit = 67;
     g_cfg.menu_mouse = 1;
@@ -259,6 +263,7 @@ static void parse_line(const char *section, char *key, char *val) {
     else if (!strcmp(key, "field_of_view")) g_cfg.field_of_view = i;
     else if (!strcmp(key, "perspective")) g_cfg.perspective = i;
     else if (!strcmp(key, "smooth_textures")) g_cfg.smooth_textures = i;
+    else if (!strcmp(key, "true_color")) g_cfg.true_color = i;
     else if (!strcmp(key, "auto_resolution")) g_cfg.auto_resolution = i;
     else if (!strcmp(key, "brightness")) g_cfg.brightness = i < 50 ? 50 : i > 200 ? 200 : i;
     else if (!strcmp(key, "volume")) g_cfg.volume = i;
@@ -400,6 +405,7 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "brightness")) snprintf(out, n, "%d", g_cfg.brightness);
     else if (!strcmp(key, "perspective")) snprintf(out, n, "%d", g_cfg.perspective);
     else if (!strcmp(key, "smooth_textures")) snprintf(out, n, "%d", g_cfg.smooth_textures);
+    else if (!strcmp(key, "true_color")) snprintf(out, n, "%d", g_cfg.true_color);
     else if (!strcmp(key, "auto_resolution")) snprintf(out, n, "%d", g_cfg.auto_resolution);
     else if (!strcmp(key, "volume")) snprintf(out, n, "%d", g_cfg.volume);
     else if (!strcmp(key, "music_volume")) snprintf(out, n, "%d", g_cfg.music_volume);

@@ -242,16 +242,22 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
     int stride;
     const uint16_t *hv = render_hires(&stride);
     const uint8_t *bare = render_bare();
+    const uint16_t *low = render_low();
     int W = d.w * s, H = d.h * s, X = d.x * s, Y = d.y * s;
     *w = W;
     *h = H;
     for (int y = 0; y < H; y++) {
         size_t ro = (size_t)((Y + y) % (512 * s)) * stride;
-        const uint16_t *row = hv + ro;
+        const uint16_t *row = hv + ro, *lrow = low ? low + ro : NULL;
         uint32_t *o = out + (size_t)y * W;
         for (int x = 0; x < W; x++) {
             int sx = (X + x) % (1024 * s);
-            o[x] = lut15[row[sx] & 0x7FFF];
+            uint16_t c = row[sx], e = lrow ? lrow[sx] : 0;
+            if (e & 0x8000) {                /* drawn in 24-bit colour */
+                uint32_t r = ((c & 31) << 3) | (e & 7), g = (((c >> 5) & 31) << 3) | ((e >> 3) & 7), b = (((c >> 10) & 31) << 3) | ((e >> 6) & 7);
+                o[x] = gamma8[b] | ((uint32_t)gamma8[g] << 8) | ((uint32_t)gamma8[r] << 16);
+            } else
+                o[x] = lut15[c & 0x7FFF];
         }
     }
     if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);

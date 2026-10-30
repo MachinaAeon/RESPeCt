@@ -825,6 +825,8 @@ static void menu_build(void) {
              "Textures stay straight on big walls and floors instead of bending and swimming as you move (the PlayStation can't do this).");
     add_item(1, IT_BOOL, "Smooth textures", &g_cfg.smooth_textures, 0, 1, 1,
              "Smooth the game's own textures on 3D surfaces at 2x and higher, as the PC version draws them, instead of square texels.");
+    add_item(1, IT_BOOL, "24-bit colour", &g_cfg.true_color, 0, 1, 1,
+             "Shade and blend the picture in 24-bit colour at 2x and higher, as the PC version does, instead of the PlayStation's 15 bits: smooth gradients, no banding in the dark.");
     add_item(1, IT_BOOL, "Steady 3D", &g_cfg.subpixel, 0, 1, 1, "Smoother geometry without the PlayStation wobble.");
     add_item(1, IT_BOOL, "Smooth scaling", &g_cfg.smooth_scaling, 0, 1, 1, "Smooth the picture when scaling it to the window.");
     add_item(1, IT_BOOL, "Depth fix", &g_cfg.depth_buffer, 0, 1, 1,
@@ -869,7 +871,7 @@ static void apply_audio(void) {
 static void apply_settings(void) {
     apply_audio();
     g_opt_fov = g_cfg.field_of_view;
-    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp, g_smooth_tex; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; g_smooth_tex = g_cfg.smooth_textures; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
+    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp, g_smooth_tex, g_true_color; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; g_smooth_tex = g_cfg.smooth_textures; g_true_color = g_cfg.true_color; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
     rt_set_look_limit(g_cfg.look_limit);
     g_cheat_god = g_cfg.god_mode;
     g_cheat_infinite_ammo = g_cfg.infinite_ammo;
@@ -1434,7 +1436,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         g_cheat_infinite_ammo = g_cfg.infinite_ammo;
         g_cheat_no_reload = g_cfg.no_reload;
         g_opt_fov = g_cfg.field_of_view;
-    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp, g_smooth_tex; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; g_smooth_tex = g_cfg.smooth_textures; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
+    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp, g_smooth_tex, g_true_color; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; g_smooth_tex = g_cfg.smooth_textures; g_true_color = g_cfg.true_color; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
         apply_audio();
         games_dir();
         pick_latest_slot();
