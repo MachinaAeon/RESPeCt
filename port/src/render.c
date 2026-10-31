@@ -339,9 +339,24 @@ static Plane plane(const double X[3], const double Y[3], double v0, double v1, d
 #define FIX 256                                    /* sub-pixel steps */
 
 int g_zp_on, g_zp_x, g_zp_y; unsigned g_zp_f;
-static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
+
+/* Everything about a triangle that doesn't depend on the pixel: raster_tri
+ * runs it over its pixels, the GPU renderer (render_gpu.c) packs it. */
+typedef struct {
+    int64_t ex[3], ey[3], ec[3], bias[3], mbias[3];
+    double margin;                               /* high-res pixels */
+    int guarded, zuse, ztest, zwrite, gour, dith, smooth, persp, pcol;
+    int umin, umax, vmin, vmax;
+    uint32_t id;
+    int x0, x1, y0, y1;                          /* clipped to the drawing area */
+    Plane pr, pg, pb, pu, pv, pw, qw, qu, qv, qr, qg, qb;
+    int32_t dr, dg, db, du, dv;
+} TriSetup;
+
+static int tri_setup(const Target *t, const RPrim *p, TriSetup *q) {
     const RVtx *v = p->v;
     int s = t->scale;
+    memset(q, 0, sizeof *q);
     /* hardware limit: polygons this large aren't drawn. Not for 3D drawn
      * in perspective at a higher resolution: there the game no longer
      * splits close polygons (rt.c), and a wall right in front of you is
@@ -349,7 +364,7 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     float minxf = fminf(v[0].x, fminf(v[1].x, v[2].x)), maxxf = fmaxf(v[0].x, fmaxf(v[1].x, v[2].x));
     float minyf = fminf(v[0].y, fminf(v[1].y, v[2].y)), maxyf = fmaxf(v[0].y, fmaxf(v[1].y, v[2].y));
     int whole = g_persp && p->zt == 2 && t->buf == hires && t->scale > 1;
-    if ((maxxf - minxf >= 1024 || maxyf - minyf >= 512) && !whole) return;
+    if ((maxxf - minxf >= 1024 || maxyf - minyf >= 512) && !whole) return 0;
     int64_t X[3], Y[3];
     double Xd[3], Yd[3];
     for (int i = 0; i < 3; i++) {
@@ -359,12 +374,10 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
         Y[i] = (int64_t)llround(Yd[i] * FIX);
     }
     int64_t area = (X[1] - X[0]) * (Y[2] - Y[0]) - (X[2] - X[0]) * (Y[1] - Y[0]);
-    if (area == 0) return;
+    if (area == 0) return 0;
     int o[3] = {0, 1, 2};
     if (area < 0) { o[1] = 2; o[2] = 1; }
     /* edges: e opposite vertex o[e], from o[e+1] to o[e+2] */
-    int64_t ex[3], ey[3], ec[3];
-    int64_t bias[3], mbias[3];
     /* Opaque 3D at a higher resolution gets a hairline margin (half a
      * pixel) against the cracks between a model's own triangles. The gaps
      * between its parts, which the PS1's whole pixels close and a sharper
@@ -408,13 +421,13 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     }
     for (int e = 0; e < 3; e++) {
         int a = o[(e + 1) % 3], b = o[(e + 2) % 3];
-        ex[e] = -(Y[b] - Y[a]);                   /* d/dx */
-        ey[e] = (X[b] - X[a]);                    /* d/dy */
-        ec[e] = -(ex[e] * X[a] + ey[e] * Y[a]);
+        q->ex[e] = -(Y[b] - Y[a]);                /* d/dx */
+        q->ey[e] = (X[b] - X[a]);                 /* d/dy */
+        q->ec[e] = -(q->ex[e] * X[a] + q->ey[e] * Y[a]);
         int dy = (int)(Y[b] - Y[a]), dx = (int)(X[b] - X[a]);
         int top_left = (dy < 0) || (dy == 0 && dx > 0);
-        bias[e] = top_left ? 0 : -1;
-        mbias[e] = bias[e] + (int64_t)(margin * FIX * sqrt((double)ex[e] * ex[e] + (double)ey[e] * ey[e]));
+        q->bias[e] = top_left ? 0 : -1;
+        q->mbias[e] = q->bias[e] + (int64_t)(margin * FIX * sqrt((double)q->ex[e] * q->ex[e] + (double)q->ey[e] * q->ey[e]));
     }
     int x0 = (int)floor(minxf * s), x1 = (int)ceil(maxxf * s);
     int y0 = (int)floor(minyf * s), y1 = (int)ceil(maxyf * s);
@@ -424,26 +437,28 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     if (x1 > cx1) x1 = cx1;
     if (y0 < cy0) y0 = cy0;
     if (y1 > cy1) y1 = cy1;
-    if (y0 < band0) y0 = band0;
-    if (y1 >= band1) y1 = band1 - 1;
-    if (x0 > x1 || y0 > y1) return;
+    if (x0 > x1 || y0 > y1) return 0;
+    q->x0 = x0; q->x1 = x1; q->y0 = y0; q->y1 = y1;
+    q->margin = margin;
+    q->guarded = guarded;
+    q->zuse = zuse;
 
-    Plane pr = {0}, pg = {0}, pb = {0}, pu = {0}, pv = {0};
     int gour = p->gouraud;
     if (gour) {
-        pr = plane(Xd, Yd, v[0].r, v[1].r, v[2].r);
-        pg = plane(Xd, Yd, v[0].g, v[1].g, v[2].g);
-        pb = plane(Xd, Yd, v[0].b, v[1].b, v[2].b);
+        q->pr = plane(Xd, Yd, v[0].r, v[1].r, v[2].r);
+        q->pg = plane(Xd, Yd, v[0].g, v[1].g, v[2].g);
+        q->pb = plane(Xd, Yd, v[0].b, v[1].b, v[2].b);
     }
     if (p->textured) {
-        pu = plane(Xd, Yd, v[0].u, v[1].u, v[2].u);
-        pv = plane(Xd, Yd, v[0].v, v[1].v, v[2].v);
+        q->pu = plane(Xd, Yd, v[0].u, v[1].u, v[2].u);
+        q->pv = plane(Xd, Yd, v[0].v, v[1].v, v[2].v);
     }
-    int dith = p->dither && s == 1 && (gour || (p->textured && !p->raw));
+    q->gour = gour;
+    q->dith = p->dither && s == 1 && (gour || (p->textured && !p->raw));
     /* Smooth textures: the game's own textures on 3D surfaces (every corner
      * from the GTE) in the high-resolution picture; 2D (menus, the HUD,
      * text) keeps its sharp texels. */
-    int smooth = g_smooth_tex && p->textured && p->zt && s > 1 && t->buf == hires;
+    q->smooth = g_smooth_tex && p->textured && p->zt && s > 1 && t->buf == hires;
     /* Texture coordinates stay off the far edge of the triangle's texture
      * area (its largest u and v), as on the PS1: it never draws a
      * triangle's right and bottom edge, so at 1x the texel column and row
@@ -459,19 +474,19 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
         if (umax > umin) umax--;
         if (vmax > vmin) vmax--;
     }
+    q->umin = umin; q->umax = umax; q->vmin = vmin; q->vmax = vmax;
     /* depth: 1/z, linear on the screen */
-    int ztest = zuse && g_depth_buffer;              /* the Depth fix setting */
+    q->ztest = zuse && g_depth_buffer;               /* the Depth fix setting */
     /* Slivers (the game's thin highlight strips, edge on surfaces) don't
      * hide anything: what the game draws over them still covers them. */
-    int zwrite = zuse && !sliver;
+    q->zwrite = zuse && !sliver;
     /* texture page and CLUT: a model part's own triangles share both;
      * decals (a dart board on a wall) and other objects drawn with the
      * room's page have their own CLUT */
-    uint32_t id = p->textured ? 1u + (uint32_t)(p->tx >> 6) + ((uint32_t)(p->ty >> 8) << 4) +
-                                ((uint32_t)(p->clut_x >> 4) << 5) + ((uint32_t)p->clut_y << 11)
-                              : 0xFFFFFFFFu;
-    Plane pw = {0};
-    if (zuse) pw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
+    q->id = p->textured ? 1u + (uint32_t)(p->tx >> 6) + ((uint32_t)(p->ty >> 8) << 4) +
+                          ((uint32_t)(p->clut_x >> 4) << 5) + ((uint32_t)p->clut_y << 11)
+                        : 0xFFFFFFFFu;
+    if (zuse) q->pw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
     /* Perspective-correct textures (a 3D polygon, every corner's depth
      * known): the PS1 interpolates u and v straight across the screen,
      * which bends a texture's straight lines across big polygons and makes
@@ -484,16 +499,15 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
      * close polygons into smaller ones. Direct3D (the PC version) spreads
      * them in perspective. */
     int pcol = pz && gour;
-    Plane qw = {0}, qu = {0}, qv = {0}, qr = {0}, qg = {0}, qb = {0};
-    if (persp || pcol) qw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
+    if (persp || pcol) q->qw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
     if (pcol) {
-        qr = plane(Xd, Yd, v[0].r / v[0].z, v[1].r / v[1].z, v[2].r / v[2].z);
-        qg = plane(Xd, Yd, v[0].g / v[0].z, v[1].g / v[1].z, v[2].g / v[2].z);
-        qb = plane(Xd, Yd, v[0].b / v[0].z, v[1].b / v[1].z, v[2].b / v[2].z);
+        q->qr = plane(Xd, Yd, v[0].r / v[0].z, v[1].r / v[1].z, v[2].r / v[2].z);
+        q->qg = plane(Xd, Yd, v[0].g / v[0].z, v[1].g / v[1].z, v[2].g / v[2].z);
+        q->qb = plane(Xd, Yd, v[0].b / v[0].z, v[1].b / v[1].z, v[2].b / v[2].z);
     }
     if (persp) {
-        qu = plane(Xd, Yd, v[0].u / v[0].z, v[1].u / v[1].z, v[2].u / v[2].z);
-        qv = plane(Xd, Yd, v[0].v / v[0].z, v[1].v / v[1].z, v[2].v / v[2].z);
+        q->qu = plane(Xd, Yd, v[0].u / v[0].z, v[1].u / v[1].z, v[2].u / v[2].z);
+        q->qv = plane(Xd, Yd, v[0].v / v[0].z, v[1].v / v[1].z, v[2].v / v[2].z);
         static int pl = -1;
         if (pl < 0) pl = getenv("RT_PERSP_LOG") != NULL;
         if (pl) {
@@ -503,9 +517,33 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                        v[0].x, v[0].y, v[1].x, v[1].y, v[2].x, v[2].y, v[0].u, v[0].v, v[1].u, v[1].v, v[2].u, v[2].v);
         }
     }
+    q->persp = persp;
+    q->pcol = pcol;
     const int32_t one = 65536;
-    int32_t dr = (int32_t)(pr.a * one), dg = (int32_t)(pg.a * one), db = (int32_t)(pb.a * one);
-    int32_t du = (int32_t)(pu.a * one), dv = (int32_t)(pv.a * one);
+    q->dr = (int32_t)(q->pr.a * one); q->dg = (int32_t)(q->pg.a * one); q->db = (int32_t)(q->pb.a * one);
+    q->du = (int32_t)(q->pu.a * one); q->dv = (int32_t)(q->pv.a * one);
+    return 1;
+}
+
+static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
+    TriSetup q;
+    if (!tri_setup(t, p, &q)) return;
+    const RVtx *v = p->v;
+    int s = t->scale;
+    int x0 = q.x0, x1 = q.x1, y0 = q.y0, y1 = q.y1;
+    if (y0 < band0) y0 = band0;
+    if (y1 >= band1) y1 = band1 - 1;
+    if (y0 > y1) return;
+    const int64_t *ex = q.ex, *ey = q.ey, *ec = q.ec, *bias = q.bias, *mbias = q.mbias;
+    double margin = q.margin;
+    int guarded = q.guarded, zuse = q.zuse, ztest = q.ztest, zwrite = q.zwrite, gour = q.gour, dith = q.dith;
+    int smooth = q.smooth, persp = q.persp, pcol = q.pcol;
+    int umin = q.umin, umax = q.umax, vmin = q.vmin, vmax = q.vmax;
+    uint32_t id = q.id;
+    Plane pr = q.pr, pg = q.pg, pb = q.pb, pu = q.pu, pv = q.pv, pw = q.pw;
+    Plane qw = q.qw, qu = q.qu, qv = q.qv, qr = q.qr, qg = q.qg, qb = q.qb;
+    const int32_t one = 65536;
+    int32_t dr = q.dr, dg = q.dg, db = q.db, du = q.du, dv = q.dv;
     for (int y = y0; y <= y1; y++) {
         int64_t py = (int64_t)y * FIX;
         int64_t w[3];
