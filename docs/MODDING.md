@@ -41,7 +41,7 @@ mods/
 | Bosses' models, enemy textures | `RESOURCE/TAIRANT.HMD`, `RESOURCE/DEBUGTA00.TIM`... | `extract`, the PC's `Resource` |
 | 2D screens: maps, results, title and menus, fonts | `map/MAP00_1.png`, `RESULT/RANK_A.png`, `RESOURCE/TITLE10.png`... (BMP works too) | `extract`, `PSX_DATA`, `Resource` |
 | An enemy's skin | `nab/ENEMnn.png`, nn its type (00 to 30) | `extract` |
-| An enemy's textures and animations, the PC's way | `nab/ENEMnn.NAB`, `nab/ENEMnn.NAC` | the PC's `nab` |
+| An enemy's shape, textures and animations, the PC's way | `nab/ENEMnn.NAB`, `nab/ENEMnn.NAC` | the PC's `nab` |
 | Music, voices, a movie's sound | `X/BGM_32.STR/05.wav`: a channel of a stream | `extract` |
 | A movie's pictures | `M/OPENING.STR/0042.png`: frame 42 | `movie_dump` (below) |
 | Any texture in HD | a texture pack (see the README) | |
@@ -101,14 +101,20 @@ An enemy's look and movement are in the PC version's `nab` folder as
 animations), nn the enemy's type. They are the PS1's own data read out
 into another form, so RESPeCt converts them back:
 
+- from a NAB, its shape: where each vertex is (each body part's, around
+  its joint), its normals (the light on it) and where each polygon takes
+  its texture from (UVs);
 - from a NAB, its textures (edit them with a NAB tool, or give the skin
   as a picture: `nab/ENEMnn.png`, which `extract` has for every type);
 - from a NAC, its animations: every key (each bone's rotation and
   position over time) and the animation script.
 
-What can't be done yet: changing the model's shape (the NAB's polygons are
-read but not used), adding animations or keys (a NAC has to have as many
-as the PS1's), and the types the PS1 keeps otherwise (31 to 37).
+Vertices can be moved as far as you like, but polygons can't be added or
+taken away, nor animations or keys (a NAB has to have as many polygons
+as the PS1's model, a NAC as many keys); the log says when one doesn't
+match. Type 30's model on the PS1 isn't the one in the PC's NAB, so only
+its textures and animations are taken from it; types 31 to 37 the PS1
+keeps in other forms.
 
 ## Music, voices and movies' sound
 

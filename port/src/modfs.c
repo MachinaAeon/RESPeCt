@@ -1472,6 +1472,110 @@ static const char *nac_into(const uint8_t *nac, long n, uint8_t *A, uint32_t na)
     return NULL;
 }
 
+static int16_t sat16(float f) {
+    long v = lrintf(f);
+    return (int16_t)(v < -32768 ? -32768 : v > 32767 ? 32767 : v);
+}
+
+/* The NAB's shape into the PS1's model (B: 2, then the vertices and
+ * normals, then the HMD). The NAB's triangles are the HMD's textured
+ * polygons (GT3; GT4 as two: corners 0,1,2 and 3,2,1) ordered by
+ * material (the NAB's textures, each on its VRAM texture page), then by
+ * block, then as in the HMD; untextured ones come last and aren't
+ * shapes anyone edits. A corner gives its vertex's position (the PC's z
+ * is the PS1's -z), its normal and its UV (in the material's texture,
+ * the polygon's page counted from it). Only what differs from the disc's
+ * is written, so a vertex shared by many corners takes the one that was
+ * moved. NULL, or why not. */
+static const char *nab_shape(const uint8_t *nab, long n, uint8_t *B, uint32_t nb, uint32_t timw, int *ntri, int *moved) {
+    if (n < 8 || nb < 12 || rd32(B) != 2) return "the disc's model isn't laid out as expected";
+    uint32_t nv = rd32(nab), o0 = rd32(B + 4), o1 = rd32(B + 8);
+    if (o0 + 8 > o1 || o1 + 16 > nb) return "the disc's model isn't laid out as expected";
+    uint32_t vb = o0 + rd32(B + o0) * 4, nbase = o0 + rd32(B + o0 + 4) * 4;
+    if (vb > nbase || nbase > o1) return "the disc's model isn't laid out as expected";
+    uint32_t nvert = (nbase - vb) / 8, nnorm = (o1 - nbase) / 8;
+    /* the NAB's materials: texture page and size */
+    struct { uint32_t page, w, h; } mat[8];
+    uint64_t at = 8 + (uint64_t)nv * 36;
+    if (at + 4 > (uint64_t)n) return "it's cut short";
+    uint32_t nm = rd32(nab + at);
+    at += 4;
+    if (nm > 8) return "it has more materials than this reads";
+    for (uint32_t m = 0; m < nm; m++) {
+        if (at + 352 > (uint64_t)n) return "it's cut short";
+        uint32_t ntx = rd32(nab + at + 8);
+        mat[m].page = rd32(nab + at + 4) & 0x1F;
+        mat[m].w = mat[m].h = 0;
+        at += 352;
+        for (uint32_t t = 0; t < ntx; t++) {
+            if (at + 16 > (uint64_t)n) return "it's cut short";
+            if (!mat[m].w) { mat[m].w = rd32(nab + at + 8); mat[m].h = rd32(nab + at + 12); }
+            at += 16 + (uint64_t)rd32(nab + at);
+        }
+    }
+    uint8_t *was = malloc(nb);                   /* the disc's, to tell what the NAB changes */
+    if (!was) return "out of memory";
+    memcpy(was, B, nb);
+    const uint8_t *h = B + o1;
+    uint32_t hw = (nb - o1) / 4;
+#define HW(i) ((uint32_t)(i) < hw ? rd32(h + 4 * (uint32_t)(i)) : 0xFFFFFFFFu)
+    /* the textured polygons, in the NAB's order */
+    uint32_t tri = 0, nblk = HW(3);
+    *moved = 0;
+    for (uint32_t m = 0; m < nm; m++)
+        for (uint32_t bi = 0; bi < nblk && bi < 256; bi++)
+            for (uint32_t p = HW(4 + bi), guard = 0; p && p != 0xFFFFFFFFu && guard < 4096; p = HW(p), guard++) {
+                uint32_t nt = HW(p + 2) & 0xFFFF, base = HW(HW(p + 1) + 1) & 0x7FFFFFFF;
+                for (uint32_t t = 0; t < nt && t < 4096; t++) {
+                    uint32_t ty = HW(p + 3 + 3 * t), sz = HW(p + 4 + 3 * t), idx = HW(p + 5 + 3 * t);
+                    if (ty & 0xFF000000u) break;
+                    if ((ty & 0xFF) != 0x0D && (ty & 0xFF) != 0x15) continue;
+                    int quad = (ty & 0x10) != 0;
+                    for (uint32_t k = 0; k < ((sz >> 16) & 0x7FFF); k++) {
+                        uint32_t w0 = base + idx + k * (quad ? 7 : 6);
+                        if (w0 + 7 > hw) { free(was); return "the disc's model isn't laid out as expected"; }
+                        uint8_t *a = (uint8_t *)h + 4 * w0;
+                        uint32_t pg = (rd32(a + 4) >> 16) & 0x1F, best = nm;
+                        for (uint32_t q = 0; q < nm; q++)   /* the material whose page it is on */
+                            if ((mat[q].page & 0x10) == (pg & 0x10) && (mat[q].page & 0xF) <= (pg & 0xF) &&
+                                (best == nm || (mat[q].page & 0xF) > (mat[best].page & 0xF)))
+                                best = q;
+                        if (best != m) continue;
+                        static const int corners[2][3] = {{0, 1, 2}, {3, 2, 1}};
+                        for (int half = 0; half < (quad ? 2 : 1); half++, tri++) {
+                            if (tri >= nv / 3) { free(was); return "it has fewer polygons than the PS1's model (they can be moved, not added or taken away)"; }
+                            for (int c = 0; c < 3; c++) {
+                                int corner = corners[half][c];
+                                uint32_t ni, vi;
+                                if (!quad) { ni = rd16(a + 12 + 4 * corner); vi = rd16(a + 14 + 4 * corner); }
+                                else if (!corner) { ni = rd16(a + 10); vi = rd16(a + 14); }
+                                else { ni = rd16(a + 16 + 4 * (corner - 1)); vi = rd16(a + 18 + 4 * (corner - 1)); }
+                                if (vi >= nvert || ni >= nnorm) { free(was); return "the disc's model isn't laid out as expected"; }
+                                float f[9];
+                                memcpy(f, nab + 8 + (size_t)(3 * tri + c) * 36, sizeof f);
+                                int16_t pos[3] = {sat16(f[0]), sat16(f[1]), sat16(-f[2])}, nor[3] = {sat16(f[3]), sat16(f[4]), sat16(-f[5])};
+                                uint32_t ov = vb + 8 * vi, on = nbase + 8 * ni;
+                                for (int x = 0; x < 3; x++) {
+                                    if ((int16_t)rd16(was + ov + 2 * x) != pos[x]) { wr16(B + ov + 2 * x, (uint16_t)pos[x]); (*moved)++; }
+                                    if ((int16_t)rd16(was + on + 2 * x) != nor[x]) wr16(B + on + 2 * x, (uint16_t)nor[x]);
+                                }
+                                uint32_t wm = !m && timw ? timw : mat[m].w, hm = mat[m].h ? mat[m].h : 256;
+                                long u = lrintf(f[7] * (float)wm) - 64 * (long)((pg & 0xF) - (mat[m].page & 0xF)), v = lrintf(f[8] * (float)hm);
+                                uint8_t nu = (uint8_t)(u < 0 ? 0 : u > 255 ? 255 : u), nv8 = (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v);
+                                size_t ua = (size_t)(a - B) + 4 * (size_t)corner;
+                                if (was[ua] != nu) a[4 * corner] = nu;
+                                if (was[ua + 1] != nv8) a[4 * corner + 1] = nv8;
+                            }
+                        }
+                    }
+                }
+            }
+#undef HW
+    free(was);
+    *ntri = (int)tri;
+    return NULL;
+}
+
 /* The NAB's textures into the PS1's 16-bit TIMs (in order, same height). */
 static const char *nab_into(const uint8_t *nab, long n, uint8_t *tex, uint32_t nt, int *ntex) {
     if (n < 8) return "it's cut short";
@@ -1558,9 +1662,23 @@ static void enemies_done(void) {
             if (why) { note("mods: %s: %s: not used", e->what[0], why); nused--; }
             else {
                 packed_note(p, 0, e->what[0]);
-                note("mods: %s: its textures (%d) in place of enemy type %d's (the model's shape isn't taken)", e->what[0], ntex, e->type);
+                note("mods: %s: its textures (%d) in place of enemy type %d's", e->what[0], ntex, e->type);
             }
         }
+        if (e->data[0] && e->type != 30) {      /* the NAB's shape (type 30's model on the disc isn't the NAB's) */
+            uint32_t nt = 0, n2 = 0, tw = 0, th = 0;
+            uint8_t *tex = packed_part(p, 0, &nt), *skin = tex ? enemy_skin(tex, nt) : NULL;
+            if (skin) tim_size(skin, &tw, &th);
+            u = packed_part(p, 2, &n2);
+            int ntri = 0, moved = 0;
+            why = u ? nab_shape(e->data[0], e->n[0], u, n2, tw, &ntri, &moved) : "the disc's model couldn't be unpacked";
+            if (why) note("mods: %s: its shape: %s: not used (its textures are)", e->what[0], why);
+            else if (p->was[2] && memcmp(p->was[2], u, n2)) {
+                packed_note(p, 2, e->what[0]);
+                note("mods: %s: its shape in place of enemy type %d's (%d polygons; %d vertex coordinates moved)", e->what[0], e->type, ntri, moved);
+            }
+        } else if (e->data[0])
+            note("mods: %s: type 30's model on the disc isn't the one in the NAB: its shape isn't taken", e->what[0]);
         if (e->data[2]) {                        /* a picture of the skin: after the NAB's, so it wins */
             u = packed_part(p, 0, &n);
             uint8_t *tim = u ? enemy_skin(u, n) : NULL;
