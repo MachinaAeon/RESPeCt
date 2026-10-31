@@ -901,8 +901,14 @@ static Precise *precise_find(uint32_t word) {
     return NULL;
 }
 
-static float g_weld = -1;                       /* weld radius, pixels (RT_WELD) */
-#define WELD (g_weld >= 0 ? g_weld : (g_weld = getenv("RT_WELD") ? (float)atof(getenv("RT_WELD")) : 0.35f))
+/* Weld radius, pixels (RT_WELD; 0: off). Off now: with the models'
+ * matrices in full precision a seam's corners already meet, and a distant
+ * model has many corners within a fraction of a pixel of each other, so
+ * welding them snapped a head's or a hand's corner onto a neighbour's for
+ * a frame or a few (half a PS1 pixel, 4 at 8x): necks and wrists that
+ * jumped as the camera moved. 0.35 was the old radius. */
+static float g_weld = -1;
+#define WELD (g_weld >= 0 ? g_weld : (g_weld = getenv("RT_WELD") ? (float)atof(getenv("RT_WELD")) : 0.0f))
 
 
 static unsigned st_addr, st_addr_amb, st_hash, st_hash_amb, st_miss;
