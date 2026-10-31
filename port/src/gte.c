@@ -250,6 +250,19 @@ static int whole_corner(void) {
            !(G.flag & (3u << 17));
 }
 
+/* NCLIP from the corners' fractions, when they're the whole ones' own (the
+ * high-resolution picture; RT_INT_NCLIP: whole pixels, for comparisons).
+ * Within a few pixels: a model's precise matrices put its corners up to a
+ * pixel or so from the GTE's own. */
+static int precise_nclip(void) {
+    static int off = -1;
+    if (off < 0) off = getenv("RT_INT_NCLIP") != NULL;
+    if (off || !g_subpixel) return 0;
+    for (int i = 0; i < 3; i++)
+        if (fabsf(G.fx[i] - G.sx[i]) > 4.0f || fabsf(G.fy[i] - G.sy[i]) > 4.0f) return 0;
+    return 1;
+}
+
 static void push_sxy(int32_t x, int32_t y, float fx, float fy) {
     int whole = whole_corner();
     if (x < -0x400) { if (!whole) { G.flag |= 1u << 14; fx = -1024.0f; } x = -0x400; }
@@ -417,6 +430,17 @@ void gte_command(uint32_t cmd) {
     case 0x06: {                                                     /* NCLIP */
         int64_t v = (int64_t)G.sx[0] * G.sy[1] + (int64_t)G.sx[1] * G.sy[2] + (int64_t)G.sx[2] * G.sy[0] -
                     (int64_t)G.sx[0] * G.sy[2] - (int64_t)G.sx[1] * G.sy[0] - (int64_t)G.sx[2] * G.sy[1];
+        if (precise_nclip()) {
+            /* The face's side from its corners' true positions: on whole
+             * pixels a small or distant face that's nearly edge-on, or a
+             * hair's width, comes out the wrong way or of no area at all, so
+             * the game drops it, and as the camera moves it comes and goes:
+             * distant models' faces flicker and holes open. The game only
+             * uses the sign (and zero) to keep or drop the face. */
+            double a = (double)G.fx[0] * G.fy[1] + (double)G.fx[1] * G.fy[2] + (double)G.fx[2] * G.fy[0] -
+                       (double)G.fx[0] * G.fy[2] - (double)G.fx[1] * G.fy[0] - (double)G.fx[2] * G.fy[1];
+            v = a > 0 ? (a < 1 ? 1 : (int64_t)a) : a < 0 ? (a > -1 ? -1 : (int64_t)a) : 0;
+        }
         set_mac(0, v, 0);
         break;
     }
