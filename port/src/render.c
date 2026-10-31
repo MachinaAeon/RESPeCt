@@ -62,11 +62,15 @@ static float g_depth_rel = 0;               /* ... or this share of the distance
 static int g_fill_mark, g_sliver_mark;                          /* testing: RT_FILL_MARK fills the screen magenta (gaps show) */
 static int g_depth_any;                          /* testing: RT_DEPTH_ANY hides any model behind any */
 static int g_far_page = 1;                       /* RT_FAR_PAGE=0: off */
-/* Another object: hidden this far behind (RT_CROSS_TOL; 0 = never), well
- * behind only: a model reaching into another (a dead zombie's hand through
- * the floor, the lab tyrant into its tank's frame) stays drawn as on the
- * PS1. A model's own parts are one object (same_object). */
-static float g_cross_tol = 128;
+/* Another object: hidden this far behind (RT_CROSS_TOL; 0 = never). Never
+ * now (was 128): the PS1's order between objects stands, so a model
+ * reaching into another (a dead zombie's hand through the floor, the lab
+ * tyrant into its tank's frame) is drawn as on the PS1. Measured along the
+ * view, how far a hand is behind the floor grows with the distance and the
+ * slant, so with 128 hands sank into the floor more or less as you walked.
+ * A model's own parts are one object (same_object); a room's surfaces far
+ * behind its own walls still go (g_far_page). */
+static float g_cross_tol = 0;
 static double g_margin_len = 6;                  /* longest edge (PS1 pixels) of a triangle given the gap margin; RT_MARGIN_LEN */
 int g_gap_fill = 1; 
 int g_persp = 1;                                /* Perspective-correct textures (setting) */

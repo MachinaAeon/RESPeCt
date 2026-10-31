@@ -322,8 +322,10 @@ GTE's own integers):
   pixels from frame to frame.
 - The depth fix knows which model a polygon belongs to (the root of its
   coordinate chain): a model's parts hide each other 2 units behind; other
-  objects only 128 units behind, so a model reaching into another (a hand
-  through the floor) stays drawn as on the PS1.
+  objects keep the PS1's order, so a model reaching into another (a hand
+  through the floor) is drawn as on the PS1 at any distance. (A threshold
+  measured along the view, as before, grows with the distance and the
+  slant: hands sank into the floor more or less as you walked.)
 
 The bench checks all of this on recorded frames: `RT_INT_MATRIX`,
 `RT_INT_NCLIP`, `RT_INT_Z`, `RT_WELD`, `RT_HOLES`, `RT_DEPTH_TOL`,
