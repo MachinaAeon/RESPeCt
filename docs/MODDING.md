@@ -54,8 +54,9 @@ works here unchanged. Paths are not case-sensitive.
 - **Code.** Files that hold game code (`KERNEL.BIN`, `TEST.BIN`, the
   overlays) can't be replaced: RESPeCt runs that code translated, not from
   the disc.
-- **Streams.** Movies (`.STR`) can't be replaced yet; their sound, and
-  streamed music and voices, can (below).
+- **Streams.** Movies and streamed sound (`.STR`) aren't replaced whole:
+  their pictures go frame by frame and their sound channel by channel
+  (below), and the game still plays the disc's stream for its timing.
 - **The PC version's other files.** Enemies (`ENEMnn.NAB/NAC`), items and
   characters (`item`, `people`), 2D pictures (`.BMP`), sound (`.WAV`) and
   movies (`.AVI`) are in other formats than the PS1 disc's, so they aren't
@@ -81,6 +82,31 @@ silence, a longer one is cut (both in the log).
 stream as a WAV with the right name and length, ready to edit and put
 back.
 
+## Movies
+
+A movie's pictures are replaced one frame at a time, with pictures (PNG,
+JPG, BMP or TGA, any size up to 4096x4096) named after the frame's
+number in the stream, from 1:
+
+```
+mods/my-movies/M/OPENING.STR/0001.png     frame 1 of M/OPENING.STR
+mods/my-movies/M/OPENING.STR/0002.png     frame 2
+```
+
+Each picture is the whole screen while that frame shows (black bars
+included), and is stretched to fill it: keep the original's shape (4:3)
+and draw it as large as you like, say 1280x960. RESPeCt follows which of
+the stream's frames the game is showing, so the pictures keep the game's
+own timing, in step with the sound; a frame with no picture in the mod
+shows the disc's.
+
+To get the original frames to work from, make a folder `movie_dump` next
+to `RESPeCt.exe` and play the movies: every frame shown is written there
+as it looks on the PS1 (`movie_dump/M/OPENING.STR/0001.png`...), with the
+names a mod needs. Upscale or redraw them, put them in a mod, and delete
+`movie_dump` when done (while it's there, every movie played is written
+out again).
+
 ## Textures
 
 HD replacements for any texture, without changing the disc's files, are
@@ -92,5 +118,6 @@ after the texture's hash in a `textures` folder.
 - `tools/mod_pcnames.py` builds `port/src/modfs_pc.h` from a PC version's
   `PSX_DATA` folder and the disc image.
 - The headless runner (`port/build/.../resurv_headless`) takes `RT_MODS=dir`
-  for a mods folder, and `RT_DUMP_FILE=lba:size=path` writes a disc file as
-  the game reads it, mods applied (lba and size from `disc_ids.h`).
+  for a mods folder, `RT_MOVIE_DUMP=dir` to write the movies' frames (as
+  `movie_dump` does), and `RT_DUMP_FILE=lba:size=path` writes a disc file
+  as the game reads it, mods applied (lba and size from `disc_ids.h`).

@@ -223,6 +223,8 @@ static void deliver(void) {
         cd_read_sector_raw(r.lba, s);
         if (cd.mode & 0x20) { memcpy(cd.data, s + 12, 2340); cd.data_len = 2340; }
         else { memcpy(cd.data, s + 24, 2048); cd.data_len = 2048; }
+        void modfs_data(uint32_t lba, const uint8_t *s);           /* a movie's frames as they're read (modfs.c) */
+        modfs_data(r.lba, s);
         cd.data_ready = 0;
         cd.data_pos = 0;
     }

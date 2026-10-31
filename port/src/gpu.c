@@ -319,6 +319,8 @@ static void start_xfer(int in) {
     g.xf_i = 0;
     g.xf_n = g.xf_w * g.xf_h;
     if (in) {
+        void modfs_vram_write(int x, int y);       /* where a movie's picture goes (modfs.c) */
+        modfs_vram_write(g.xf_x, g.xf_y);
         render_before_write(g.xf_x, g.xf_y, g.xf_w, g.xf_h);
         g.xfer_in = 1;
     } else {

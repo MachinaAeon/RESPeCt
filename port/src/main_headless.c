@@ -386,9 +386,10 @@ int main(int argc, char **argv) {
         }
     }
     rt_set_log(stderr);
-    {   /* RT_MODS=dir: a mods folder (modfs.c) */
-        extern char g_mods_dir[1024];
+    {   /* RT_MODS=dir: a mods folder; RT_MOVIE_DUMP=dir: the movies' pictures written there (modfs.c) */
+        extern char g_mods_dir[1024], g_movie_dump[1024];
         if (getenv("RT_MODS")) snprintf(g_mods_dir, sizeof g_mods_dir, "%s", getenv("RT_MODS"));
+        if (getenv("RT_MOVIE_DUMP")) snprintf(g_movie_dump, sizeof g_movie_dump, "%s", getenv("RT_MOVIE_DUMP"));
     }
     { extern int g_audio_limiter; g_audio_limiter = getenv("RT_LIMITER") != NULL; }
     if (getenv("RT_NO_DEPTH")) g_depth_buffer = 0;

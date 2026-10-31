@@ -1539,8 +1539,11 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         char *sl = strrchr(dir, '\\');
         if (sl) sl[1] = 0;
         card_set_dir(dir);
-        extern char g_mods_dir[1024];          /* mods: the mods folder next to the exe (modfs.c) */
+        extern char g_mods_dir[1024], g_movie_dump[1024];   /* mods: the mods folder next to the exe (modfs.c) */
         snprintf(g_mods_dir, sizeof g_mods_dir, "%smods", dir);
+        snprintf(g_movie_dump, sizeof g_movie_dump, "%smovie_dump", dir);   /* when there's one: the movies' pictures */
+        DWORD at = GetFileAttributesA(g_movie_dump);
+        if (at == INVALID_FILE_ATTRIBUTES || !(at & FILE_ATTRIBUTE_DIRECTORY)) g_movie_dump[0] = 0;
     }
     open_texture_pack();
     audio_init();

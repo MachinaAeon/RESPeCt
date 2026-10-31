@@ -64,9 +64,11 @@ MODS
 ----
 Files in a "mods" folder next to RESPeCt.exe take the place of the disc's,
 one folder per mod, without changing your disc image. Room, door and
-effect files from the PC version's PSX_DATA folder work as they are. The
-game says on start how many it used; resurv.log has the details. More in
-docs/MODDING.md on the RESPeCt page.
+effect files from the PC version's PSX_DATA folder work as they are.
+Music, voices and movies' sound can be WAV files, movies' frames
+pictures (a "movie_dump" folder next to RESPeCt.exe gets the originals).
+The game says on start how many it used; resurv.log has the details. More
+in docs/MODDING.md on the RESPeCt page.
 
 CONTROLS
 --------

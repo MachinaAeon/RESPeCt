@@ -199,7 +199,11 @@ void mdec_write(uint32_t a, uint32_t v) {
     }
     if (mode == 0) {
         cmd = v;
-        if ((v >> 29) == 1) g_mdec_frame = g_frame;   /* decoding: a movie is playing */
+        if ((v >> 29) == 1) {                       /* decoding: a movie is playing */
+            void modfs_mdec(void);                  /* which frame it is (modfs.c) */
+            g_mdec_frame = g_frame;
+            modfs_mdec();
+        }
         switch (v >> 29) {
         case 1:
             mode = 1;
