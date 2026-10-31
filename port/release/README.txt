@@ -62,14 +62,15 @@ textures add a little more.
 
 MODS
 ----
-Files in a "mods" folder next to RESPeCt.exe take the place of the disc's,
-one folder per mod, without changing your disc image. Room, door and
-effect files from the PC version's PSX_DATA folder work as they are, and
-its BMPs of maps, menus and results are converted.
-Music, voices and movies' sound can be WAV files, movies' frames
-pictures (a "movie_dump" folder next to RESPeCt.exe gets the originals).
-The game says on start how many it used; resurv.log has the details. More
-in docs/MODDING.md on the RESPeCt page.
+Files in a "mods" folder next to RESPeCt.exe take the place of the game's,
+one folder per mod, without changing your disc image: rooms, doors,
+effects, items, 2D screens, enemies' textures and animations, music and
+voices (WAV), movies (a picture per frame). The PC version's files work
+too. To start, make an empty "extract" folder next to RESPeCt.exe and run
+the game once: every original is written there, named the way a mod
+names it. mods\README.txt (made on the first start) says the rest; the
+game says on start how many files it used, and resurv.log why any wasn't.
+More in docs/MODDING.md on the RESPeCt page.
 
 CONTROLS
 --------

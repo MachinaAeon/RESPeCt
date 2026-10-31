@@ -8,6 +8,8 @@ each one and writes port/src/modfs_pc.h, so a mod made for the PC version
 (port/src/modfs.c) can be dropped in as it is.
 
 Usage: mod_pcnames.py <PSX_DATA folder> <disc .cue/.bin> [out.h]
+The Resource folder next to PSX_DATA is searched too (its files named
+RESOURCE/...).
 Only files found whole and in one place are listed; the rest (enemies,
 items, 2D, sound, movies) are in other formats on the PS1 disc.
 """
@@ -41,7 +43,12 @@ def main():
     # archives only: the files that hold no game code and aren't streamed (STR)
     arch = {n: read_file(binf, l, s) for n, l, s, h in disc_files() if h == 0 and not n.endswith('.STR') and s > 2048}
     rows = []
-    for root, _, files in os.walk(pc):
+    walks = [(pc, pc, '')]                       # and the Resource folder next to PSX_DATA, as RESOURCE/...
+    res = os.path.join(os.path.dirname(os.path.abspath(pc)), 'Resource')
+    if os.path.isdir(res):
+        walks.append((res, res, 'RESOURCE/'))
+    for top, base, prefix in walks:
+      for root, _, files in os.walk(top):
         for fn in files:
             p = os.path.join(root, fn)
             data = open(p, 'rb').read()
@@ -50,7 +57,7 @@ def main():
             hits = [(n, b.find(data)) for n, b in arch.items() if b.find(data) >= 0]
             if len(hits) != 1 or arch[hits[0][0]].find(data, hits[0][1] + 1) >= 0:
                 continue                                  # not there, or not in one place
-            rel = os.path.relpath(p, pc).replace(os.sep, '/')
+            rel = prefix + os.path.relpath(p, base).replace(os.sep, '/')
             rows.append((rel.upper(), hits[0][0], hits[0][1], len(data), zlib.crc32(data) & 0xFFFFFFFF))
     rows.sort()
     with open(out_h, 'w', newline='\n') as f:

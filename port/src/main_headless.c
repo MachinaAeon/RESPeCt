@@ -390,6 +390,8 @@ int main(int argc, char **argv) {
         extern char g_mods_dir[1024], g_movie_dump[1024];
         if (getenv("RT_MODS")) snprintf(g_mods_dir, sizeof g_mods_dir, "%s", getenv("RT_MODS"));
         if (getenv("RT_MOVIE_DUMP")) snprintf(g_movie_dump, sizeof g_movie_dump, "%s", getenv("RT_MOVIE_DUMP"));
+        extern char g_extract_dir[1024];        /* RT_EXTRACT=dir: the originals written there */
+        if (getenv("RT_EXTRACT")) snprintf(g_extract_dir, sizeof g_extract_dir, "%s", getenv("RT_EXTRACT"));
     }
     { extern int g_audio_limiter; g_audio_limiter = getenv("RT_LIMITER") != NULL; }
     if (getenv("RT_NO_DEPTH")) g_depth_buffer = 0;

@@ -48,8 +48,10 @@ int rt_boot(const char *disc_path) {
         fprintf(stderr, "can't open disc image %s\n", disc_path);
         return 0;
     }
-    {   /* mods: files in place of the disc's (modfs.c) */
+    {   /* mods: the originals written out first, if asked (from the disc as it is), then files in place of the disc's (modfs.c) */
+        int modfs_extract(void);
         void modfs_open(void);
+        modfs_extract();
         modfs_open();
     }
     uint8_t *exe;

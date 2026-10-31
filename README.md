@@ -70,11 +70,12 @@ folder works anywhere in the RESPeCt folder, and `texture_pack =` in
 ### Mods (optional)
 
 Files in a `mods` folder next to `RESPeCt.exe` take the place of the
-disc's, a folder per mod, without touching your disc image. Room, door and
-effect files from the PC version's `PSX_DATA` folder work as they are: they
-are the same files the PS1 disc packs. Music, voices and movies' sound can
-be replaced with WAV files, movies frame by frame with pictures, and the
-PC version's 2D BMPs are converted to the PS1's pictures. See
+game's, a folder per mod, without touching your disc image: rooms, doors,
+effects, items, 2D screens, enemies' textures and animations, music and
+voices (WAV), movies (a picture per frame). The PC version's files work
+too (`PSX_DATA`, `Resource`, and its enemies' `.NAB`/`.NAC`), converted to
+the PS1's where they differ. An empty `extract` folder next to the exe
+gets every original, named the way a mod names it. See
 [docs/MODDING.md](docs/MODDING.md).
 
 ### Controls

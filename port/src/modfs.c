@@ -26,8 +26,10 @@
 #include "disc_ids.h"
 #include "modfs_pc.h"
 #include "modfs_bmp.h"
+#include "modfs_pack.h"
 
 #include <ctype.h>
+#include <stdarg.h>
 #include <math.h>
 #include <dirent.h>
 #include <stdio.h>
@@ -48,11 +50,25 @@ char g_mods_dir[1024];                           /* set by the platform; "" = no
 char g_movie_dump[1024];                         /* set by the platform: write the movies' pictures there; "" = don't */
 
 typedef struct { uint32_t lba, nsec; uint8_t *data; const char *name; } Touched;
-static Touched touched[64];
+static Touched touched[128];
 static int ntouched;
 static int disc_only;                            /* reading the disc's own sectors */
 unsigned long mz_crc32(unsigned long crc, const unsigned char *ptr, size_t buf_len);   /* miniz */
-static int nused, nmods;
+static int nused, nmods, nskipped;
+
+/* A line in the log; what a mod gives that isn't used is counted (the
+ * player is told how many on start). */
+static void note(const char *fmt, ...) {
+    char b[1600];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(b, sizeof b, fmt, ap);
+    va_end(ap);
+    rt_log("%s", b);
+    if (strstr(b, "not used") || strstr(b, "can't be replaced") || strstr(b, "couldn't") || strstr(b, "not shown") ||
+        strstr(b, "no such folder"))
+        nskipped++;
+}
 
 /* Files inside an archive that grow (done once every mod is in). */
 typedef struct { int fi; uint32_t offset, size, orig; uint8_t *data; char what[300]; } Grow;
@@ -69,6 +85,7 @@ static int disc_index(const char *name) {
 
 /* The disc file's copy to change (read from the image the first time). */
 static Touched *touch(int fi) {
+    if (fi < 0) return NULL;
     for (int i = 0; i < ntouched; i++)
         if (touched[i].lba == disc_files[fi].lba) return &touched[i];
     if (ntouched == (int)(sizeof touched / sizeof touched[0])) return NULL;
@@ -116,6 +133,8 @@ static int movie_apply(const char *mod, const char *rel, const char *up, const c
 static int bmp_apply(const char *mod, const char *rel, const char *up, const char *path);
 static int enemy_apply(const char *mod, const char *rel, const char *up, const char *path);
 static void enemies_done(void);
+static int pack_apply(const char *mod, const char *rel, const char *up, const char *path);
+static void packs_done(void);
 
 static uint8_t *load(const char *path, long *n) {
     FILE *f = fopen(path, "rb");
@@ -146,12 +165,13 @@ static const struct { const char *name; uint32_t loc, tab, kinds, cap; int copie
     {"EFFECTX.BIN", 0x80058544u, 0x800A6F1Cu, 1, 0, 0},
     {"OBJ.DAT", 0x80058530u, 0x800A0CD8u, 1, 93u * 2048, 1},
     {"EV_OBJ.DAT", 0x80058534u, 0x800A195Cu, 1, 93u * 2048, 1},
+    {"ITEMDAT.DAT", 0x8005855Cu, 0x800A3EDCu, 1, 0, 1},
 };
 
 static int can_grow(const char *disc) {
     if (!strncasecmp(disc, "B/STGBG", 7)) return 1;
     for (size_t k = 0; k < sizeof archives / sizeof archives[0]; k++)
-        if (!strcasecmp(disc, archives[k].name) && !archives[k].copies) return 1;
+        if (!strcasecmp(disc, archives[k].name)) return 1;
     return 0;
 }
 
@@ -164,14 +184,14 @@ static void apply(const char *mod, const char *rel, const char *path) {
     int fi = disc_index(up);
     if (fi >= 0) {                                /* a disc file, whole */
         if (disc_files[fi].hash || strstr(up, ".STR")) {
-            rt_log("mods: %s/%s: game code or a stream, can't be replaced", mod, rel);
+            note("mods: %s/%s: game code or a stream, can't be replaced", mod, rel);
             return;
         }
         uint8_t *d = load(path, &n);
         Touched *t = d ? touch(fi) : NULL;
-        if (!t) { free(d); rt_log("mods: %s/%s: couldn't read it", mod, rel); return; }
+        if (!t) { free(d); note("mods: %s/%s: couldn't read it", mod, rel); return; }
         if ((uint32_t)n > t->nsec * 2048) {
-            rt_log("mods: %s/%s: %ld bytes, %u more than its place on the disc: not used", mod, rel, n,
+            note("mods: %s/%s: %ld bytes, %u more than its place on the disc: not used", mod, rel, n,
                    (unsigned)((uint32_t)n - t->nsec * 2048));
             free(d);
             return;
@@ -179,7 +199,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
         memset(t->data, 0, (size_t)t->nsec * 2048);
         memcpy(t->data, d, (size_t)n);
         free(d);
-        rt_log("mods: %s/%s: in place of the disc's (%ld bytes)", mod, rel, n);
+        note("mods: %s/%s: in place of the disc's (%ld bytes)", mod, rel, n);
         nused++;
         return;
     }
@@ -188,7 +208,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
         int di = disc_index(modfs_pc[i].disc);
         uint8_t *d = di >= 0 ? load(path, &n) : NULL;
         Touched *t = d ? touch(di) : NULL;
-        if (!t) { free(d); rt_log("mods: %s/%s: couldn't read it", mod, rel); return; }
+        if (!t) { free(d); note("mods: %s/%s: couldn't read it", mod, rel); return; }
         uint8_t *at = t->data + modfs_pc[i].offset;
         static int checked[sizeof modfs_pc / sizeof modfs_pc[0]];
         if (!checked[i]) {                       /* the disc's original is there */
@@ -206,7 +226,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
             checked[i] = crc == modfs_pc[i].crc ? 1 : -1;
         }
         if (checked[i] < 0) {
-            rt_log("mods: %s/%s: the disc's %s isn't the one expected there: not used", mod, rel, modfs_pc[i].disc);
+            note("mods: %s/%s: the disc's %s isn't the one expected there: not used", mod, rel, modfs_pc[i].disc);
             free(d);
             return;
         }
@@ -222,7 +242,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
                 nused++;
                 return;
             }
-            rt_log("mods: %s/%s: %ld bytes, %u more than the original's place in %s: not used", mod, rel, n,
+            note("mods: %s/%s: %ld bytes, %u more than the original's place in %s: not used", mod, rel, n,
                    (unsigned)((uint32_t)n - modfs_pc[i].size), modfs_pc[i].disc);
             free(d);
             return;
@@ -230,15 +250,16 @@ static void apply(const char *mod, const char *rel, const char *path) {
         memset(at, 0, modfs_pc[i].size);
         memcpy(at, d, (size_t)n);
         free(d);
-        rt_log("mods: %s/%s: into %s at %u (%ld bytes)", mod, rel, modfs_pc[i].disc, modfs_pc[i].offset, n);
+        note("mods: %s/%s: into %s at %u (%ld bytes)", mod, rel, modfs_pc[i].disc, modfs_pc[i].offset, n);
         nused++;
         return;
     }
     if (bmp_apply(mod, rel, up, path)) return;
     if (enemy_apply(mod, rel, up, path)) return;
+    if (pack_apply(mod, rel, up, path)) return;
     if (sound_apply(mod, rel, up, path)) return;
     if (movie_apply(mod, rel, up, path)) return;
-    rt_log("mods: %s/%s: not a file of the disc or of the PC version's PSX_DATA: not used", mod, rel);
+    note("mods: %s/%s: not a file of the disc or of the PC version's PSX_DATA: not used", mod, rel);
 }
 
 static uint32_t rd32(const uint8_t *p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
@@ -330,7 +351,7 @@ void modfs_state_loaded(void) {
         for (uint32_t o = 0; o + f->n <= 0x200000; o += 4)
             if (g_ram[o] == f->was[0] && !memcmp(g_ram + o, f->was, f->n)) { memcpy(g_ram + o, f->now, f->n); fixed++; }
     }
-    if (fixed) rt_log("mods: the save was made without some of these mods: %d places in memory brought up to date", fixed);
+    if (fixed) note("mods: the save was made without some of these mods: %d places in memory brought up to date", fixed);
 }
 
 /* The archives that have files growing: each block they're in laid out
@@ -380,7 +401,7 @@ static void grow_all(void) {
         if (!tab || !nb || v[0] != 0 || v[nb] != t->nsec) {
             for (int g = gi; g < ngrows; g++)
                 if (grows[g].fi == fi) {
-                    rt_log("mods: %s: bigger than the original, and %s's block table wasn't found: not used", grows[g].what, disc_files[fi].name);
+                    note("mods: %s: bigger than the original, and %s's block table wasn't found: not used", grows[g].what, disc_files[fi].name);
                     grows[g].fi = -1;
                     nused--;
                 }
@@ -421,7 +442,7 @@ static void grow_all(void) {
                 newlen = (whole->size + 2047) & ~2047u;
                 if (newlen < len) newlen = len;   /* as it was, if it fits */
                 if (newlen > room) {
-                    rt_log("mods: %s block %u would be %u bytes, more than the %u the game has for it: not used",
+                    note("mods: %s block %u would be %u bytes, more than the %u the game has for it: not used",
                            disc_files[fi].name, b, newlen, room);
                     newlen = len;
                     whole = NULL;
@@ -447,17 +468,17 @@ static void grow_all(void) {
                 newlen = (at + 2047) & ~2047u;
                 memset(o + at, 0, newlen - at);
                 if (newlen > room) {
-                    rt_log("mods: %s block %u would be %u bytes, more than the %u the game has for it: not used",
+                    note("mods: %s block %u would be %u bytes, more than the %u the game has for it: not used",
                            disc_files[fi].name, b, newlen, room);
                     ok = 0;
                     newlen = len;
                 }
             } else if (any)
-                rt_log("mods: %s block %u: its layout isn't one this knows: not used", disc_files[fi].name, b);
+                note("mods: %s block %u: its layout isn't one this knows: not used", disc_files[fi].name, b);
             if (!ok) memcpy(out + cur, blk, len);
             for (int g = gi; g < ngrows; g++)
                 if (grows[g].fi == fi && grows[g].offset - start < len) {
-                    if (ok) rt_log("mods: %s: into %s block %u (%u bytes; the block %u -> %u bytes)", grows[g].what, disc_files[fi].name, b, grows[g].size, len, newlen);
+                    if (ok) note("mods: %s: into %s block %u (%u bytes; the block %u -> %u bytes)", grows[g].what, disc_files[fi].name, b, grows[g].size, len, newlen);
                     else nused--;
                 }
             cur += newlen;
@@ -477,7 +498,7 @@ static void grow_all(void) {
             uint8_t want[3];
             bcd_msf(t->lba, want);
             if (!dir || !kern || ko + 4 > kern->nsec * 2048 || memcmp(kern->data + ko, want, 3)) {
-                rt_log("mods: %s: where the game finds it wasn't found: the bigger files in it not used", disc_files[fi].name);
+                note("mods: %s: where the game finds it wasn't found: the bigger files in it not used", disc_files[fi].name);
                 free(out);
                 continue;
             }
@@ -503,7 +524,7 @@ static void grow_all(void) {
                     found++;
                 }
             if (memcmp(v, nv, 4 * (nb + 1)))
-                rt_log("mods: %s: its block table changed in TEST.BIN and %d copies", disc_files[fi].name, found);
+                note("mods: %s: its block table changed in TEST.BIN and %d copies", disc_files[fi].name, found);
         }
         for (uint32_t b = 0; b <= nb; b++) wr32(test->data + tab + 4 * b, nv[b]);   /* the block table */
         if (tn) {
@@ -587,7 +608,7 @@ static int sound_apply(const char *mod, const char *rel, const char *up, const c
     char *end;
     long chan = strtol(sl + 1, &end, 10);
     if (end == sl + 1 || strcasecmp(end, ".WAV") || chan < 0 || chan > 31) {
-        rt_log("mods: %s/%s: name it by the channel's number (00.wav to 31.wav): not used", mod, rel);
+        note("mods: %s/%s: name it by the channel's number (00.wav to 31.wav): not used", mod, rel);
         return 1;
     }
     /* the channel's sectors, in order, and how they're coded */
@@ -608,7 +629,7 @@ static int sound_apply(const char *mod, const char *rel, const char *up, const c
     }
     disc_only = 0;
     if (!count) {
-        rt_log("mods: %s/%s: %s has no sound on channel %ld: not used", mod, rel, stream, chan);
+        note("mods: %s/%s: %s has no sound on channel %ld: not used", mod, rel, stream, chan);
         free(index);
         return 1;
     }
@@ -619,7 +640,7 @@ static int sound_apply(const char *mod, const char *rel, const char *up, const c
     int16_t *pcm = d ? wav_load(d, n, rate, &frames, &why) : NULL;
     free(d);
     if (!pcm || ntracks == (int)(sizeof tracks / sizeof tracks[0])) {
-        rt_log("mods: %s/%s: %s: not used", mod, rel, pcm ? "too many sounds" : why);
+        note("mods: %s/%s: %s: not used", mod, rel, pcm ? "too many sounds" : why);
         free(pcm);
         free(index);
         return 1;
@@ -634,7 +655,7 @@ static int sound_apply(const char *mod, const char *rel, const char *up, const c
     Track *t = &tracks[ntracks++];
     *t = (Track){lba, nsec, (uint32_t)chan, rate, per, index, pcm, frames};
     double secs = (double)count * per / rate;
-    rt_log("mods: %s/%s: in place of %s channel %ld (%.1f s; the WAV %.1f s%s)", mod, rel, stream, chan, secs,
+    note("mods: %s/%s: in place of %s channel %ld (%.1f s; the WAV %.1f s%s)", mod, rel, stream, chan, secs,
            (double)frames / rate, frames < count * per ? ", silence after it" : frames > count * per ? ", cut to fit" : "");
     nused++;
     return 1;
@@ -662,6 +683,11 @@ int modfs_xa(uint32_t lba, const uint8_t *s) {
 }
 
 /* ------------------------------------------------------------ pictures */
+
+static int is_picture(const char *ext) {
+    return !strcasecmp(ext, ".PNG") || !strcasecmp(ext, ".BMP") || !strcasecmp(ext, ".JPG") || !strcasecmp(ext, ".JPEG") ||
+           !strcasecmp(ext, ".TGA");
+}
 
 /* The PC version's BMPs that are the disc's TIMs (modfs_bmp.h): the
  * picture (BMP, PNG, JPG, TGA; a PNG's alpha is transparency) goes into
@@ -734,30 +760,16 @@ static int nearest(const uint16_t *pal, int n, uint16_t v) {
     return best;
 }
 
-static int bmp_apply(const char *mod, const char *rel, const char *up, const char *path) {
-    size_t i = 0;
-    for (; i < sizeof modfs_bmp / sizeof modfs_bmp[0]; i++)
-        if (!strcmp(modfs_bmp[i].pc, up)) break;
-    if (i == sizeof modfs_bmp / sizeof modfs_bmp[0]) return 0;
-    int di = disc_index(modfs_bmp[i].disc);
-    Touched *t = di >= 0 ? touch(di) : NULL;
-    uint8_t *tim = t ? t->data + modfs_bmp[i].offset : NULL;
-    if (!tim || (uint32_t)mz_crc32(0, tim, modfs_bmp[i].size) != modfs_bmp[i].crc) {
-        /* it may be a picture an earlier mod changed: then the TIM's header is still the one expected */
-        if (!tim || rd32(tim) != 0x10) {
-            rt_log("mods: %s/%s: the disc's %s isn't the one expected there: not used", mod, rel, modfs_bmp[i].disc);
-            return 1;
-        }
-    }
-    long n = 0;
-    uint8_t *d = load(path, &n);
-    int w, h, c;
-    uint8_t *img = d ? stbi_load_from_memory(d, (int)n, &w, &h, &c, 4) : NULL;
-    free(d);
-    if (!img) {
-        rt_log("mods: %s/%s: couldn't read it as a picture: not used", mod, rel);
-        return 1;
-    }
+/* A picture (RGBA, w x h) into a TIM in the TIM's own format and size;
+ * NULL, or why not. */
+static void tim_size(const uint8_t *tim, uint32_t *w, uint32_t *h) {
+    uint32_t flag = rd32(tim + 4), bpp = (uint32_t[]){4, 8, 16, 24}[flag & 3];
+    const uint8_t *pix = flag & 8 ? tim + 8 + rd32(tim + 8) : tim + 8;
+    *w = rd16(pix + 8) * 16 / bpp;
+    *h = rd16(pix + 10);
+}
+
+static const char *tim_from_picture(uint8_t *tim, const uint8_t *img, uint32_t w, uint32_t h, const char **how) {
     /* the TIM: its palette (if any), then its pixels */
     uint32_t flag = rd32(tim + 4), bpp = (uint32_t[]){4, 8, 16, 24}[flag & 3];
     uint8_t *clut = flag & 8 ? tim + 8 : NULL;
@@ -765,11 +777,7 @@ static int bmp_apply(const char *mod, const char *rel, const char *up, const cha
     uint8_t *pix = clut ? clut + rd32(clut) : tim + 8;
     uint32_t tw = rd16(pix + 8) * 16 / bpp, th = rd16(pix + 10);
     uint8_t *px = pix + 12;
-    if (bpp == 24 || (bpp < 16 && (!clut || cw < (1u << bpp)))) {
-        rt_log("mods: %s/%s: the TIM's format isn't one this writes: not used", mod, rel);
-        stbi_image_free(img);
-        return 1;
-    }
+    if (bpp == 24 || (bpp < 16 && (!clut || cw < (1u << bpp)))) return "the TIM's format isn't one this writes";
     /* the picture at the TIM's size (nearest pixel when it's the same) */
     uint32_t *rgba = malloc((size_t)tw * th * 4);
     for (uint32_t y = 0; y < th; y++)
@@ -783,7 +791,6 @@ static int bmp_apply(const char *mod, const char *rel, const char *up, const cha
                     for (int k = 0; k < 4; k++) s[k] += img[((size_t)yy * w + xx) * 4 + k];
             rgba[y * tw + x] = (s[0] / m) | (s[1] / m) << 8 | (s[2] / m) << 16 | (s[3] / m) << 24;
         }
-    stbi_image_free(img);
     /* what the original shows at each pixel (its 15-bit colour; 0: see-through) */
     const uint8_t *row0 = clut ? clut + 12 : NULL;
     uint16_t *was = malloc((size_t)tw * th * 2);
@@ -817,10 +824,12 @@ static int bmp_apply(const char *mod, const char *rel, const char *up, const cha
             if (was[k] & 0x7FFF) { if (was[k] & 0x8000) with++; else without++; }
         if (with && !without) stp = 0x8000;
     }
-    const char *how;
     if (bpp == 16) {
-        for (uint32_t k = 0; k < tw * th; k++) wr16(px + k * 2, col[k] ? (uint16_t)(col[k] | stp) : 0);
-        how = "16-bit";
+        for (uint32_t k = 0; k < tw * th; k++) {     /* each pixel keeps its own semi-transparency bit */
+            uint16_t v = col[k] == (was[k] & 0x7FFF) ? was[k] : col[k] ? (uint16_t)(col[k] | (was[k] ? was[k] & 0x8000 : stp)) : 0;
+            wr16(px + k * 2, v);
+        }
+        *how = "16-bit";
     } else {
         int ncol = 1 << bpp;
         uint16_t pal[256];
@@ -833,10 +842,10 @@ static int bmp_apply(const char *mod, const char *rel, const char *up, const cha
             pal[0] = 0;
             for (int k = 1 + got; k < ncol; k++) pal[k] = 0;
             for (int k = 0; k < ncol; k++) wr16(row0 + k * 2, pal[k] ? (uint16_t)(pal[k] | stp) : 0);
-            how = bpp == 8 ? "256 colours" : "16 colours";
+            *how = bpp == 8 ? "256 colours" : "16 colours";
         } else {                                 /* the TIM's own palettes kept */
             for (int k = 0; k < ncol; k++) pal[k] = rd16(row0 + k * 2) & 0x7FFF;
-            how = "its own palettes";
+            *how = "its own palettes";
         }
         int clear = -1;
         for (int k = 0; k < ncol && clear < 0; k++) if (!pal[k]) clear = k;
@@ -848,7 +857,45 @@ static int bmp_apply(const char *mod, const char *rel, const char *up, const cha
     }
     free(col);
     free(was);
-    rt_log("mods: %s/%s: into %s's picture at %u (%ux%u, %s%s)", mod, rel, modfs_bmp[i].disc, modfs_bmp[i].offset, tw, th, how,
+    return NULL;
+}
+
+static int bmp_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    size_t i = 0;                                /* by name: map/MAP00_1.bmp, or .png, .jpg, .tga */
+    const char *dot = strrchr(up, '.');
+    size_t stem = dot ? (size_t)(dot - up) : strlen(up);
+    if (!dot || !is_picture(dot)) return 0;
+    for (; i < sizeof modfs_bmp / sizeof modfs_bmp[0]; i++)
+        if (!strncmp(modfs_bmp[i].pc, up, stem) && !strcmp(modfs_bmp[i].pc + stem, ".BMP")) break;
+    if (i == sizeof modfs_bmp / sizeof modfs_bmp[0]) return 0;
+    int di = disc_index(modfs_bmp[i].disc);
+    Touched *t = di >= 0 ? touch(di) : NULL;
+    uint8_t *tim = t ? t->data + modfs_bmp[i].offset : NULL;
+    if (!tim || (uint32_t)mz_crc32(0, tim, modfs_bmp[i].size) != modfs_bmp[i].crc) {
+        /* it may be a picture an earlier mod changed: then the TIM's header is still the one expected */
+        if (!tim || rd32(tim) != 0x10) {
+            note("mods: %s/%s: the disc's %s isn't the one expected there: not used", mod, rel, modfs_bmp[i].disc);
+            return 1;
+        }
+    }
+    long n = 0;
+    uint8_t *d = load(path, &n);
+    int w, h, c;
+    uint8_t *img = d ? stbi_load_from_memory(d, (int)n, &w, &h, &c, 4) : NULL;
+    free(d);
+    if (!img) {
+        note("mods: %s/%s: couldn't read it as a picture: not used", mod, rel);
+        return 1;
+    }
+    const char *how = "", *why = tim_from_picture(tim, img, (uint32_t)w, (uint32_t)h, &how);
+    stbi_image_free(img);
+    if (why) {
+        note("mods: %s/%s: %s: not used", mod, rel, why);
+        return 1;
+    }
+    uint32_t tw = 0, th = 0;
+    tim_size(tim, &tw, &th);
+    note("mods: %s/%s: into %s's picture at %u (%ux%u, %s%s)", mod, rel, modfs_bmp[i].disc, modfs_bmp[i].offset, tw, th, how,
            (uint32_t)w != tw || (uint32_t)h != th ? ", scaled to the PS1's size" : "");
     nused++;
     return 1;
@@ -891,7 +938,7 @@ static int movie_apply(const char *mod, const char *rel, const char *up, const c
     char *end;
     long frame = strtol(sl + 1, &end, 10);
     if (end == sl + 1 || end != dot || frame < 1) {
-        rt_log("mods: %s/%s: name it by the frame's number (0001.png, 0002.png...): not used", mod, rel);
+        note("mods: %s/%s: name it by the frame's number (0001.png, 0002.png...): not used", mod, rel);
         return 1;
     }
     if (npics == cpics) {
@@ -922,7 +969,7 @@ static void movie_done(void) {
     for (int i = 0; i < npics;) {
         int j = i;
         while (j < npics && pics[j].fi == pics[i].fi) j++;
-        rt_log("mods: %s: pictures for %d frames (%u to %u)", disc_files[pics[i].fi].name, j - i, pics[i].frame,
+        note("mods: %s: pictures for %d frames (%u to %u)", disc_files[pics[i].fi].name, j - i, pics[i].frame,
                pics[j - 1].frame);
         i = j;
     }
@@ -1094,7 +1141,7 @@ const uint32_t *modfs_movie_picture(int *w, int *h) {
         uint8_t *img = d ? stbi_load_from_memory(d, (int)n, &pw, &ph, &c, 4) : NULL;
         free(d);
         if (!img || pw > 4096 || ph > 4096) {
-            rt_log("mods: %s: %s: not shown", p->path, img ? "bigger than 4096x4096" : "couldn't read it as a picture");
+            note("mods: %s: %s: not shown", p->path, img ? "bigger than 4096x4096" : "couldn't read it as a picture");
             stbi_image_free(img);
             return NULL;
         }
@@ -1208,15 +1255,177 @@ static uint8_t *lz_pack(const uint8_t *in, uint32_t n, uint32_t *outn) {
     return o;
 }
 
-typedef struct { int type; uint8_t *nab, *nac; long nnab, nnac; char what[2][300]; } Enemy;
+/* Blocks of the packed archives (OBJ.DAT, EV_OBJ.DAT, ITEMDAT.DAT) that
+ * mods change: unpacked once, changed by every mod that has something
+ * for them, packed again at the end (a part nothing changed keeps the
+ * disc's packing). A block is either a header (3, then where each part
+ * starts) and three packed parts, or packed whole (part 0 here). */
+typedef struct {
+    int fi;
+    uint32_t block, start, len, off[4];
+    int split, changed;                          /* changed: a bit per part */
+    uint8_t *part[3], *was[3];
+    uint32_t plen[3];
+    char what[400];
+} Packed;
+static Packed packs[64];
+static int npacks;
+
+static uint32_t archive_table(int fi) {          /* its block table's address in TEST.BIN, or 0 */
+    for (size_t k = 0; k < sizeof archives / sizeof archives[0]; k++)
+        if (fi >= 0 && !strcasecmp(disc_files[fi].name, archives[k].name)) return archives[k].tab;
+    return 0;
+}
+
+static Packed *packed_get(int fi, uint32_t block) {
+    for (int i = 0; i < npacks; i++)
+        if (packs[i].fi == fi && packs[i].block == block) return &packs[i];
+    Touched *test = touch(disc_index("TEST.BIN")), *t = fi >= 0 ? touch(fi) : NULL;
+    uint32_t tab = archive_table(fi);
+    if (!test || !t || !tab || npacks == (int)(sizeof packs / sizeof packs[0])) return NULL;
+    tab -= TEST_BASE;
+    uint32_t start = rd32(test->data + tab + 4 * block) * 2048, end = rd32(test->data + tab + 4 * block + 4) * 2048;
+    if (end <= start || end > t->nsec * 2048) return NULL;
+    Packed *p = &packs[npacks];
+    memset(p, 0, sizeof *p);
+    p->fi = fi;
+    p->block = block;
+    p->start = start;
+    p->len = end - start;
+    const uint8_t *b = t->data + start;
+    p->split = rd32(b) == 3 && rd32(b + 4) == 16;
+    if (p->split) {
+        for (int k = 0; k < 3; k++) p->off[k] = rd32(b + 4 + 4 * k);
+        p->off[3] = p->len;
+        if (p->off[0] > p->off[1] || p->off[1] > p->off[2] || p->off[2] > p->len) return NULL;
+    } else {
+        p->off[0] = 0;
+        p->off[1] = p->len;
+    }
+    npacks++;
+    return p;
+}
+
+/* Part k of a block, unpacked (NULL if it can't be). */
+static uint8_t *packed_part(Packed *p, int k, uint32_t *n) {
+    if (!p || k < 0 || k > (p->split ? 2 : 0)) return NULL;
+    if (!p->part[k]) {
+        Touched *t = touch(p->fi);
+        p->part[k] = lz_unpack(t->data + p->start + p->off[k], p->off[k + 1] - p->off[k], &p->plen[k]);
+        if (p->part[k] && (p->was[k] = malloc(p->plen[k]))) memcpy(p->was[k], p->part[k], p->plen[k]);
+    }
+    *n = p->plen[k];
+    return p->part[k];
+}
+
+static void packed_note(Packed *p, int k, const char *what) {
+    p->changed |= 1 << k;
+    size_t l = strlen(p->what);
+    if (!strstr(p->what, what)) snprintf(p->what + l, sizeof p->what - l, "%s%s", l ? ", " : "", what);
+}
+
+/* Every changed block packed again, to grow with the archive's other
+ * files that grow (grow_all). */
+static void packs_done(void) {
+    for (int i = 0; i < npacks; i++) {
+        Packed *p = &packs[i];
+        if (p->changed) {
+            Touched *t = touch(p->fi);
+            const uint8_t *b = t->data + p->start;
+            int np = p->split ? 3 : 1;
+            uint8_t *out = malloc((size_t)p->len * 2 + p->plen[0] + p->plen[1] + p->plen[2] + 64);
+            uint32_t at = p->split ? 16 : 0;
+            if (p->split) wr32(out, 3);
+            for (int k = 0; k < np; k++) {
+                if (p->split) wr32(out + 4 + 4 * k, at);
+                uint32_t pn = 0;
+                int same = !p->part[k] || (p->was[k] && !memcmp(p->was[k], p->part[k], p->plen[k]));   /* the disc's packing kept */
+                uint8_t *pk = same ? NULL : lz_pack(p->part[k], p->plen[k], &pn);
+                if (pk) { memcpy(out + at, pk, pn); free(pk); }
+                else { pn = p->off[k + 1] - p->off[k]; memcpy(out + at, b + p->off[k], pn); }
+                at += (pn + 3) & ~3u;
+            }
+            if (ngrows < (int)(sizeof grows / sizeof grows[0])) {
+                Grow *g = &grows[ngrows++];
+                g->fi = p->fi;
+                g->offset = p->start;
+                g->size = at;
+                g->orig = p->len;
+                g->data = out;
+                snprintf(g->what, sizeof g->what, "%s", p->what);
+            } else
+                free(out);
+        }
+        for (int k = 0; k < 3; k++) { free(p->part[k]); free(p->was[k]); }
+    }
+    npacks = 0;
+}
+
+/* A PC version's file that is inside a packed block (modfs_pack.h): in
+ * its place there (every place, when the disc has it more than once). */
+static int pack_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    long n = -1;
+    uint8_t *d = NULL;
+    int any = 0, done = 0;
+    char what[400];
+    snprintf(what, sizeof what, "%s/%s", mod, rel);
+    for (size_t i = 0; i < sizeof modfs_pack / sizeof modfs_pack[0]; i++) {
+        if (strcmp(modfs_pack[i].pc, up)) continue;
+        any = 1;
+        if (n < 0 && !(d = load(path, &n))) { note("mods: %s: couldn't read it", what); return 1; }
+        if ((uint32_t)n > modfs_pack[i].size) {
+            note("mods: %s: %ld bytes, %u more than the original: not used (inside a packed block a file keeps its size)", what, n,
+                   (unsigned)((uint32_t)n - modfs_pack[i].size));
+            break;
+        }
+        int fi = disc_index(modfs_pack[i].disc);
+        uint8_t *at = NULL;
+        Packed *p = NULL;
+        if (modfs_pack[i].part == -2) {          /* the block as it is */
+            Touched *test = touch(disc_index("TEST.BIN")), *t = touch(fi);
+            uint32_t tab = archive_table(fi);
+            if (test && t && tab) at = t->data + rd32(test->data + tab - TEST_BASE + 4 * modfs_pack[i].block) * 2048 + modfs_pack[i].offset;
+        } else {
+            uint32_t pn = 0;
+            p = packed_get(fi, modfs_pack[i].block);
+            uint8_t *u = packed_part(p, modfs_pack[i].part < 0 ? 0 : modfs_pack[i].part, &pn);
+            if (u && modfs_pack[i].offset + modfs_pack[i].size <= pn) at = u + modfs_pack[i].offset;
+        }
+        if (!at) { note("mods: %s: %s block %u couldn't be read: not used there", what, modfs_pack[i].disc, modfs_pack[i].block); continue; }
+        const uint8_t *orig = p ? p->was[modfs_pack[i].part < 0 ? 0 : modfs_pack[i].part] + modfs_pack[i].offset : at;
+        static uint8_t *seen[256];               /* raw places a mod already changed (their original was checked then) */
+        int again = 0;
+        for (int s2 = 0; s2 < 256 && seen[s2]; s2++) if (seen[s2] == at) again = 1;
+        if (!again && (uint32_t)mz_crc32(0, orig, modfs_pack[i].size) != modfs_pack[i].crc) {
+            note("mods: %s: the disc's %s isn't the one expected there: not used", what, modfs_pack[i].disc);
+            continue;
+        }
+        if (!p && !again) for (int s2 = 0; s2 < 256; s2++) if (!seen[s2]) { seen[s2] = at; break; }
+        memset(at, 0, modfs_pack[i].size);
+        memcpy(at, d, (size_t)n);
+        if (p) packed_note(p, modfs_pack[i].part < 0 ? 0 : modfs_pack[i].part, what);
+        done++;
+    }
+    if (!any) return 0;
+    free(d);
+    if (done) {
+        note("mods: %s: into %d place%s of the disc's packed files", what, done, done > 1 ? "s" : "");
+        nused++;
+    }
+    return 1;
+}
+
+/* What mods give for an enemy type: [0] its NAB, [1] its NAC, [2] a
+ * picture for its texture (nab/ENEM00.png). */
+typedef struct { int type; uint8_t *data[3]; long n[3]; char what[3][300]; } Enemy;
 static Enemy enemies[64];
 static int nenemies;
 
-/* nab/ENEM00.NAB, nab/ENEM00.NAC */
+/* nab/ENEM00.NAB, nab/ENEM00.NAC, or nab/ENEM00.png (the texture as a picture) */
 static int enemy_apply(const char *mod, const char *rel, const char *up, const char *path) {
     if (strncmp(up, "NAB/ENEM", 8) || !isdigit((unsigned char)up[8]) || !isdigit((unsigned char)up[9]) || up[10] != '.') return 0;
-    int nac = !strcmp(up + 11, "NAC");
-    if (!nac && strcmp(up + 11, "NAB")) return 0;
+    int kind = !strcmp(up + 11, "NAB") ? 0 : !strcmp(up + 11, "NAC") ? 1 : is_picture(up + 10) ? 2 : -1;
+    if (kind < 0) return 0;
     int type = (up[8] - '0') * 10 + (up[9] - '0');
     Enemy *e = NULL;
     for (int i = 0; i < nenemies; i++) if (enemies[i].type == type) e = &enemies[i];
@@ -1227,10 +1436,12 @@ static int enemy_apply(const char *mod, const char *rel, const char *up, const c
     }
     long n = 0;
     uint8_t *d = e ? load(path, &n) : NULL;
-    if (!d) { rt_log("mods: %s/%s: couldn't read it", mod, rel); return 1; }
-    if (nac) { if (!e->nac) nused++; free(e->nac); e->nac = d; e->nnac = n; }    /* a later mod wins */
-    else { if (!e->nab) nused++; free(e->nab); e->nab = d; e->nnab = n; }
-    snprintf(e->what[nac], sizeof e->what[nac], "%s/%s", mod, rel);
+    if (!d) { note("mods: %s/%s: couldn't read it", mod, rel); return 1; }
+    if (!e->data[kind]) nused++;
+    free(e->data[kind]);                         /* a later mod wins */
+    e->data[kind] = d;
+    e->n[kind] = n;
+    snprintf(e->what[kind], sizeof e->what[kind], "%s/%s", mod, rel);
     return 1;
 }
 
@@ -1311,88 +1522,289 @@ static const char *nab_into(const uint8_t *nab, long n, uint8_t *tex, uint32_t n
     return NULL;
 }
 
-/* Each enemy a mod changes, converted into its block (grown with the
- * archive's other files that grow, grow_all). */
+/* The first 16-bit TIM of an enemy's textures (its skin), or NULL. */
+static uint8_t *enemy_skin(uint8_t *tex, uint32_t nt) {
+    for (uint32_t o = 0; o + 20 <= nt && rd32(tex + o) == 0x10;) {
+        uint32_t flag = rd32(tex + o + 4), j = o + 8;
+        if (flag & 8) j += rd32(tex + j);
+        if (j + 12 > nt) break;
+        if ((flag & 3) == 2) return tex + o;
+        o = j + rd32(tex + j);
+    }
+    return NULL;
+}
+
+/* Each enemy a mod changes, converted into its block (packed again in
+ * packs_done). */
 static void enemies_done(void) {
     for (int i = 0; i < nenemies; i++) {
         Enemy *e = &enemies[i];
-        const char *what = e->nab ? e->what[0] : e->what[1];
+        int nk = !!e->data[0] + !!e->data[1] + !!e->data[2];
+        const char *what = e->data[0] ? e->what[0] : e->data[1] ? e->what[1] : e->what[2];
         int fi = disc_index(e->type == 30 ? "EV_OBJ.DAT" : "OBJ.DAT");
-        uint32_t blk = e->type == 30 ? 0x196 : (uint32_t)e->type;
-        Touched *test = touch(disc_index("TEST.BIN"));
-        Touched *t = fi >= 0 ? touch(fi) : NULL;
-        uint32_t tab = (e->type == 30 ? 0x800A195Cu : 0x800A0CD8u) - TEST_BASE;
-        uint32_t start = 0, len = 0;
-        if (t && test && e->type >= 0 && e->type <= 30) {
-            start = rd32(test->data + tab + 4 * blk) * 2048;
-            len = rd32(test->data + tab + 4 * blk + 4) * 2048 - start;
-        }
-        const uint8_t *b = t ? t->data + start : NULL;
-        if (!len || len > t->nsec * 2048 - start || rd32(b) != 3 || rd32(b + 4) != 16) {
-            rt_log("mods: %s: enemy type %d isn't one the PS1 keeps in this form (types 0-30 are): not used", what, e->type);
-            nused -= !!e->nab + !!e->nac;
+        Packed *p = e->type >= 0 && e->type <= 30 ? packed_get(fi, e->type == 30 ? 0x196 : (uint32_t)e->type) : NULL;
+        if (!p || !p->split) {
+            note("mods: %s: enemy type %d isn't one the PS1 keeps in this form (types 0-30 are): not used", what, e->type);
+            nused -= nk;
             goto next;
         }
-        uint32_t off[4] = {rd32(b + 4), rd32(b + 8), rd32(b + 12), len};
-        if (off[0] > off[1] || off[1] > off[2] || off[2] > len) {
-            rt_log("mods: %s: the disc's enemy block isn't laid out as expected: not used", what);
-            nused -= !!e->nab + !!e->nac;
-            goto next;
-        }
-        uint8_t *part[3] = {NULL, NULL, NULL}, *was[3] = {NULL, NULL, NULL};
-        uint32_t plen[3] = {0, 0, 0};
-        int changed[3] = {0, 0, 0}, ntex = 0;
-        const char *why = NULL;
-        if (e->nab) {
-            part[0] = lz_unpack(b + off[0], off[1] - off[0], &plen[0]);
-            if (part[0] && (was[0] = malloc(plen[0]))) memcpy(was[0], part[0], plen[0]);
-            why = part[0] ? nab_into(e->nab, e->nnab, part[0], plen[0], &ntex) : "the disc's textures couldn't be unpacked";
-            if (why) { rt_log("mods: %s: %s: not used", e->what[0], why); nused--; }
-            else changed[0] = 1;
-        }
-        if (e->nac) {
-            part[1] = lz_unpack(b + off[1], off[2] - off[1], &plen[1]);
-            if (part[1] && (was[1] = malloc(plen[1]))) memcpy(was[1], part[1], plen[1]);
-            why = part[1] ? nac_into(e->nac, e->nnac, part[1], plen[1]) : "the disc's animations couldn't be unpacked";
-            if (why) { rt_log("mods: %s: %s: not used", e->what[1], why); nused--; }
-            else changed[1] = 1;
-        }
-        if (changed[0] || changed[1]) {
-            uint8_t *out = malloc((size_t)len * 2 + plen[0] + plen[1] + 64);
-            uint32_t at = 16;
-            wr32(out, 3);
-            for (int k = 0; k < 3; k++) {
-                wr32(out + 4 + 4 * k, at);
-                uint32_t pn = 0;
-                int same = !changed[k] || (was[k] && !memcmp(was[k], part[k], plen[k]));   /* the disc's packing kept */
-                uint8_t *pk = same ? NULL : lz_pack(part[k], plen[k], &pn);
-                if (pk) { memcpy(out + at, pk, pn); free(pk); }
-                else { pn = off[k + 1] - off[k]; memcpy(out + at, b + off[k], pn); }
-                at += (pn + 3) & ~3u;
-            }
-            if (ngrows < (int)(sizeof grows / sizeof grows[0])) {
-                Grow *g = &grows[ngrows++];
-                g->fi = fi;
-                g->offset = start;
-                g->size = at;
-                g->orig = len;
-                g->data = out;
-                snprintf(g->what, sizeof g->what, "enemy type %d (%s%s%s)", e->type, changed[0] ? e->what[0] : "",
-                         changed[0] && changed[1] ? ", " : "", changed[1] ? e->what[1] : "");
-                if (changed[0]) rt_log("mods: %s: its textures (%d) in place of enemy type %d's", e->what[0], ntex, e->type);
-                if (changed[1]) rt_log("mods: %s: its animations in place of enemy type %d's", e->what[1], e->type);
-                if (e->nab) rt_log("mods: %s: the model's shape isn't taken (only its textures)", e->what[0]);
-            } else {
-                free(out);
-                nused -= changed[0] + changed[1];
+        uint32_t n = 0;
+        uint8_t *u;
+        const char *why;
+        int ntex = 0;
+        if (e->data[0]) {
+            u = packed_part(p, 0, &n);
+            why = u ? nab_into(e->data[0], e->n[0], u, n, &ntex) : "the disc's textures couldn't be unpacked";
+            if (why) { note("mods: %s: %s: not used", e->what[0], why); nused--; }
+            else {
+                packed_note(p, 0, e->what[0]);
+                note("mods: %s: its textures (%d) in place of enemy type %d's (the model's shape isn't taken)", e->what[0], ntex, e->type);
             }
         }
-        for (int k = 0; k < 3; k++) { free(part[k]); free(was[k]); }
+        if (e->data[2]) {                        /* a picture of the skin: after the NAB's, so it wins */
+            u = packed_part(p, 0, &n);
+            uint8_t *tim = u ? enemy_skin(u, n) : NULL;
+            int w = 0, h = 0, c;
+            uint8_t *img = tim ? stbi_load_from_memory(e->data[2], (int)e->n[2], &w, &h, &c, 4) : NULL;
+            const char *how = "";
+            why = !tim ? "the disc's textures couldn't be unpacked" : !img ? "couldn't read it as a picture"
+                                                                          : tim_from_picture(tim, img, (uint32_t)w, (uint32_t)h, &how);
+            stbi_image_free(img);
+            if (why) { note("mods: %s: %s: not used", e->what[2], why); nused--; }
+            else {
+                uint32_t tw = 0, th = 0;
+                tim_size(tim, &tw, &th);
+                packed_note(p, 0, e->what[2]);
+                note("mods: %s: enemy type %d's texture (%ux%u%s)", e->what[2], e->type, tw, th,
+                       (uint32_t)w != tw || (uint32_t)h != th ? ", scaled to the PS1's size" : "");
+            }
+        }
+        if (e->data[1]) {
+            u = packed_part(p, 1, &n);
+            why = u ? nac_into(e->data[1], e->n[1], u, n) : "the disc's animations couldn't be unpacked";
+            if (why) { note("mods: %s: %s: not used", e->what[1], why); nused--; }
+            else {
+                packed_note(p, 1, e->what[1]);
+                note("mods: %s: its animations in place of enemy type %d's", e->what[1], e->type);
+            }
+        }
     next:
-        free(e->nab);
-        free(e->nac);
+        for (int k = 0; k < 3; k++) free(e->data[k]);
     }
     nenemies = 0;
+}
+
+/* ------------------------------------------------------------ extracting */
+
+/* The originals of everything a mod can replace, written under the names
+ * a mod gives them, to start from (the platform's `extract` folder, when
+ * it's there and empty; RT_EXTRACT for the headless runner): the disc's
+ * files that aren't code or streams, by their disc path; the files the
+ * PC version has loose (rooms, doors, effects, items, Resource...), by
+ * their PC path; the PC's 2D pictures as PNG (map/MAP00_1.png); each
+ * enemy's texture as PNG (nab/ENEM00.png); every streamed sound channel
+ * as WAV (X/BGM_32.STR/05.wav). Movies' frames come out as they play
+ * (movie_dump). Read from the disc, mods left out. */
+char g_extract_dir[1024];
+
+static int write_out(const char *rel, const uint8_t *d, size_t n) {
+    char path[1400];
+    snprintf(path, sizeof path, "%s/%s", g_extract_dir, rel);
+    for (char *c = path + 1; *c; c++)
+        if (*c == '/') { *c = 0; mkdir(path); *c = '/'; }
+    FILE *f = fopen(path, "wb");
+    if (!f) return 0;
+    fwrite(d, 1, n, f);
+    fclose(f);
+    return 1;
+}
+
+static uint8_t *disc_read(int fi) {               /* a disc file as it is on the disc */
+    uint32_t nsec = (disc_files[fi].size + 2047) / 2048;
+    uint8_t *d = malloc((size_t)nsec * 2048 + 1), s[2352];
+    disc_only = 1;
+    for (uint32_t k = 0; d && k < nsec; k++) {
+        cd_read_sector_raw(disc_files[fi].lba + k, s);
+        memcpy(d + (size_t)k * 2048, s + 24, 2048);
+    }
+    disc_only = 0;
+    return d;
+}
+
+/* A TIM as a PNG (its first palette), to path. */
+static int tim_png(const char *rel, const uint8_t *tim) {
+    uint32_t flag = rd32(tim + 4), bpp = (uint32_t[]){4, 8, 16, 24}[flag & 3], w, h;
+    if (bpp == 24) return 0;
+    const uint8_t *clut = flag & 8 ? tim + 12 + 8 : NULL, *pix = flag & 8 ? tim + 8 + rd32(tim + 8) : tim + 8;
+    tim_size(tim, &w, &h);
+    uint8_t *rgb = malloc((size_t)w * h * 3);
+    for (uint32_t k = 0; k < w * h; k++) {
+        uint32_t v = bpp == 16 ? rd16(pix + 12 + 2 * k) : bpp == 8 ? rd16(clut + 2 * pix[12 + k]) : rd16(clut + 2 * ((pix[12 + k / 2] >> (k & 1) * 4) & 15));
+        uint32_t r = (v & 31) << 3, g = ((v >> 5) & 31) << 3, b = ((v >> 10) & 31) << 3;
+        rgb[3 * k] = (uint8_t)(r | r >> 5);
+        rgb[3 * k + 1] = (uint8_t)(g | g >> 5);
+        rgb[3 * k + 2] = (uint8_t)(b | b >> 5);
+    }
+    char path[1400];
+    snprintf(path, sizeof path, "%s/%s", g_extract_dir, rel);
+    for (char *c = path + 1; *c; c++)
+        if (*c == '/') { *c = 0; mkdir(path); *c = '/'; }
+    png_write(path, rgb, (int)w, (int)h);
+    free(rgb);
+    FILE *f = fopen(path, "rb");
+    if (f) fclose(f);
+    return f != NULL;
+}
+
+/* XA ADPCM, one sector, appended to a channel's PCM (as spu.c plays it). */
+typedef struct { int16_t *pcm; size_t n, cap; int32_t hist[2][2]; uint32_t rate; int stereo; } XaChan;
+static void xa_decode(const uint8_t *sec, XaChan *c) {
+    static const int pos[5] = {0, 60, 115, 98, 122}, neg[5] = {0, 0, -52, -55, -60};
+    uint8_t coding = sec[19];
+    int stereo = (coding & 3) == 1, bits8 = ((coding >> 4) & 3) == 1;
+    c->stereo = stereo;
+    c->rate = (coding >> 2) & 1 ? 18900 : 37800;
+    size_t frames = (size_t)(bits8 ? 4 : 8) * 28 * 18 / (stereo ? 2 : 1);
+    if (c->n + frames > c->cap) {
+        c->cap = (c->n + frames) * 2;
+        c->pcm = realloc(c->pcm, c->cap * 4);
+    }
+    int16_t *out = c->pcm + c->n * 2;
+    size_t at[2] = {0, 0};
+    for (int g = 0; g < 18; g++) {
+        const uint8_t *grp = sec + 24 + g * 128;
+        for (int u = 0; u < (bits8 ? 4 : 8); u++) {
+            int shift = grp[4 + u] & 15, filt = (grp[4 + u] >> 4) & 3;
+            if (shift > 12) shift = 9;
+            int ch = stereo ? (u & 1) : 0;
+            int32_t *h = c->hist[ch];
+            for (int i = 0; i < 28; i++) {
+                int32_t t;
+                if (bits8) t = (int32_t)(int8_t)grp[16 + i * 4 + u] << 8;
+                else {
+                    int nib = (grp[16 + i * 4 + (u >> 1)] >> ((u & 1) * 4)) & 15;
+                    t = (nib & 8 ? nib - 16 : nib) << 12;
+                }
+                int32_t v = (t >> shift) + ((h[0] * pos[filt] + h[1] * neg[filt] + 32) >> 6);
+                v = v < -32768 ? -32768 : v > 32767 ? 32767 : v;
+                h[1] = h[0];
+                h[0] = v;
+                size_t k = at[ch]++;
+                if (stereo) out[2 * k + ch] = (int16_t)v;
+                else out[2 * k] = out[2 * k + 1] = (int16_t)v;
+            }
+        }
+    }
+    c->n += frames;
+}
+
+static int wav_write(const char *rel, const int16_t *lr, size_t frames, uint32_t rate) {
+    size_t n = frames * 4;
+    uint8_t *d = malloc(44 + n);
+    memcpy(d, "RIFF", 4);
+    wr32(d + 4, (uint32_t)(36 + n));
+    memcpy(d + 8, "WAVEfmt ", 8);
+    wr32(d + 16, 16);
+    wr16(d + 20, 1);
+    wr16(d + 22, 2);
+    wr32(d + 24, rate);
+    wr32(d + 28, rate * 4);
+    wr16(d + 32, 4);
+    wr16(d + 34, 16);
+    memcpy(d + 36, "data", 4);
+    wr32(d + 40, (uint32_t)n);
+    for (size_t k = 0; k < frames * 2; k++) wr16(d + 44 + 2 * k, (uint16_t)lr[k]);
+    int ok = write_out(rel, d, 44 + n);
+    free(d);
+    return ok;
+}
+
+static int nextracted;
+int modfs_extracted(void) { return nextracted; }
+
+/* Returns how many files it wrote. */
+int modfs_extract(void) {
+    if (!g_extract_dir[0]) return 0;
+    note("mods: writing the originals to %s (it takes a minute)", g_extract_dir);
+    int files = 0;
+    char rel[700];
+    /* the disc's files, and the sound of its streams */
+    for (size_t i = 0; i < sizeof disc_files / sizeof disc_files[0]; i++) {
+        if (disc_files[i].hash) continue;
+        if (!strstr(disc_files[i].name, ".STR")) {
+            uint8_t *d = disc_read((int)i);
+            size_t z = 0;
+            while (d && z < disc_files[i].size && !d[z]) z++;
+            if (d && z < disc_files[i].size) files += write_out(disc_files[i].name, d, disc_files[i].size);   /* (not the disc's filler) */
+            free(d);
+            continue;
+        }
+        static XaChan ch[32];
+        memset(ch, 0, sizeof ch);
+        uint8_t s[2352];
+        uint32_t nsec = (disc_files[i].size + 2047) / 2048;
+        disc_only = 1;
+        for (uint32_t k = 0; k < nsec; k++) {
+            if (!cd_read_sector_raw(disc_files[i].lba + k, s)) continue;
+            if (s[15] != 2 || !(s[18] & 0x04) || s[17] >= 32) continue;
+            xa_decode(s, &ch[s[17]]);
+        }
+        disc_only = 0;
+        for (int c = 0; c < 32; c++) {
+            if (!ch[c].n) continue;
+            snprintf(rel, sizeof rel, "%s/%02d.wav", disc_files[i].name, c);
+            files += wav_write(rel, ch[c].pcm, ch[c].n, ch[c].rate);
+            free(ch[c].pcm);
+        }
+    }
+    /* the PC version's names: loose files, ones in packed blocks, 2D pictures, enemies' textures */
+    for (size_t i = 0; i < sizeof modfs_pc / sizeof modfs_pc[0]; i++) {
+        Touched *t = touch(disc_index(modfs_pc[i].disc));
+        const uint8_t *d = t ? t->data : NULL;
+        if (d && (uint32_t)mz_crc32(0, d + modfs_pc[i].offset, modfs_pc[i].size) == modfs_pc[i].crc)
+            files += write_out(modfs_pc[i].pc, d + modfs_pc[i].offset, modfs_pc[i].size);
+    }
+    for (size_t i = 0; i < sizeof modfs_pack / sizeof modfs_pack[0]; i++) {
+        if (i && !strcmp(modfs_pack[i].pc, modfs_pack[i - 1].pc)) continue;   /* (the same file in another place) */
+        Packed *p = packed_get(disc_index(modfs_pack[i].disc), modfs_pack[i].block);
+        uint32_t n = 0;
+        const uint8_t *u = NULL;
+        if (modfs_pack[i].part == -2) {
+            int fi = disc_index(modfs_pack[i].disc);
+            Touched *test = touch(disc_index("TEST.BIN")), *t = touch(fi);
+            uint32_t at = t && test ? rd32(test->data + archive_table(fi) - TEST_BASE + 4 * modfs_pack[i].block) * 2048 + modfs_pack[i].offset : 0;
+            if (t && (uint32_t)mz_crc32(0, t->data + at, modfs_pack[i].size) == modfs_pack[i].crc)
+                files += write_out(modfs_pack[i].pc, t->data + at, modfs_pack[i].size);
+            continue;
+        }
+        u = packed_part(p, modfs_pack[i].part < 0 ? 0 : modfs_pack[i].part, &n);
+        if (u && modfs_pack[i].offset + modfs_pack[i].size <= n &&
+            (uint32_t)mz_crc32(0, u + modfs_pack[i].offset, modfs_pack[i].size) == modfs_pack[i].crc)
+            files += write_out(modfs_pack[i].pc, u + modfs_pack[i].offset, modfs_pack[i].size);
+    }
+    for (size_t i = 0; i < sizeof modfs_bmp / sizeof modfs_bmp[0]; i++) {
+        if (i && !strcmp(modfs_bmp[i].pc, modfs_bmp[i - 1].pc)) continue;
+        Touched *t = touch(disc_index(modfs_bmp[i].disc));
+        const uint8_t *d = t ? t->data : NULL;
+        snprintf(rel, sizeof rel, "%s", modfs_bmp[i].pc);
+        char *dot = strrchr(rel, '.');
+        if (dot) strcpy(dot, ".png");
+        if (d && (uint32_t)mz_crc32(0, d + modfs_bmp[i].offset, modfs_bmp[i].size) == modfs_bmp[i].crc)
+            files += tim_png(rel, d + modfs_bmp[i].offset);
+    }
+    for (int type = 0; type <= 30; type++) {
+        Packed *p = packed_get(disc_index(type == 30 ? "EV_OBJ.DAT" : "OBJ.DAT"), type == 30 ? 0x196 : (uint32_t)type);
+        uint32_t n = 0;
+        uint8_t *u = p && p->split ? packed_part(p, 0, &n) : NULL, *tim = u ? enemy_skin(u, n) : NULL;
+        snprintf(rel, sizeof rel, "NAB/ENEM%02d.png", type);
+        if (tim) files += tim_png(rel, tim);
+    }
+    for (int i = 0; i < npacks; i++)             /* nothing changed: just let them go */
+        for (int k = 0; k < 3; k++) { free(packs[i].part[k]); free(packs[i].was[k]); }
+    npacks = 0;
+    note("mods: %d originals written to %s", files, g_extract_dir);
+    nextracted = files;
+    return files;
 }
 
 static void walk(const char *mod, const char *dir, const char *rel) {
@@ -1407,7 +1819,7 @@ static void walk(const char *mod, const char *dir, const char *rel) {
         struct stat st;
         if (stat(path, &st)) continue;
         if (S_ISDIR(st.st_mode)) walk(mod, path, r);
-        else if (*rel || (strcasecmp(e->d_name, "readme.txt") && strcasecmp(e->d_name, "readme.md")))
+        else if (*rel || disc_index(e->d_name) >= 0)   /* at the top only the disc's own files (the rest: readme, pictures...) */
             apply(mod, r, path);
     }
     closedir(d);
@@ -1436,7 +1848,9 @@ void modfs_open(void) {
             if (e->d_name[0] == '.') continue;
             snprintf(path, sizeof path, "%s/%s", g_mods_dir, e->d_name);
             struct stat st;
-            if (!stat(path, &st) && S_ISDIR(st.st_mode)) names[n++] = strdup(e->d_name);
+            if (stat(path, &st) || !S_ISDIR(st.st_mode)) continue;
+            if (e->d_name[0] == '_') { note("mods: %s: switched off (its name starts with _)", e->d_name); continue; }
+            names[n++] = strdup(e->d_name);
         }
         if (d) closedir(d);
         qsort(names, (size_t)n, sizeof *names, cmp_str);
@@ -1444,19 +1858,21 @@ void modfs_open(void) {
     for (int i = 0; i < n; i++) {
         snprintf(path, sizeof path, "%s/%s", g_mods_dir, names[i]);
         struct stat st;
-        if (stat(path, &st) || !S_ISDIR(st.st_mode)) { rt_log("mods: %s (order.txt): no such folder", names[i]); continue; }
+        if (stat(path, &st) || !S_ISDIR(st.st_mode)) { note("mods: %s (order.txt): no such folder", names[i]); continue; }
         int before = nused;
         walk(names[i], path, "");
         if (nused > before) nmods++;
         free(names[i]);
     }
     enemies_done();
+    packs_done();
     grow_all();
     movie_done();
-    if (nused) rt_log("mods: %d files from %d mods", nused, nmods);
+    if (nused || nskipped) note("mods: %d files from %d mods, %d not used", nused, nmods, nskipped);
 }
 
 int modfs_used(void) { return nused; }
+int modfs_skipped(void) { return nskipped; }
 int modfs_mods(void) { return nmods; }
 
 /* cd_read_sector_raw: a sector of a file a mod changed (1), or the disc's (0).

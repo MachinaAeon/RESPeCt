@@ -38,7 +38,7 @@ extern int g_opt_fov;                                                       /* g
 static int cutscene_frames;                /* frames in a cutscene so far (for the hint) */
 #define SAVE_SLOTS 99
 static int save_slot = 1;                  /* 1-99: F5 saves there, F9 loads it; F6/F7 pick */
-static char toast[128];
+static char toast[192];
 static DWORD toast_until;
 
 static void show_toast(const char *msg) {
@@ -332,6 +332,54 @@ static void grab_frame(void) {
     g_display_h = dh > 0 ? dh : 0;
     g_display_smooth = g_cfg.smooth_scaling;
     display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+}
+
+/* The mods folder, made on the first start with a note on how it works;
+ * and an empty `extract` folder next to the exe asks for the originals
+ * (modfs.c). */
+static void mods_folder(const char *dir) {
+    extern char g_mods_dir[1024], g_extract_dir[1024];
+    if (GetFileAttributesA(g_mods_dir) == INVALID_FILE_ATTRIBUTES && CreateDirectoryA(g_mods_dir, NULL)) {
+        char p[MAX_PATH + 32];
+        snprintf(p, sizeof p, "%s\\README.txt", g_mods_dir);
+        FILE *f = fopen(p, "w");
+        if (f) {
+            fputs("RESPeCt mods\n"
+                  "============\n\n"
+                  "Each folder in here is one mod. Its files take the place of the game's\n"
+                  "while it plays, without changing your disc image:\n\n"
+                  "  mods\\my-mod\\B\\MAPTIM.BIN                  a file of the disc, by its path\n"
+                  "  mods\\my-mod\\stage\\STAGE07\\0700\\0700_A.hmd  a PC version file (PSX_DATA)\n"
+                  "  mods\\my-mod\\map\\MAP00_1.png                a PC version picture (BMP or PNG)\n"
+                  "  mods\\my-mod\\nab\\ENEM11.NAB, .NAC, .png     an enemy's textures, animations\n"
+                  "  mods\\my-mod\\X\\BGM_32.STR\\05.wav          music, voices: a channel of a stream\n"
+                  "  mods\\my-mod\\M\\OPENING.STR\\0042.png       a movie's frame 42\n\n"
+                  "To get the originals to start from, make an empty folder called\n"
+                  "\"extract\" next to RESPeCt.exe and start the game once: everything a\n"
+                  "mod can replace is written there, under the names to use. For movies,\n"
+                  "a folder called \"movie_dump\" gets every frame as the movies play.\n\n"
+                  "Mods apply in alphabetical order, or in the order of an order.txt in\n"
+                  "this folder (one folder name per line); the later one wins. A folder\n"
+                  "whose name starts with _ is switched off.\n\n"
+                  "On start the game says how many files it used. What each file did, or\n"
+                  "why it wasn't used, is in resurv.log (lines starting \"mods:\").\n"
+                  "All the details: docs/MODDING.md on the RESPeCt page.\n", f);
+            fclose(f);
+        }
+    }
+    snprintf(g_extract_dir, sizeof g_extract_dir, "%sextract", dir);
+    char pat[MAX_PATH + 16];
+    snprintf(pat, sizeof pat, "%s\\*", g_extract_dir);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    int empty = h != INVALID_HANDLE_VALUE;
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if (strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, "..")) empty = 0;
+        } while (empty && FindNextFileA(h, &fd));
+        FindClose(h);
+    }
+    if (!empty) g_extract_dir[0] = 0;            /* only into an empty one: never over a modder's work */
 }
 
 static int key_down(int vk);
@@ -1338,12 +1386,15 @@ void plat_frame(void) {
     if (g_frame == 1 || g_frame % 300 == 0)
         rt_log("frame %u (last loop %08X)", g_frame, g_poll_pc);
     if (g_frame == 120) {                        /* mods in use (modfs.c): say so once */
-        int modfs_used(void), modfs_mods(void);
-        if (modfs_used()) {
-            char m[96];
-            snprintf(m, sizeof m, "Mods: %d files from %d mods (details in resurv.log)", modfs_used(), modfs_mods());
-            show_toast(m);
-        }
+        int modfs_used(void), modfs_mods(void), modfs_skipped(void), modfs_extracted(void);
+        char m[192] = "";
+        size_t l = 0;
+        if (modfs_extracted()) l += (size_t)snprintf(m, sizeof m, "%d originals written to the extract folder. ", modfs_extracted());
+        if (modfs_skipped())
+            snprintf(m + l, sizeof m - l, "Mods: %d files from %d mods; %d not used (why: resurv.log)", modfs_used(), modfs_mods(), modfs_skipped());
+        else if (modfs_used())
+            snprintf(m + l, sizeof m - l, "Mods: %d files from %d mods (details in resurv.log)", modfs_used(), modfs_mods());
+        if (m[0]) show_toast(m);
     }
     /* Fast start: run the boot (disc check, logos, warnings) flat out until
      * just before the title screen, unless a key is pressed. The boot takes
@@ -1544,6 +1595,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         snprintf(g_movie_dump, sizeof g_movie_dump, "%smovie_dump", dir);   /* when there's one: the movies' pictures */
         DWORD at = GetFileAttributesA(g_movie_dump);
         if (at == INVALID_FILE_ATTRIBUTES || !(at & FILE_ATTRIBUTE_DIRECTORY)) g_movie_dump[0] = 0;
+        mods_folder(dir);
     }
     open_texture_pack();
     audio_init();
