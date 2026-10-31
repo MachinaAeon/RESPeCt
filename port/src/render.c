@@ -55,7 +55,13 @@ static float g_depth_tol = 24;                  /* touching surfaces keep the PS
 static int g_fill_mark, g_sliver_mark;                          /* testing: RT_FILL_MARK fills the screen magenta (gaps show) */
 static int g_depth_any;                          /* testing: RT_DEPTH_ANY hides any model behind any */
 static int g_far_page = 1;                       /* RT_FAR_PAGE=0: off */
-static float g_cross_tol = 128;                  /* another object: hidden this far behind (RT_CROSS_TOL; 0 = never) */
+/* Another object: hidden this far behind (RT_CROSS_TOL; 0 = never). As
+ * close as a model's own back (g_depth_tol): a model's parts have their
+ * own texture pages (a zombie's head and torso), so they count as other
+ * objects, and 128 let a torso 60-odd units behind its head be drawn over
+ * it whenever the PS1's order put it later: the neck changed from frame
+ * to frame as the camera moved. */
+static float g_cross_tol = 24;
 static double g_margin_len = 6;                  /* longest edge (PS1 pixels) of a triangle given the gap margin; RT_MARGIN_LEN */
 int g_gap_fill = 1; 
 int g_persp = 1;                                /* Perspective-correct textures (setting) */
