@@ -31,6 +31,7 @@ typedef struct RPrim {
     int mask_set, mask_check;
     int w, h, flipx, flipy;                  /* rectangles */
     int zt;                                  /* 3D with depth: depth-test it */
+    uint32_t obj;                            /* 3D: the model it belongs to (gte.c), 0 if not known */
     float sqx0, sqx1;                        /* widescreen: a rectangle squeezed to x sqx0..sqx1 (if sqx1 > sqx0) */
     const HdImg *hd;                         /* HD texture pack image to draw from (texpack.c), high-res only: */
     float hd_ox, hd_oy, hd_kx, hd_ky;        /*   its pixel = (hd_ox + u * hd_kx, hd_oy + v * hd_ky) */

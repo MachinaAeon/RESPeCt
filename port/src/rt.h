@@ -75,7 +75,8 @@ uint32_t gpu_status(void);
 void gpu_vblank(void);
 extern uint32_t g_gp0_src;
 extern int g_widescreen, g_subpixel;
-int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z);
+/* o: the model the corner belongs to (its matrices' chain), 0 if not known */
+int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z, uint32_t *o);
 void gte_precise_frame(void);
 extern uint16_t g_vram[512][1024];
 typedef struct {

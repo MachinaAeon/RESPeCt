@@ -243,6 +243,12 @@ void shade_smooth(int r, int g, int b, float U, float V2, float4 lo, int x, int 
     put((stp ? 0x8000 : 0) | o0 | (o1 << 5) | (o2 << 10), (fl & GF_SEMI) && stp);
 }
 
+// render.c same_object: one model if both are known, else one page and CLUT
+bool same_object(uint a, uint b) {
+    if ((a >> 21) && (b >> 21) && a != 0xFFFFFFFFu && b != 0xFFFFFFFFu) return (a >> 21) == (b >> 21);
+    return a == b;
+}
+
 void tri(int x, int y) {
     int x0 = OI(GO_X0);
     if (x < x0 || x > OI(GO_X1) || y < OI(GO_Y0) || y > OI(GO_Y1)) return;
@@ -281,7 +287,7 @@ void tri(int x, int y) {
             float behind = 1.0f / (float)wz - 1.0f / zs;
             float tol = depth_rel / zs;
             if (tol < depth_tol) tol = depth_tol;
-            if (behind > tol && (idv == id || depth_any)) return;
+            if (behind > tol && (same_object(idv, id) || depth_any)) return;
             if (cross_tol > 0 && !semi && behind > cross_tol && behind > tol) return;
         } else if (far_page && (float)wz <= zs * 0.88f && !semi && id != 0xFFFFFFFFu &&
                    idv != 0xFFFFFFFFu && ((idv ^ id) & 0x1F) == 0)

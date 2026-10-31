@@ -51,24 +51,22 @@ unsigned g_margin_hist[7];
 static float g_margin_depth = 64;
 static double g_margin_area = 8;                /* PS1 pixels (RT_MARGIN_AREA) */               /* GTE depth units behind (RT_MARGIN_DEPTH) */
 static double g_overlap = 0.75;                 /* PS1 pixels (RT_OVERLAP) */
-/* Touching surfaces keep the PS1's order (RT_DEPTH_TOL, GTE depth units).
- * 2 now, was 24 (or 0.4% of the distance): with the models' corners and
- * depths in full precision (gte.c) a head and the shirt it pokes out of are
- * told apart a few units apart, and with 24 the shirt, drawn later, came
- * over the top of the head in some frames and not in others as the camera
- * turned. */
+/* A model's own surfaces keep the PS1's order this close (RT_DEPTH_TOL,
+ * GTE depth units). 2 now, was 24 (or 0.4% of the distance): with the
+ * models' corners and depths in full precision (gte.c) a head and the
+ * shirt it pokes out of are told apart a few units apart, and with 24 the
+ * shirt, drawn later, came over the top of the head in some frames and not
+ * in others as the camera turned. */
 static float g_depth_tol = 2;
 static float g_depth_rel = 0;               /* ... or this share of the distance, if more (RT_DEPTH_REL) */
 static int g_fill_mark, g_sliver_mark;                          /* testing: RT_FILL_MARK fills the screen magenta (gaps show) */
 static int g_depth_any;                          /* testing: RT_DEPTH_ANY hides any model behind any */
 static int g_far_page = 1;                       /* RT_FAR_PAGE=0: off */
-/* Another object: hidden this far behind (RT_CROSS_TOL; 0 = never). As
- * close as a model's own back (g_depth_tol): a model's parts have their
- * own texture pages (a zombie's head and torso), so they count as other
- * objects, and 128 let a torso 60-odd units behind its head be drawn over
- * it whenever the PS1's order put it later: the neck changed from frame
- * to frame as the camera moved. */
-static float g_cross_tol = 2;
+/* Another object: hidden this far behind (RT_CROSS_TOL; 0 = never), well
+ * behind only: a model reaching into another (a dead zombie's hand through
+ * the floor, the lab tyrant into its tank's frame) stays drawn as on the
+ * PS1. A model's own parts are one object (same_object). */
+static float g_cross_tol = 128;
 static double g_margin_len = 6;                  /* longest edge (PS1 pixels) of a triangle given the gap margin; RT_MARGIN_LEN */
 int g_gap_fill = 1; 
 int g_persp = 1;                                /* Perspective-correct textures (setting) */
@@ -367,6 +365,13 @@ typedef struct {
     int32_t dr, dg, db, du, dv;
 } TriSetup;
 
+/* Two depth buffer ids (tri_setup) of one object: the same model if both
+ * models are known, else the same texture page and CLUT. */
+static inline int same_object(uint32_t a, uint32_t b) {
+    if ((a >> 21) && (b >> 21) && a != 0xFFFFFFFFu && b != 0xFFFFFFFFu) return (a >> 21) == (b >> 21);
+    return a == b;
+}
+
 static int tri_setup(const Target *t, const RPrim *p, TriSetup *q) {
     const RVtx *v = p->v;
     int s = t->scale;
@@ -500,6 +505,10 @@ static int tri_setup(const Target *t, const RPrim *p, TriSetup *q) {
     q->id = p->textured ? 1u + (uint32_t)(p->tx >> 6) + ((uint32_t)(p->ty >> 8) << 4) +
                           ((uint32_t)(p->clut_x >> 4) << 5) + ((uint32_t)p->clut_y << 11)
                         : 0xFFFFFFFFu;
+    /* and the model it belongs to, when known (the root of its matrices'
+     * chain, gte.c), in the top bits: a model's parts often have pages of
+     * their own (a zombie's head and torso), and they are one object */
+    if (p->textured && p->obj) q->id |= (((p->obj * 0x9E3779B1u) >> 21) | 1u) << 21;
     if (zuse) q->pw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
     /* Perspective-correct textures (a 3D polygon, every corner's depth
      * known): the PS1 interpolates u and v straight across the screen,
@@ -619,7 +628,7 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                         float behind = 1.0f / (float)wz - 1.0f / zs;   /* in GTE depth units */
                         float tol = g_depth_rel / zs;
                         if (tol < g_depth_tol) tol = g_depth_tol;
-                        if (behind > tol && (idrow[x] == id || g_depth_any)) goto next;
+                        if (behind > tol && (same_object(idrow[x], id) || g_depth_any)) goto next;
                         /* Another object's surface well in front (the
                          * PS1 sorts whole polygons, so a stair rail can
                          * come after the ceiling it's behind): hidden
