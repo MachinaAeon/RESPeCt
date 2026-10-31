@@ -15,9 +15,12 @@
  * (its directory entry says where) and the game's table of its blocks
  * (in TEST.BIN, 0x800A5B90) is changed to match, up to what the room's
  * object file can take in memory (0x80108000-0x80150000). Files that hold
- * game code (the game runs translated, from what it read) and streamed
- * movies and sound can't be replaced. What is and isn't used is in the
- * log. */
+ * game code (the game runs translated, from what it read) can't be
+ * replaced, nor streams whole; their sound goes by channel instead:
+ * X/BGM_32.STR/05.wav is what the game plays from that file's channel 5
+ * (music, voices, a movie's sound), sample for sample in step with the
+ * disc's, so loops, cuts and the end stay the game's. What is and isn't
+ * used is in the log. */
 #include "rt.h"
 #include "disc_ids.h"
 #include "modfs_pc.h"
@@ -95,6 +98,8 @@ static Touched *touch_lba(uint32_t lba, uint32_t nsec, const char *name) {
     ntouched++;
     return t;
 }
+
+static int sound_apply(const char *mod, const char *rel, const char *up, const char *path);
 
 static uint8_t *load(const char *path, long *n) {
     FILE *f = fopen(path, "rb");
@@ -186,6 +191,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
         nused++;
         return;
     }
+    if (sound_apply(mod, rel, up, path)) return;
     rt_log("mods: %s/%s: not a file of the disc or of the PC version's PSX_DATA: not used", mod, rel);
 }
 
@@ -357,6 +363,138 @@ static void grow_all(void) {
         }
         t->nsec = nsec;
     }
+}
+
+/* ------------------------------------------------------------ sound */
+
+/* A stream's channel played from a mod's WAV: each of the channel's
+ * sectors on the disc numbered in order (index), the WAV in stereo at the
+ * channel's rate. */
+typedef struct {
+    uint32_t lba, nsec, chan, rate, per;          /* per: frames a sector holds */
+    int32_t *index;                               /* the sector's place in the channel, -1 another's */
+    int16_t *pcm;                                 /* stereo */
+    uint32_t frames;
+} Track;
+static Track tracks[128];
+static int ntracks;
+
+static uint16_t rd16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] << 8); }
+
+/* PCM WAV, 16 bits, mono or stereo, to stereo at rate (linear). */
+static int16_t *wav_load(const uint8_t *d, long n, uint32_t rate, uint32_t *frames, const char **why) {
+    if (n < 44 || memcmp(d, "RIFF", 4) || memcmp(d + 8, "WAVE", 4)) { *why = "not a WAV file"; return NULL; }
+    const uint8_t *fmt = NULL, *data = NULL;
+    uint32_t dlen = 0;
+    for (long o = 12; o + 8 <= n;) {
+        uint32_t len = rd32(d + o + 4);
+        if (!memcmp(d + o, "fmt ", 4)) fmt = d + o + 8;
+        if (!memcmp(d + o, "data", 4)) { data = d + o + 8; dlen = len; if ((long)(o + 8 + len) > n) dlen = (uint32_t)(n - o - 8); }
+        o += 8 + len + (len & 1);
+    }
+    if (!fmt || !data) { *why = "no format or no samples"; return NULL; }
+    uint32_t chans = rd16(fmt + 2), srate = rd32(fmt + 4), bits = rd16(fmt + 14);
+    if (rd16(fmt) != 1 || bits != 16 || chans < 1 || chans > 2 || !srate) { *why = "not 16-bit PCM, mono or stereo"; return NULL; }
+    uint32_t in = dlen / (2 * chans);
+    uint32_t out = (uint32_t)((uint64_t)in * rate / srate);
+    int16_t *pcm = malloc((size_t)(out ? out : 1) * 4);
+    if (!pcm) { *why = "out of memory"; return NULL; }
+    for (uint32_t i = 0; i < out; i++) {
+        uint64_t pos = (uint64_t)i * srate * 65536 / rate;
+        uint32_t a = (uint32_t)(pos >> 16), f = (uint32_t)(pos & 0xFFFF), b = a + 1 < in ? a + 1 : a;
+        for (int c = 0; c < 2; c++) {
+            uint32_t cc = chans == 2 ? (uint32_t)c : 0;
+            int32_t va = (int16_t)rd16(data + (a * chans + cc) * 2), vb = (int16_t)rd16(data + (b * chans + cc) * 2);
+            pcm[2 * i + c] = (int16_t)(va + (((vb - va) * (int32_t)f) >> 16));
+        }
+    }
+    *frames = out;
+    return pcm;
+}
+
+/* X/BGM_32.STR/05.wav: channel 5 of that stream. */
+static int sound_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    const char *sl = strrchr(up, '/');
+    if (!sl || strcasecmp(up + strlen(up) - 4, ".WAV")) return 0;
+    char stream[512];
+    snprintf(stream, sizeof stream, "%.*s", (int)(sl - up), up);
+    int fi = disc_index(stream);
+    if (fi < 0 || !strstr(stream, ".STR")) return 0;
+    char *end;
+    long chan = strtol(sl + 1, &end, 10);
+    if (end == sl + 1 || strcasecmp(end, ".WAV") || chan < 0 || chan > 31) {
+        rt_log("mods: %s/%s: name it by the channel's number (00.wav to 31.wav): not used", mod, rel);
+        return 1;
+    }
+    /* the channel's sectors, in order, and how they're coded */
+    uint32_t lba = disc_files[fi].lba, nsec = (disc_files[fi].size + 2047) / 2048, count = 0, rate = 0, per = 0;
+    int32_t *index = malloc(nsec * sizeof *index);
+    uint8_t sec[2352];
+    disc_only = 1;
+    for (uint32_t k = 0; index && k < nsec; k++) {
+        index[k] = -1;
+        if (!cd_read_sector_raw(lba + k, sec)) continue;
+        if (sec[15] != 2 || !(sec[18] & 0x04) || sec[17] != chan) continue;
+        index[k] = (int32_t)count++;
+        if (!rate) {
+            uint8_t c = sec[19];
+            rate = (c >> 2) & 1 ? 18900 : 37800;
+            per = (((c >> 4) & 3) == 1 ? 4 : 8) * 28 * 18 / ((c & 3) == 1 ? 2 : 1);
+        }
+    }
+    disc_only = 0;
+    if (!count) {
+        rt_log("mods: %s/%s: %s has no sound on channel %ld: not used", mod, rel, stream, chan);
+        free(index);
+        return 1;
+    }
+    long n = 0;
+    uint8_t *d = load(path, &n);
+    const char *why = "couldn't read it";
+    uint32_t frames = 0;
+    int16_t *pcm = d ? wav_load(d, n, rate, &frames, &why) : NULL;
+    free(d);
+    if (!pcm || ntracks == (int)(sizeof tracks / sizeof tracks[0])) {
+        rt_log("mods: %s/%s: %s: not used", mod, rel, pcm ? "too many sounds" : why);
+        free(pcm);
+        free(index);
+        return 1;
+    }
+    for (int i = 0; i < ntracks; i++)             /* a later mod wins */
+        if (tracks[i].lba == lba && tracks[i].chan == (uint32_t)chan) {
+            free(tracks[i].pcm);
+            free(tracks[i].index);
+            tracks[i] = tracks[--ntracks];
+            break;
+        }
+    Track *t = &tracks[ntracks++];
+    *t = (Track){lba, nsec, (uint32_t)chan, rate, per, index, pcm, frames};
+    double secs = (double)count * per / rate;
+    rt_log("mods: %s/%s: in place of %s channel %ld (%.1f s; the WAV %.1f s%s)", mod, rel, stream, chan, secs,
+           (double)frames / rate, frames < count * per ? ", silence after it" : frames > count * per ? ", cut to fit" : "");
+    nused++;
+    return 1;
+}
+
+/* cdrom.c: an XA sound sector the game is playing: a mod's in its place (1). */
+int modfs_xa(uint32_t lba, const uint8_t *s) {
+    for (int i = 0; i < ntracks; i++) {
+        Track *t = &tracks[i];
+        if (lba - t->lba >= t->nsec || s[17] != t->chan) continue;
+        int32_t k = t->index[lba - t->lba];
+        if (k < 0) return 0;
+        static int16_t buf[4032 * 2];
+        uint64_t at = (uint64_t)k * t->per;
+        for (uint32_t f = 0; f < t->per && f < 4032; f++) {
+            uint64_t j = at + f;
+            buf[2 * f] = j < t->frames ? t->pcm[2 * j] : 0;
+            buf[2 * f + 1] = j < t->frames ? t->pcm[2 * j + 1] : 0;
+        }
+        void spu_xa_pcm(const int16_t *lr, int frames, int rate);
+        spu_xa_pcm(buf, (int)t->per, (int)t->rate);
+        return 1;
+    }
+    return 0;
 }
 
 static void walk(const char *mod, const char *dir, const char *rel) {

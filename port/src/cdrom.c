@@ -196,7 +196,10 @@ static void sector_tick(void) {
     if ((cd.mode & 0x40) && (submode & 0x04) && s[15] == 2) {
         /* XA-ADPCM audio: to the SPU (if the filter matches), not to the host. */
         if (!(cd.mode & 0x08) || (file == cd.filter_file && chan == cd.filter_chan))
-            if (!cd.muted) spu_xa_sector(s);
+            if (!cd.muted) {
+                int modfs_xa(uint32_t lba, const uint8_t *s);      /* a mod's sound in its place (modfs.c) */
+                if (!modfs_xa(cd.pos - 1, s)) spu_xa_sector(s);
+            }
         return;
     }
     if ((cd.mode & 0x08) && (submode & 0x04)) return;

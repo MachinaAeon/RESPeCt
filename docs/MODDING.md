@@ -54,12 +54,32 @@ works here unchanged. Paths are not case-sensitive.
 - **Code.** Files that hold game code (`KERNEL.BIN`, `TEST.BIN`, the
   overlays) can't be replaced: RESPeCt runs that code translated, not from
   the disc.
-- **Streams.** Movies and streamed music and voices (`.STR`) can't be
-  replaced yet.
+- **Streams.** Movies (`.STR`) can't be replaced yet; their sound, and
+  streamed music and voices, can (below).
 - **The PC version's other files.** Enemies (`ENEMnn.NAB/NAC`), items and
   characters (`item`, `people`), 2D pictures (`.BMP`), sound (`.WAV`) and
   movies (`.AVI`) are in other formats than the PS1 disc's, so they aren't
   used. The log says so for each one.
+
+## Music, voices and movies' sound
+
+The disc's streamed sound (XA: the music in `X/BGM_32.STR`, the voices in
+`X/VC/*.STR`, the movies' sound in `M/*.STR`) is in channels, and a mod
+replaces one channel at a time with a WAV file (16-bit PCM, mono or
+stereo, any rate):
+
+```
+mods/my-music/X/BGM_32.STR/00.wav      channel 0 of X/BGM_32.STR
+```
+
+The game still plays the stream from the disc, so it starts, loops and
+stops where it always did; RESPeCt plays the WAV's samples in place of
+the channel's, at the same point. A WAV shorter than the channel ends in
+silence, a longer one is cut (both in the log).
+
+`tools/xa_dump.py <disc.cue> <folder>` writes every channel of every
+stream as a WAV with the right name and length, ready to edit and put
+back.
 
 ## Textures
 

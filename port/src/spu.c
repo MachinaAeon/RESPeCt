@@ -383,6 +383,11 @@ static void xa_out(int16_t l, int16_t r, int rate) {
     xa_last[1] = r;
 }
 
+/* XA audio from a mod (modfs.c): frames of stereo samples at the sector's rate. */
+void spu_xa_pcm(const int16_t *lr, int frames, int rate) {
+    for (int i = 0; i < frames; i++) xa_out(lr[2 * i], lr[2 * i + 1], rate);
+}
+
 void spu_xa_sector(const uint8_t *s) {
     uint8_t coding = s[19];
     int stereo = (coding & 3) == 1;
