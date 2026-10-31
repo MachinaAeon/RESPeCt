@@ -60,6 +60,14 @@ suit your CPU, and if the game still can't keep up it lowers it by itself
 1x is the PlayStation's own, 2x is four times the work, 4x sixteen. HD
 textures add a little more.
 
+MODS
+----
+Files in a "mods" folder next to RESPeCt.exe take the place of the disc's,
+one folder per mod, without changing your disc image. Room, door and
+effect files from the PC version's PSX_DATA folder work as they are. The
+game says on start how many it used; resurv.log has the details. More in
+docs/MODDING.md on the RESPeCt page.
+
 CONTROLS
 --------
 Mouse: aim and shoot (left button). In menus the mouse moves the cursor

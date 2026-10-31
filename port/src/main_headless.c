@@ -134,6 +134,18 @@ void plat_frame(void) {
             if (getenv("RT_SAVE_SKIP")) g_ss_skip = atoi(getenv("RT_SAVE_SKIP"));
             ss_request_save(path);
         }
+        /* RT_DUMP_FILE=lba:size=path: disc sectors as the game reads them (mods in), at frame 2 */
+        const char *df = getenv("RT_DUMP_FILE");
+        unsigned dl, ds;
+        if (df && g_frame == 2 && sscanf(df, "%u:%u=", &dl, &ds) == 2 && strchr(df, '=')) {
+            FILE *o = fopen(strchr(df, '=') + 1, "wb");
+            uint8_t sec[2352];
+            for (unsigned k = 0; o && k * 2048 < ds; k++) {
+                cd_read_sector_raw(dl + k, sec);
+                fwrite(sec + 24, 1, ds - k * 2048 < 2048 ? ds - k * 2048 : 2048, o);
+            }
+            if (o) fclose(o);
+        }
         const char *l = getenv("RT_LOAD");
         if (l && !done_load && g_frame == 2) { done_load = 1; ss_request_load(l); }
         /* RT_LOAD_AT=frame:path loads in the middle of a run */
@@ -374,6 +386,10 @@ int main(int argc, char **argv) {
         }
     }
     rt_set_log(stderr);
+    {   /* RT_MODS=dir: a mods folder (modfs.c) */
+        extern char g_mods_dir[1024];
+        if (getenv("RT_MODS")) snprintf(g_mods_dir, sizeof g_mods_dir, "%s", getenv("RT_MODS"));
+    }
     { extern int g_audio_limiter; g_audio_limiter = getenv("RT_LIMITER") != NULL; }
     if (getenv("RT_NO_DEPTH")) g_depth_buffer = 0;
     if (getenv("RT_NO_PERSP")) { extern int g_persp; g_persp = 0; }

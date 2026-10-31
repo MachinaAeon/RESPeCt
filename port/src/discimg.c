@@ -160,7 +160,7 @@ int disc_image_open(const char *path, char *err, size_t n) {
 uint32_t disc_image_sectors(void) { return nsectors; }
 uint32_t disc_expected_sectors(void) { return DISC_SECTORS; }
 
-int cd_read_sector_raw(uint32_t lba, uint8_t out[2352]) {
+static int read_disc_sector(uint32_t lba, uint8_t out[2352]) {
     if (lba >= nsectors) { memset(out, 0, 2352); return 0; }
     if (raw) {
         seek_to(raw, (int64_t)lba * 2352);
@@ -177,6 +177,14 @@ int cd_read_sector_raw(uint32_t lba, uint8_t out[2352]) {
     }
     memset(out, 0, 2352);
     return 0;
+}
+
+/* A sector as the game sees it: the disc's, or a mod's (modfs.c). */
+void modfs_sector(uint32_t lba, uint8_t out[2352]);
+int cd_read_sector_raw(uint32_t lba, uint8_t out[2352]) {
+    int ok = read_disc_sector(lba, out);
+    if (ok) modfs_sector(lba, out);
+    return ok;
 }
 
 /* ------------------------------------------------------------ checking */

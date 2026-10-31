@@ -198,6 +198,7 @@ machine code to C (`port/gen/`, generated from your disc, not in git) and
 | `spu.c`, `mdec.c` | Sound (voices, reverb, XA streaming) and movie decoding |
 | `card.c`, `sio.c` | Memory cards (`.mcd` files) and controller port |
 | `config.c` | `resurv.ini` settings |
+| `modfs.c`, `modfs_pc.h` | Mods: files in place of the disc's, by disc path or PC version path ([MODDING.md](MODDING.md)) |
 | `main_win32.c`, `main_headless.c` | Windows front end; headless runner for testing (PNG frames, WAV) |
 
 `port/decomp/` holds hand-written C that replaces translated functions

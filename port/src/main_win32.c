@@ -1337,6 +1337,14 @@ static void auto_resolution(int late) {
 void plat_frame(void) {
     if (g_frame == 1 || g_frame % 300 == 0)
         rt_log("frame %u (last loop %08X)", g_frame, g_poll_pc);
+    if (g_frame == 120) {                        /* mods in use (modfs.c): say so once */
+        int modfs_used(void), modfs_mods(void);
+        if (modfs_used()) {
+            char m[96];
+            snprintf(m, sizeof m, "Mods: %d files from %d mods (details in resurv.log)", modfs_used(), modfs_mods());
+            show_toast(m);
+        }
+    }
     /* Fast start: run the boot (disc check, logos, warnings) flat out until
      * just before the title screen, unless a key is pressed. The boot takes
      * the same number of frames on every machine. */
@@ -1531,6 +1539,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         char *sl = strrchr(dir, '\\');
         if (sl) sl[1] = 0;
         card_set_dir(dir);
+        extern char g_mods_dir[1024];          /* mods: the mods folder next to the exe (modfs.c) */
+        snprintf(g_mods_dir, sizeof g_mods_dir, "%smods", dir);
     }
     open_texture_pack();
     audio_init();

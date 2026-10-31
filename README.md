@@ -67,6 +67,13 @@ folder works anywhere in the RESPeCt folder, and `texture_pack =` in
 
 **F2** turns HD textures on and off. They show at resolution 2x and higher.
 
+### Mods (optional)
+
+Files in a `mods` folder next to `RESPeCt.exe` take the place of the
+disc's, a folder per mod, without touching your disc image. Room, door and
+effect files from the PC version's `PSX_DATA` folder work as they are: they
+are the same files the PS1 disc packs. See [docs/MODDING.md](docs/MODDING.md).
+
 ### Controls
 
 | | |
