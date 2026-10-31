@@ -255,6 +255,14 @@ void plat_frame(void) {
             e = strchr(e, ',');
             if (e) e++;
         }
+        /* RT_GPU_AT=frame:on,...: switch the graphics card on or off while running */
+        e = getenv("RT_GPU_AT");
+        while (e && *e) {
+            unsigned f; int on;
+            if (sscanf(e, "%u:%d", &f, &on) == 2 && f == g_frame) render_set_gpu(on);
+            e = strchr(e, ',');
+            if (e) e++;
+        }
     }
     if (every && g_frame % every == 0) {
         static uint32_t bgrx[2560 * 1920];

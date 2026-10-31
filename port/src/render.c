@@ -1025,6 +1025,30 @@ void render_want(int x, int y, int w, int h) { want_x = x; want_y = y; want_w = 
 
 int render_on_gpu(void) { return gpu_on; }
 
+/* The graphics card setting changed while running: the high-resolution
+ * picture moves over to the card or back. 0: drawing stays as it was (no
+ * usable card). */
+int render_set_gpu(int on) {
+    g_gpu = on;
+    if (!!on == gpu_on || S == 1) return 1;
+    render_sync();
+    if (on) {
+        if (!rgpu_init(S)) return 0;
+        if (zid) memset(zid, 0, hires_n * sizeof *zid);
+        rgpu_write(hires, low, bare, zbuf, zid);
+        gpu_on = 1;
+        gpu_dirty = 0;
+    } else {
+        gpu_dirty = 1;
+        want_w = 0;
+        gpu_fetch();                             /* the whole picture back, for the CPU to go on from */
+        gpu_on = 0;
+        if (S > 4) render_set_scale(4);
+    }
+    rt_log("renderer: now drawing with the %s", gpu_on ? "graphics card" : "processor");
+    return 1;
+}
+
 /* ------------------------------------------------------------ workers */
 
 #define MAX_WORKERS 16
@@ -1215,6 +1239,7 @@ void render_set_scale(int scale) {
             for (int x = 0; x < W; x++) hires[(size_t)y * W + x] = g_vram[y / S][x / S];
         hires_t = (Target){hires, W, S, 512 * S};
         if (!workers_started) { start_workers(); workers_started = 1; }
+        if (!gpu_on && g_gpu) gpu_on = rgpu_init(S);   /* the setting on, from 1x */
         if (gpu_on) { rgpu_set_scale(S); rgpu_write(hires, low, bare, zbuf, zid); gpu_dirty = 0; }
     }
     set_bands();

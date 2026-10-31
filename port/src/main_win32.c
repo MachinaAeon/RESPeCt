@@ -845,8 +845,10 @@ static void menu_build(void) {
     add_item(0, IT_INT, "Controller dead zone", &g_cfg.pad_deadzone, 0, 50, 1, "How much stick movement around the centre is ignored, in %.");
     add_item(0, IT_BOOL, "Skip intro", &g_cfg.skip_intro, 0, 1, 1, "Fast-forward the logos and warnings at startup.");
     add_item(1, IT_BOOL, "Fullscreen", &g_cfg.fullscreen, 0, 1, 1, "F11 or Alt+Enter also switches.");
-    add_item(1, IT_SCALE, "Resolution", &g_cfg.resolution_scale, 1, render_on_gpu() ? 8 : 4, 1,
-             "Internal rendering resolution. Higher is sharper and needs a faster PC.");
+    add_item(1, IT_BOOL, "Graphics card", &g_cfg.graphics_card, 0, 1, 1,
+             "Draw with the graphics card (Direct3D 11): much faster, and resolutions up to 8x. HD texture packs: not yet.");
+    add_item(1, IT_SCALE, "Resolution", &g_cfg.resolution_scale, 1, 8, 1,
+             "Internal rendering resolution. Higher is sharper and needs a faster PC (above 4x: graphics card).");
     add_item(1, IT_BOOL, "Widescreen (experimental)", &g_cfg.widescreen, 0, 1, 1,
              "16:9: a wider view of the 3D scene; the HUD keeps its shape. Some full-screen menus are stretched.");
     add_item(1, IT_INT, "Brightness (%)", &g_cfg.brightness, 50, 200, 5,
@@ -921,6 +923,11 @@ static void apply_settings(void) {
     g_opt_widescreen = g_cfg.widescreen;
     g_subpixel = g_cfg.subpixel;
     if (!!g_cfg.fullscreen != !!fullscreen) toggle_fullscreen();
+    if (!!g_cfg.graphics_card != render_on_gpu() && !render_set_gpu(g_cfg.graphics_card)) {
+        g_cfg.graphics_card = 0;
+        show_toast("No graphics card with Direct3D 11 that can do this: drawing with the processor");
+    }
+    if (!render_on_gpu() && g_cfg.resolution_scale > 4) g_cfg.resolution_scale = 4;
     if (render_scale() != g_cfg.resolution_scale) {
         render_set_scale(g_cfg.resolution_scale);
         grab_frame();
@@ -998,10 +1005,10 @@ static void change(int i, int dir) {
         break;
     }
     case IT_INT: case IT_SCALE: {
-        int *v = it->val;
+        int *v = it->val, hi = it->type == IT_SCALE && !render_on_gpu() ? 4 : (int)it->hi;
         *v += dir * (int)it->step;
         if (*v < it->lo) *v = (int)it->lo;
-        if (*v > it->hi) *v = (int)it->hi;
+        if (*v > hi) *v = hi;
         break;
     }
     case IT_BOOL: *(int *)it->val = !*(int *)it->val; break;

@@ -144,6 +144,10 @@ static int make_picture(void) {
 }
 
 int rgpu_init(int scale) {
+    if (dev) {                                   /* switched back on: the device is still there */
+        rgpu_set_scale(scale);
+        return 1;
+    }
     HMODULE md3d = LoadLibraryA("d3d11.dll"), mdxgi = LoadLibraryA("dxgi.dll"), mcomp = LoadLibraryA("d3dcompiler_47.dll");
     if (!md3d || !mdxgi || !mcomp) { rt_log("gpu: Direct3D 11 not found"); return 0; }
     PFN_D3D11_CREATE_DEVICE create = (PFN_D3D11_CREATE_DEVICE)(void *)GetProcAddress(md3d, "D3D11CreateDevice");
@@ -219,7 +223,7 @@ int rgpu_init(int scale) {
 }
 
 void rgpu_set_scale(int scale) {
-    if (!dev || scale == S) return;
+    if (!dev || (scale == S && b_hl.buf)) return;
     S = scale;
     W = 1024 * S;
     H = 512 * S;

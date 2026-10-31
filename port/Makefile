@@ -80,7 +80,7 @@ DMETA_O = $(META:meta/%.c=$(DBUILD)/meta/%.o)
 
 dist: $(DBUILD)/resurv_headless
 
-$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
+$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -DRT_DIST -c $< -o $@
 
@@ -106,9 +106,11 @@ WDMETA_O = $(META:meta/%.c=$(WDBUILD)/meta/%.o)
 
 windist: $(WDBUILD)/RESPeCt.exe
 
-$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
+$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -DRT_DIST -c $< -o $@
+
+$(WDBUILD)/src/render_gpu.o: src/render_gpu.hlsl   # built in (.incbin)
 
 $(WDBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
 	@mkdir -p $(dir $@)

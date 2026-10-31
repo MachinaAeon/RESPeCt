@@ -49,12 +49,16 @@ resolution for a moment while its HD image loads.
 
 RUNNING SLOWLY?
 ---------------
-RESPeCt draws the game with your CPU, not your graphics card, so a fast
-graphics card doesn't help and the resolution setting matters most. The
-first start picks a resolution to suit your CPU, and if the game still
-can't keep up it lowers it by itself (with a message). You can change it
-any time in F1 > Video > Resolution: 1x is the PlayStation's own, 2x is
-four times the work, 4x sixteen. HD textures add a little more.
+RESPeCt draws the game with your CPU unless you turn on F1 > Video >
+Graphics card: then the graphics card draws it (Direct3D 11), much faster,
+and resolutions up to 8x become available. Drawn larger than your screen,
+the picture is shrunk to fit and edges come out smooth (HD texture packs
+aren't drawn on the graphics card yet). With the CPU the resolution
+setting matters most. The first start picks a resolution to
+suit your CPU, and if the game still can't keep up it lowers it by itself
+(with a message). You can change it any time in F1 > Video > Resolution:
+1x is the PlayStation's own, 2x is four times the work, 4x sixteen. HD
+textures add a little more.
 
 CONTROLS
 --------

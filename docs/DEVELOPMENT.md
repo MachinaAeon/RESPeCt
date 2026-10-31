@@ -192,7 +192,8 @@ machine code to C (`port/gen/`, generated from your disc, not in git) and
 | --- | --- |
 | `rt.c`, `bios.c`, `thread.c` | CPU state, calls into overlays, BIOS services, threads and interrupts as coroutines |
 | `gpu.c`, `render.c` | GPU commands; rasterizer for the PS1's VRAM and a 1-4x high-resolution copy (worker threads) |
-| `gte.c` | Geometry coprocessor, with fractional screen positions kept for the renderer |
+| `render_gpu.c`, `render_gpu.hlsl` | The same high-resolution drawing on the graphics card (Direct3D 11 compute shaders), up to 8x |
+| `gte.c` | Geometry coprocessor, with fractional screen positions, depths and models' matrices in full precision kept for the renderer |
 | `cdrom.c`, `iso.c` | CD drive and file system on the `.bin` image |
 | `spu.c`, `mdec.c` | Sound (voices, reverb, XA streaming) and movie decoding |
 | `card.c`, `sio.c` | Memory cards (`.mcd` files) and controller port |
@@ -300,6 +301,49 @@ play one sample at once: a swarm of bugs keys the same one-shot sound on all
 With "Steady 3D", a corner's exact projected position is found by the RAM
 word the GTE stored it in (port/src/gte.c); looking it up by its pixel alone
 mixed up about one corner in eight on small, distant models.
+
+### Steady 3D and the depth fix at high resolutions
+
+What makes models tremble at 4x and up, and what port/src/gte.c does about
+it (the high-resolution picture only: everything the game reads stays the
+GTE's own integers):
+
+- Each part of a model is drawn with its own matrix, which libgs's GsGetLs
+  builds through the GTE with a cut to whole units at each step. The same
+  chain is multiplied out in double precision (hook on the call, interp.c)
+  and goes with the matrix when the game loads it (SetRotMatrix,
+  SetTransMatrix): corners, and their depths, come from it.
+- NCLIP (keep or drop a face) takes its sign from the corners' fractions:
+  on whole pixels a distant model's tiny faces came and went as the camera
+  turned (129-151 of a zombie's 156 triangles drawn, now all of them).
+- Corners a fraction of a pixel apart are not welded together any more,
+  and the pass that filled background between a model's parts is off: with
+  the matrices exact the seams meet, and both moved outlines by a few
+  pixels from frame to frame.
+- The depth fix knows which model a polygon belongs to (the root of its
+  coordinate chain): a model's parts hide each other 2 units behind; other
+  objects only 128 units behind, so a model reaching into another (a hand
+  through the floor) stays drawn as on the PS1.
+
+The bench checks all of this on recorded frames: `RT_INT_MATRIX`,
+`RT_INT_NCLIP`, `RT_INT_Z`, `RT_WELD`, `RT_HOLES`, `RT_DEPTH_TOL`,
+`RT_CROSS_TOL` bring back the old behaviour for comparisons.
+
+### Graphics card
+
+With `graphics_card = 1` the queue render.c's worker threads run goes to the
+card instead (port/src/render_gpu.c): render_gpu.hlsl runs the same code as
+raster_tri, raster_rect and run_ops, one thread per pixel, each pixel's
+operations in the queue's order (binned to 16x16 tiles), edges in double
+precision so they come out exactly as the CPU's 64-bit integers. The
+picture shown is made there too (24-bit colour, brightness, Close model
+gaps) and at the window's size, shrunk by area. The PS1's own VRAM stays on
+the CPU (the game reads it); the card gets a copy with every batch for
+textures. HD texture packs aren't drawn on the card yet (it shows the
+game's own textures, smoothed). Frames from
+the headless runner with `RT_GPU=1` are identical to the CPU's;
+`RT_GPU_AT=frame:on` switches while running, `RT_SHOW=w,h` makes the picture
+at a window's size.
 
 ### Field of view
 
