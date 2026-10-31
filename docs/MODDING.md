@@ -41,10 +41,16 @@ works here unchanged. Paths are not case-sensitive.
 ## Limits
 
 - **Size.** The game finds files by their place on the disc, from its own
-  tables, so a file can't grow: a whole disc file can use up to the end of
-  its last 2048-byte sector, a PC version file up to its original size
-  (what's left of its place is filled with zeros). A bigger file is
-  refused, with how much too big it is in the log.
+  tables. A whole disc file can use up to the end of its last 2048-byte
+  sector. A PC version file can use its original size (what's left of its
+  place is filled with zeros), and the rooms' files (`stage/...`, packed in
+  `B/STGBGn.BIN`) can be bigger: RESPeCt lays the room's block out again,
+  moves the archive past the end of the disc and changes the game's tables
+  to match (`TEST.BIN`'s block table, `KERNEL.BIN`'s list of where the
+  stage files are). A room's block can take up to 290816 bytes, the
+  biggest the game itself loads into the memory it has for it
+  (0x80108000-0x80150000); the log says how big each changed room is. Other files that grow are refused, with how much
+  too big they are in the log.
 - **Code.** Files that hold game code (`KERNEL.BIN`, `TEST.BIN`, the
   overlays) can't be replaced: RESPeCt runs that code translated, not from
   the disc.
