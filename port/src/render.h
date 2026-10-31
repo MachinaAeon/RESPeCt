@@ -46,6 +46,8 @@ void render_copy(int sx, int sy, int dx, int dy, int w, int h, int mask_set, int
 void render_before_write(int x, int y, int w, int h); /* CPU is about to write this g_vram area */
 void render_uploaded(int x, int y, int w, int h);  /* g_vram area written by the CPU */
 void render_sync(void);
+void render_want(int x, int y, int w, int h);      /* the high-res area the picture shown needs next */
+int render_on_gpu(void);                           /* drawing with the graphics card */
 void render_zclear(int x, int y, int w, int h);    /* a new frame starts drawing here */
 extern int g_depth_buffer;                         /* setting */                            /* finish queued high-res drawing */
 const uint16_t *render_hires(int *stride);

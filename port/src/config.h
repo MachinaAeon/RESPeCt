@@ -26,6 +26,7 @@ typedef struct {
     int nkeys[ACT_COUNT];
     int fullscreen;
     int resolution_scale;
+    int graphics_card;
     int widescreen;
     int subpixel;
     int smooth_scaling;

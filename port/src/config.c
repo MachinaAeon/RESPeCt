@@ -56,8 +56,12 @@ static const char *default_ini =
     "[video]\n"
     "; Start in fullscreen (F11 or Alt+Enter switches at any time).\n"
     "fullscreen = 1\n"
-    "; Internal rendering resolution: 1 = original (320x240), 2-4 = sharper.\n"
+    "; Internal rendering resolution: 1 = original (320x240), 2-4 = sharper;\n"
+    "; 5-8 with graphics_card = 1.\n"
     "resolution_scale = 4\n"
+    "; Draw the sharper picture with the graphics card (Direct3D 11) instead of\n"
+    "; the processor: much faster, and resolutions up to 8x (2560x1920).\n"
+    "graphics_card = 0\n"
     "; Widescreen 16:9: wider view of the 3D scene (the HUD keeps its shape).\n"
     "; Experimental: some full-screen menus are stretched.\n"
     "widescreen = 0\n"
@@ -169,6 +173,7 @@ static void set_defaults(void) {
     g_cfg.menu_mouse = 1;
     g_cfg.menu_mouse_step = 240;
     g_cfg.resolution_scale = 4;
+    g_cfg.graphics_card = 0;
     g_cfg.subpixel = 1;
     g_cfg.fullscreen = 1;
     g_cfg.smooth_scaling = 1;
@@ -250,6 +255,7 @@ static void parse_line(const char *section, char *key, char *val) {
     else if (!strcmp(key, "menu_mouse_step")) g_cfg.menu_mouse_step = i;
     else if (!strcmp(key, "fullscreen")) g_cfg.fullscreen = i;
     else if (!strcmp(key, "resolution_scale")) g_cfg.resolution_scale = i;
+    else if (!strcmp(key, "graphics_card")) g_cfg.graphics_card = i;
     else if (!strcmp(key, "widescreen")) g_cfg.widescreen = i;
     else if (!strcmp(key, "subpixel")) g_cfg.subpixel = i;
     else if (!strcmp(key, "smooth_scaling")) g_cfg.smooth_scaling = i;
@@ -306,7 +312,7 @@ static void clamp(void) {
     if (g_cfg.look_limit > 85) g_cfg.look_limit = 85;
     if (g_cfg.menu_mouse_step < 5) g_cfg.menu_mouse_step = 5;
     if (g_cfg.resolution_scale < 1) g_cfg.resolution_scale = 1;
-    if (g_cfg.resolution_scale > 4) g_cfg.resolution_scale = 4;
+    if (g_cfg.resolution_scale > 8) g_cfg.resolution_scale = 8;
     if (g_cfg.field_of_view && g_cfg.field_of_view < 50) g_cfg.field_of_view = 50;
     if (g_cfg.field_of_view > 120) g_cfg.field_of_view = 120;
     if (g_cfg.volume < 0) g_cfg.volume = 0;
@@ -391,6 +397,7 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "menu_mouse_step")) snprintf(out, n, "%d", g_cfg.menu_mouse_step);
     else if (!strcmp(key, "fullscreen")) snprintf(out, n, "%d", g_cfg.fullscreen);
     else if (!strcmp(key, "resolution_scale")) snprintf(out, n, "%d", g_cfg.resolution_scale);
+    else if (!strcmp(key, "graphics_card")) snprintf(out, n, "%d", g_cfg.graphics_card);
     else if (!strcmp(key, "widescreen")) snprintf(out, n, "%d", g_cfg.widescreen);
     else if (!strcmp(key, "subpixel")) snprintf(out, n, "%d", g_cfg.subpixel);
     else if (!strcmp(key, "smooth_scaling")) snprintf(out, n, "%d", g_cfg.smooth_scaling);

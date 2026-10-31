@@ -260,6 +260,11 @@ void plat_frame(void) {
         static uint32_t bgrx[2560 * 1920];
         static uint8_t rgb[2560 * 1920 * 3];
         int w, h;
+        {   /* RT_SHOW=w,h: the picture made at the size a window would show it (graphics card) */
+            extern int g_display_w, g_display_h;
+            const char *e = getenv("RT_SHOW");
+            if (e) sscanf(e, "%d,%d", &g_display_w, &g_display_h);
+        }
         display_grab_bgrx(bgrx, &w, &h);
         for (int i = 0; i < w * h; i++) {
             rgb[i * 3] = (uint8_t)(bgrx[i] >> 16);

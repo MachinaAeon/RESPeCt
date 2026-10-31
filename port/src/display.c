@@ -3,6 +3,7 @@
  * original resolution (24-bit movie frames always come from the PS1's own
  * VRAM, since they're uploaded rather than drawn). */
 #include "render.h"
+#include "render_gpu.h"
 #include "rt.h"
 
 #include <math.h>
@@ -10,6 +11,10 @@
 #include <string.h>
 
 int g_opt_widescreen;
+/* The size the picture is shown at (the platform sets it; 0: as made) and
+ * whether to smooth it there: drawing on the graphics card, the picture is
+ * made at that size (render_gpu.c). */
+int g_display_w, g_display_h, g_display_smooth = 1;
 
 /* Once per frame: decide whether widescreen applies (in game, not movies). */
 void display_frame_update(void) {
@@ -305,18 +310,40 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
         return;
     }
     int stride;
+    int W = d.w * s, H = d.h * s, X = d.x * s, Y = d.y * s;
+    if (render_on_gpu()) {                       /* made on the graphics card, to the window's size */
+        int ow = g_display_w, oh = g_display_h;
+        if (ow > 0 && oh > 0) {
+            while (ow > 2560 || oh > 1920) { ow = ow * 3 / 4; oh = oh * 3 / 4; }
+        } else if (W <= 2560 && H <= 1920) {
+            ow = W;
+            oh = H;
+        } else
+            ow = 0;
+        if (ow > 0) {
+            render_sync();
+            rgpu_picture(X, Y, W, H, g_gap_fill, gamma8, out, ow, oh, g_display_smooth);
+            *w = ow;
+            *h = oh;
+            return;
+        }
+    }
+    render_want(X, Y, W, H);
     const uint16_t *hv = render_hires(&stride);
     const uint8_t *bare = render_bare();
     const uint16_t *low = render_low();
-    int W = d.w * s, H = d.h * s, X = d.x * s, Y = d.y * s;
-    *w = W;
-    *h = H;
-    for (int y = 0; y < H; y++) {
-        size_t ro = (size_t)((Y + y) % (512 * s)) * stride;
+    /* a wide screen mode at a high scale: every k-th pixel (the picture
+     * shown holds 2560 x 1920 at most) */
+    int k = 1;
+    while (W / k > 2560 || H / k > 1920) k++;
+    *w = W / k;
+    *h = H / k;
+    for (int y = 0; y < *h; y++) {
+        size_t ro = (size_t)((Y + y * k) % (512 * s)) * stride;
         const uint16_t *row = hv + ro, *lrow = low ? low + ro : NULL;
-        uint32_t *o = out + (size_t)y * W;
-        for (int x = 0; x < W; x++) {
-            int sx = (X + x) % (1024 * s);
+        uint32_t *o = out + (size_t)y * *w;
+        for (int x = 0; x < *w; x++) {
+            int sx = (X + x * k) % (1024 * s);
             uint16_t c = row[sx], e = lrow ? lrow[sx] : 0;
             if (e & 0x8000) {                /* drawn in 24-bit colour */
                 uint32_t r = ((c & 31) << 3) | (e & 7), g = (((c >> 5) & 31) << 3) | ((e >> 3) & 7), b = (((c >> 10) & 31) << 3) | ((e >> 6) & 7);
@@ -325,6 +352,7 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
                 o[x] = lut15[c & 0x7FFF];
         }
     }
+    if (k > 1) return;
     const float *depth = render_depth();
     if (depth) close_holes(out, depth, stride, s, X, Y, W, H);
     if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);

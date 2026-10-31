@@ -11,6 +11,7 @@
 #endif
 
 #include "render.h"
+#include "render_gpu.h"
 #include "rt.h"
 
 #include <math.h>
@@ -831,6 +832,177 @@ static void run_ops(int band0, int band1) {
     }
 }
 
+/* ------------------------------------------------------------ the graphics card */
+
+/* Draw with the graphics card (setting): the queue runs there instead of
+ * on the worker threads (render_gpu.c). The arrays above then hold what was
+ * last read back from it, for the picture shown. */
+int g_gpu = 0;
+static int gpu_on, gpu_dirty;
+static uint32_t *gops;
+static size_t gops_cap;
+static uint16_t *gpool;
+static size_t gpool_n, gpool_cap;
+static int want_x, want_y, want_w, want_h;     /* the area the picture shown needs (high-res), or none */
+
+static void put_d(uint32_t *w, int at, double d) { memcpy(&w[at], &d, 8); }
+
+static uint32_t *gop_new(int *n) {
+    if ((size_t)(*n + 1) * GOP_WORDS > gops_cap) {
+        gops_cap = gops_cap ? gops_cap * 2 : (size_t)4096 * GOP_WORDS;
+        gops = realloc(gops, gops_cap * 4);
+    }
+    uint32_t *w = gops + (size_t)(*n)++ * GOP_WORDS;
+    memset(w, 0, GOP_WORDS * 4);
+    return w;
+}
+
+static void gop_prim_common(uint32_t *w, const RPrim *p) {
+    w[GO_FLAGS] = (p->textured ? GF_TEX : 0) | (p->raw ? GF_RAW : 0) | (p->semi ? GF_SEMI : 0) |
+                  ((uint32_t)(p->abr & 3) << GF_ABR_SH) | ((uint32_t)(p->depth & 3) << GF_DEPTH_SH) |
+                  (p->mask_set ? GF_MSET : 0) | (p->mask_check ? GF_MCHK : 0) | (p->zt ? GF_ZT : 0);
+    w[GO_TEX] = (uint32_t)(p->tx & 0xFFFF) | ((uint32_t)p->ty << 16);
+    w[GO_CLUT] = (uint32_t)(p->clut_x & 0xFFFF) | ((uint32_t)p->clut_y << 16);
+    w[GO_TWIN] = (uint32_t)(p->twmx & 0xFF) | ((uint32_t)(p->twmy & 0xFF) << 8) | ((uint32_t)(p->twox & 0xFF) << 16) |
+                 ((uint32_t)(p->twoy & 0xFF) << 24);
+    w[GO_COLOR] = (uint32_t)(p->v[0].r & 0xFF) | ((uint32_t)(p->v[0].g & 0xFF) << 8) | ((uint32_t)(p->v[0].b & 0xFF) << 16);
+}
+
+/* A rectangle (the area raster_rect draws) as an op. */
+static void gop_rect(int *n, const RPrim *p, int nx, int ny, int pw, int ph, int r, int g, int b) {
+    int s = S;
+    int x0 = nx * s, y0 = ny * s, x1 = (nx + pw) * s - 1, y1 = (ny + ph) * s - 1;
+    int cx0 = p->dx1 * s, cx1 = (p->dx2 + 1) * s - 1, cy0 = p->dy1 * s, cy1 = (p->dy2 + 1) * s - 1;
+    int ys = y0 > cy0 ? y0 : cy0, ye = y1 < cy1 ? y1 : cy1;
+    int xs = x0 > cx0 ? x0 : cx0, xe = x1 < cx1 ? x1 : cx1;
+    double sq0 = 0, sqk = 0;
+    if (p->sqx1 > p->sqx0) {
+        sq0 = p->sqx0 * s;
+        sqk = pw / ((p->sqx1 - p->sqx0) * s);
+        xs = (int)ceil(sq0 - 0.5);
+        xe = (int)ceil(p->sqx1 * s - 0.5) - 1;
+        if (xs < cx0) xs = cx0;
+        if (xe > cx1) xe = cx1;
+    }
+    if (xs > xe || ys > ye) return;
+    uint32_t *w = gop_new(n);
+    w[GO_KIND] = GK_RECT;
+    gop_prim_common(w, p);
+    w[GO_COLOR] = (uint32_t)(r & 0xFF) | ((uint32_t)(g & 0xFF) << 8) | ((uint32_t)(b & 0xFF) << 16);
+    w[GO_FLAGS] |= (p->flipx ? GF_FLIPX : 0) | (p->flipy ? GF_FLIPY : 0) | (sqk > 0 ? GF_SQ : 0);
+    w[GO_X0] = (uint32_t)xs; w[GO_X1] = (uint32_t)xe; w[GO_Y0] = (uint32_t)ys; w[GO_Y1] = (uint32_t)ye;
+    w[GO_RX] = (uint32_t)nx; w[GO_RY] = (uint32_t)ny; w[GO_RW] = (uint32_t)pw; w[GO_RH] = (uint32_t)ph;
+    w[GO_U0V0] = (uint32_t)(p->v[0].u & 0xFFFF) | ((uint32_t)(p->v[0].v & 0xFFFF) << 16);
+    put_d(w, GO_SQ0, sq0);
+    put_d(w, GO_SQK, sqk);
+}
+
+/* The queue as the card's ops. */
+static int gpu_pack(void) {
+    int n = 0;
+    gpool_n = 0;
+    for (int i = 0; i < nq; i++) {
+        Op *o = &queue[i];
+        if (o->op == OP_PRIM && o->prim.kind == RP_TRI) {
+            const RPrim *p = &o->prim;
+            TriSetup q;
+            if (!tri_setup(&hires_t, p, &q)) continue;
+            uint32_t *w = gop_new(&n);
+            w[GO_KIND] = GK_TRI;
+            gop_prim_common(w, p);
+            w[GO_FLAGS] |= (q.gour ? GF_GOUR : 0) | (q.smooth ? GF_SMOOTH : 0) | (q.persp ? GF_PERSP : 0) |
+                           (q.pcol ? GF_PCOL : 0) | (q.zuse ? GF_ZUSE : 0) | (q.ztest ? GF_ZTEST : 0) |
+                           (q.zwrite ? GF_ZWRITE : 0) | (q.guarded ? GF_GUARD : 0) | (q.margin > 0 ? GF_MARGIN : 0);
+            w[GO_X0] = (uint32_t)q.x0; w[GO_X1] = (uint32_t)q.x1; w[GO_Y0] = (uint32_t)q.y0; w[GO_Y1] = (uint32_t)q.y1;
+            w[GO_UV] = (uint32_t)(q.umin & 0xFF) | ((uint32_t)(q.umax & 0xFF) << 8) | ((uint32_t)(q.vmin & 0xFF) << 16) |
+                       ((uint32_t)(q.vmax & 0xFF) << 24);
+            w[GO_ID] = q.id;
+            w[GO_DU] = (uint32_t)q.du; w[GO_DV] = (uint32_t)q.dv;
+            w[GO_DR] = (uint32_t)q.dr; w[GO_DG] = (uint32_t)q.dg; w[GO_DB] = (uint32_t)q.db;
+            for (int e = 0; e < 3; e++) {
+                w[GO_BIAS + e] = (uint32_t)(int32_t)q.bias[e];
+                put_d(w, GO_EX + 2 * e, (double)q.ex[e]);
+                put_d(w, GO_EY + 2 * e, (double)q.ey[e]);
+                put_d(w, GO_EC + 2 * e, (double)q.ec[e]);
+                put_d(w, GO_MB + 2 * e, (double)q.mbias[e]);
+            }
+            const Plane *pl[12] = {&q.pr, &q.pg, &q.pb, &q.pu, &q.pv, &q.pw, &q.qw, &q.qu, &q.qv, &q.qr, &q.qg, &q.qb};
+            for (int k = 0; k < 12; k++) {
+                put_d(w, GO_PL + k * 6, pl[k]->a);
+                put_d(w, GO_PL + k * 6 + 2, pl[k]->b);
+                put_d(w, GO_PL + k * 6 + 4, pl[k]->c);
+            }
+        } else if (o->op == OP_PRIM && o->prim.kind == RP_RECT) {
+            const RPrim *p = &o->prim;
+            gop_rect(&n, p, (int)p->v[0].x, (int)p->v[0].y, p->w, p->h, p->v[0].r, p->v[0].g, p->v[0].b);
+        } else if (o->op == OP_PRIM) {               /* a line: its PS1 pixels, as raster_line steps them */
+            const RPrim *p = &o->prim;
+            RPrim q = *p;
+            q.sqx0 = q.sqx1 = 0;
+            q.flipx = q.flipy = 0;
+            q.v[0].u = q.v[0].v = 0;
+            int ax = (int)lroundf(p->v[0].x), ay = (int)lroundf(p->v[0].y);
+            int bx = (int)lroundf(p->v[1].x), by = (int)lroundf(p->v[1].y);
+            int dx = bx - ax, dy = by - ay;
+            if (abs(dx) >= 1024 || abs(dy) >= 512) continue;
+            int m = abs(dx) > abs(dy) ? abs(dx) : abs(dy);
+            for (int k = 0; k <= m; k++) {
+                int x = m ? ax + (dx * k + (dx >= 0 ? m / 2 : -m / 2)) / m : ax;
+                int y = m ? ay + (dy * k + (dy >= 0 ? m / 2 : -m / 2)) / m : ay;
+                if (x < p->dx1 || x > p->dx2 || y < p->dy1 || y > p->dy2) continue;
+                int r = p->v[0].r, g = p->v[0].g, b = p->v[0].b;
+                if (p->gouraud && m) {
+                    r += (p->v[1].r - r) * k / m;
+                    g += (p->v[1].g - g) * k / m;
+                    b += (p->v[1].b - b) * k / m;
+                }
+                gop_rect(&n, &q, x, y, 1, 1, r, g, b);
+            }
+        } else {
+            uint32_t *w = gop_new(&n);
+            w[GO_RX] = (uint32_t)o->x; w[GO_RY] = (uint32_t)o->y; w[GO_RW] = (uint32_t)o->w; w[GO_RH] = (uint32_t)o->h;
+            if (o->op == OP_FILL) {
+                w[GO_KIND] = GK_FILL;
+                w[GO_FILLC] = o->color;
+                w[GO_FLAGS] = o->w >= 256 && o->h >= 128 ? GF_BIGFILL : 0;
+            } else if (o->op == OP_ZCLEAR)
+                w[GO_KIND] = GK_ZCLEAR;
+            else {
+                w[GO_KIND] = GK_UPLOAD;
+                size_t k = (size_t)o->w * o->h;
+                if (gpool_n + k > gpool_cap) {
+                    gpool_cap = (gpool_n + k) * 2;
+                    gpool = realloc(gpool, gpool_cap * sizeof *gpool);
+                }
+                memcpy(gpool + gpool_n, o->pixels, k * sizeof *gpool);
+                w[GO_POOL] = (uint32_t)gpool_n;
+                gpool_n += k;
+            }
+        }
+    }
+    return n;
+}
+
+static void gpu_run(void) {
+    int n = gpu_pack();
+    GpuParams gp = {g_depth_tol, g_cross_tol, g_margin_depth, g_true_color, g_far_page, g_depth_any, g_margin_any};
+    rgpu_draw(gops, n, gpool, gpool_n, &g_vram[0][0], &gp);
+    gpu_dirty = 1;
+}
+
+/* The arrays up to date with the card, where the picture shown needs them. */
+static void gpu_fetch(void) {
+    if (!gpu_on || !gpu_dirty) return;
+    if (want_w > 0) rgpu_read(want_x, want_y, want_w, want_h, hires, low, bare, zbuf);
+    else rgpu_read(0, 0, 1024 * S, 512 * S, hires, low, bare, zbuf);
+    gpu_dirty = 0;
+    want_w = 0;
+}
+
+void render_want(int x, int y, int w, int h) { want_x = x; want_y = y; want_w = w; want_h = h; }
+
+int render_on_gpu(void) { return gpu_on; }
+
 /* ------------------------------------------------------------ workers */
 
 #define MAX_WORKERS 16
@@ -903,9 +1075,12 @@ void render_sync(void) {
         rt_log("ops: tri %u (%.0f px) semi-tri %u (%.0f) rect %u (%.0f) line %u fill %u (%.0f) upload %u (%.0f) other %u",
                k[0], area[0], k[1], area[1], k[2], area[2], k[3], k[4], area[4], k[5], area[5], k[6]);
     }
-    go_workers();
-    run_ops(band_of[0][0], band_of[0][1]);
-    wait_workers();
+    if (gpu_on) gpu_run();
+    else {
+        go_workers();
+        run_ops(band_of[0][0], band_of[0][1]);
+        wait_workers();
+    }
     for (int i = 0; i < nq; i++)
         if (queue[i].op == OP_UPLOAD) free(queue[i].pixels);
     nq = 0;
@@ -925,7 +1100,10 @@ static void set_bands(void) {
 }
 
 void render_init(int scale, int threads) {
-    S = scale < 1 ? 1 : scale > 4 ? 4 : scale;
+    S = scale < 1 ? 1 : scale > 8 ? 8 : scale;
+    if (getenv("RT_GPU")) g_gpu = atoi(getenv("RT_GPU"));
+    if (S > 1 && g_gpu) gpu_on = rgpu_init(S);
+    if (!gpu_on && S > 4) S = 4;                 /* above 4x only on the card */
     g_tex_edge = getenv("RT_TEX_EDGE") != NULL;      /* for comparing */
     g_depth_any = getenv("RT_DEPTH_ANY") != NULL;
     g_fill_mark = getenv("RT_FILL_MARK") != NULL;
@@ -957,7 +1135,8 @@ void render_init(int scale, int threads) {
     if (nworkers > MAX_WORKERS) nworkers = MAX_WORKERS;
     set_bands();
     if (S > 1) { start_workers(); workers_started = 1; }
-    rt_log("renderer: %dx internal resolution, %d threads", S, nworkers + 1);
+    rt_log("renderer: %dx internal resolution, %s", S, gpu_on ? "graphics card" : "processor");
+    if (!gpu_on) rt_log("renderer: %d threads", nworkers + 1);
 }
 
 /* Change the internal resolution while running: the new high-res VRAM
@@ -977,10 +1156,16 @@ void render_reload(void) {
     if (zbuf) memset(zbuf, 0, (size_t)1024 * S * 512 * S * sizeof *zbuf);
     if (bare) memset(bare, 0, hires_n);
     if (low) memset(low, 0, hires_n * sizeof *low);
+    if (gpu_on && S > 1) {
+        if (zid) memset(zid, 0, hires_n * sizeof *zid);
+        rgpu_write(hires, low, bare, zbuf, zid);
+        gpu_dirty = 0;
+    }
 }
 
 void render_set_scale(int scale) {
-    scale = scale < 1 ? 1 : scale > 4 ? 4 : scale;
+    int top = gpu_on ? 8 : 4;
+    scale = scale < 1 ? 1 : scale > top ? top : scale;
     if (scale == S) return;
     render_sync();
     free(hires);
@@ -1007,6 +1192,7 @@ void render_set_scale(int scale) {
             for (int x = 0; x < W; x++) hires[(size_t)y * W + x] = g_vram[y / S][x / S];
         hires_t = (Target){hires, W, S, 512 * S};
         if (!workers_started) { start_workers(); workers_started = 1; }
+        if (gpu_on) { rgpu_set_scale(S); rgpu_write(hires, low, bare, zbuf, zid); gpu_dirty = 0; }
     }
     set_bands();
     rt_log("renderer: now %dx internal resolution", S);
@@ -1016,21 +1202,22 @@ int render_scale(void) { return S; }
 
 /* The high-res VRAM's bare-pixel map (NULL at 1x or with Close model
  * gaps off), same layout as render_hires. */
-const uint8_t *render_bare(void) { return S > 1 && g_gap_fill ? bare : NULL; }
+const uint8_t *render_bare(void) { gpu_fetch(); return S > 1 && g_gap_fill ? bare : NULL; }
 
 /* The high-res depth (1/z per pixel; 0: no 3D there, -1: 2D drawn over the
  * 3D), NULL at 1x or with Close model gaps off; same layout as render_hires. */
-const float *render_depth(void) { return S > 1 && g_gap_fill ? zbuf : NULL; }
+const float *render_depth(void) { gpu_fetch(); return S > 1 && g_gap_fill ? zbuf : NULL; }
 
 const uint16_t *render_hires(int *stride) {
     render_sync();
+    gpu_fetch();
     *stride = S > 1 ? 1024 * S : 1024;
     return S > 1 ? hires : &g_vram[0][0];
 }
 
 /* The high-res VRAM's 24-bit colour plane (NULL at 1x), same layout as
  * render_hires. */
-const uint16_t *render_low(void) { return S > 1 ? low : NULL; }
+const uint16_t *render_low(void) { gpu_fetch(); return S > 1 ? low : NULL; }
 
 
 /* The VRAM a textured primitive reads: its texture coordinates' bounds in
@@ -1205,7 +1392,10 @@ void render_copy(int sx, int sy, int dx, int dy, int w, int h, int mask_set, int
             *d = tmp[i] | (mask_set ? 0x8000 : 0);
         }
     }
-    if (S > 1) {
+    if (S > 1 && gpu_on) {
+        rgpu_copy(sx, sy, dx, dy, w, h, mask_set, mask_check);
+        gpu_dirty = 1;
+    } else if (S > 1) {
         int W = 1024 * S, H = 512 * S;
         uint16_t *row = malloc((size_t)w * S * 2 * sizeof *row), *lrow = row + (size_t)w * S;
         for (int j = 0; j < h * S; j++) {

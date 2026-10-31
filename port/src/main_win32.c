@@ -317,6 +317,23 @@ static void toggle_fullscreen(void) {
     if (captured) { captured = 0; set_capture(1); }
 }
 
+/* The frame to show: drawing on the graphics card, made at the size it's
+ * shown at (paint's picture area), so a picture drawn larger than the
+ * window comes out smoothed rather than with rows and columns dropped. */
+static void grab_frame(void) {
+    extern int g_display_w, g_display_h, g_display_smooth;
+    RECT r;
+    GetClientRect(hwnd, &r);
+    int cw = r.right, ch = r.bottom;
+    int an = g_widescreen ? 16 : 4, ad = g_widescreen ? 9 : 3;
+    int dw = cw, dh = cw * ad / an;
+    if (dh > ch) { dh = ch; dw = ch * an / ad; }
+    g_display_w = dw > 0 ? dw : 0;
+    g_display_h = dh > 0 ? dh : 0;
+    g_display_smooth = g_cfg.smooth_scaling;
+    display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+}
+
 static int key_down(int vk);
 static void paint(HDC dc) {
     RECT r;
@@ -828,7 +845,7 @@ static void menu_build(void) {
     add_item(0, IT_INT, "Controller dead zone", &g_cfg.pad_deadzone, 0, 50, 1, "How much stick movement around the centre is ignored, in %.");
     add_item(0, IT_BOOL, "Skip intro", &g_cfg.skip_intro, 0, 1, 1, "Fast-forward the logos and warnings at startup.");
     add_item(1, IT_BOOL, "Fullscreen", &g_cfg.fullscreen, 0, 1, 1, "F11 or Alt+Enter also switches.");
-    add_item(1, IT_SCALE, "Resolution", &g_cfg.resolution_scale, 1, 4, 1,
+    add_item(1, IT_SCALE, "Resolution", &g_cfg.resolution_scale, 1, render_on_gpu() ? 8 : 4, 1,
              "Internal rendering resolution. Higher is sharper and needs a faster PC.");
     add_item(1, IT_BOOL, "Widescreen (experimental)", &g_cfg.widescreen, 0, 1, 1,
              "16:9: a wider view of the 3D scene; the HUD keeps its shape. Some full-screen menus are stretched.");
@@ -906,7 +923,7 @@ static void apply_settings(void) {
     if (!!g_cfg.fullscreen != !!fullscreen) toggle_fullscreen();
     if (render_scale() != g_cfg.resolution_scale) {
         render_set_scale(g_cfg.resolution_scale);
-        display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+        grab_frame();
     }
     load_bindings();
 }
@@ -1300,7 +1317,7 @@ static void auto_resolution(int late) {
     int s = render_scale() - 1;
     g_cfg.resolution_scale = s;
     render_set_scale(s);
-    display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+    grab_frame();
     save_settings();
     char m[160];
     snprintf(m, sizeof m, "Resolution lowered to %dx to keep the game at full speed (F1 > Video)", s);
@@ -1347,7 +1364,7 @@ void plat_frame(void) {
     static LARGE_INTEGER last_paint;
     if (!fast || t0.QuadPart - last_paint.QuadPart >= qpf.QuadPart / 60) {
         last_paint = t0;
-        display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+        grab_frame();
         HDC dc = GetDC(hwnd);
         paint(dc);
         ReleaseDC(hwnd, dc);
@@ -1467,6 +1484,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         pick_latest_slot();
         extern int g_opt_scale, g_opt_threads;
         g_opt_scale = g_cfg.resolution_scale;
+        { extern int g_gpu; g_gpu = g_cfg.graphics_card; }
         g_opt_widescreen = g_cfg.widescreen;
         g_subpixel = g_cfg.subpixel;
         SYSTEM_INFO si;
