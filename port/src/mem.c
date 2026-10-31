@@ -35,7 +35,7 @@ static int is_hw(uint32_t p) { return p >= 0x1F801000 && p < 0x1F803000; }
 
 uint32_t mem_slow_r32(uint32_t a) {
     uint32_t p = a & 0x1FFFFFFF;
-    if (is_scratch(p)) { uint32_t v; memcpy(&v, g_scratch + (p & 0x3FC), 4); return v; }
+    if (is_scratch(p)) { uint32_t v; memcpy(&v, g_scratch + (p & 0x3FC), 4); sxy_scratch_load(p, v); return v; }
     if (is_hw(p)) return hw_read(p, 4);
     if (a == 0xFFFE0130) return 0;            /* cache control */
     return 0;                                 /* BIOS ROM, expansion: not present */
@@ -57,7 +57,7 @@ uint32_t mem_slow_r8(uint32_t a) {
 
 void mem_slow_w32(uint32_t a, uint32_t v) {
     uint32_t p = a & 0x1FFFFFFF;
-    if (is_scratch(p)) { memcpy(g_scratch + (p & 0x3FC), &v, 4); return; }
+    if (is_scratch(p)) { if (sxy_maybe(v)) sxy_scratch_store(p, v); memcpy(g_scratch + (p & 0x3FC), &v, 4); return; }
     if (is_hw(p)) { hw_write(p, v, 4); return; }
 }
 

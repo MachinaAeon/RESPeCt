@@ -75,7 +75,8 @@ uint32_t gpu_status(void);
 void gpu_vblank(void);
 extern uint32_t g_gp0_src;
 extern int g_widescreen, g_subpixel;
-int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z);
+/* o: the model the corner belongs to (its matrices' chain), 0 if not known */
+int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z, uint32_t *o);
 void gte_precise_frame(void);
 extern uint16_t g_vram[512][1024];
 typedef struct {
@@ -137,13 +138,16 @@ typedef struct {
     int mouse_present;
     int mouse_dx, mouse_dy;  /* accumulated since last poll */
     int mouse_left, mouse_right;
+    int look_dx, look_dy;    /* the same motion, since the game's last player frame (FPS turning) */
 } InputState;
 extern InputState g_input;
+void input_take_look(int *dx, int *dy);   /* sio.c: the motion for this game frame */
 
 /* platform hooks (headless or SDL) */
 int game_player_in_control(void);
 void rt_set_look_limit(int degrees);
 void plat_frame(void);      /* called once per vblank */
+void plat_poll_look(void);  /* mouse motion that came in since, for FPS turning (input_take_look) */
 int plat_quit(void);
 void plat_fatal(const char *msg);   /* show the error before exiting */
 

@@ -56,8 +56,12 @@ static const char *default_ini =
     "[video]\n"
     "; Start in fullscreen (F11 or Alt+Enter switches at any time).\n"
     "fullscreen = 1\n"
-    "; Internal rendering resolution: 1 = original (320x240), 2-4 = sharper.\n"
+    "; Internal rendering resolution: 1 = original (320x240), 2-4 = sharper;\n"
+    "; 5-8 with graphics_card = 1.\n"
     "resolution_scale = 4\n"
+    "; Draw the sharper picture with the graphics card (Direct3D 11) instead of\n"
+    "; the processor: much faster, and resolutions up to 8x (2560x1920).\n"
+    "graphics_card = 0\n"
     "; Widescreen 16:9: wider view of the 3D scene (the HUD keeps its shape).\n"
     "; Experimental: some full-screen menus are stretched.\n"
     "widescreen = 0\n"
@@ -66,8 +70,16 @@ static const char *default_ini =
     "field_of_view = 0\n"
     "; Brightness in % (50-200; 100 = as on the PlayStation). Higher lifts dark areas.\n"
     "brightness = 100\n"
-    "; Perspective-correct textures: no bending or swimming across big polygons.\n"
+    "; Perspective-correct textures: no bending or swimming across big polygons. At\n"
+    "; 2x and higher, close floors and walls also stay whole as you approach instead\n"
+    "; of being split into smaller pieces (which made them jump).\n"
     "perspective = 1\n"
+    "; Smooth the game's own textures on 3D surfaces at 2x and higher (as the PC\n"
+    "; version draws them) instead of the PlayStation's square texels.\n"
+    "smooth_textures = 1\n"
+    "; Shade and blend the picture in 24-bit colour at 2x and higher (as the PC\n"
+    "; version does) instead of the PlayStation's 15 bits: no banding in the dark.\n"
+    "true_color = 1\n"
     "; Lower the resolution by itself when this PC can't keep the game at full speed.\n"
     "auto_resolution = 1\n"
     "; Smoother, steadier 3D geometry (less PlayStation wobble).\n"
@@ -79,8 +91,8 @@ static const char *default_ini =
     "; Draw 3D models front to back properly at higher resolutions (the PS1 has no\n"
     "; depth buffer: models show their insides through their faces up close).\n"
     "depth_buffer = 1\n"
-    "; Close the gaps distant models show at higher resolutions (they open and shut\n"
-    "; as models move: flicker) by drawing their small triangles a little larger.\n"
+    "; Close the hair-thin gaps between models' parts and where walls meet, which\n"
+    "; open and shut as things move at higher resolutions (outlines stay as they are).\n"
     "gap_fill = 1\n"
     "; HD texture pack (Beetle PSX HW format: <hash>-<hash>.png images): use it if\n"
     "; there is one. Put the pack's folder, or the .rar/.zip/.7z it came in, next to\n"
@@ -154,11 +166,14 @@ static void set_defaults(void) {
     g_cfg.sens_x = g_cfg.sens_y = 1.0f;
     g_cfg.brightness = 100;
     g_cfg.perspective = 1;
+    g_cfg.smooth_textures = 1;
+    g_cfg.true_color = 1;
     g_cfg.auto_resolution = 1;
     g_cfg.look_limit = 67;
     g_cfg.menu_mouse = 1;
     g_cfg.menu_mouse_step = 240;
     g_cfg.resolution_scale = 4;
+    g_cfg.graphics_card = 0;
     g_cfg.subpixel = 1;
     g_cfg.fullscreen = 1;
     g_cfg.smooth_scaling = 1;
@@ -240,6 +255,7 @@ static void parse_line(const char *section, char *key, char *val) {
     else if (!strcmp(key, "menu_mouse_step")) g_cfg.menu_mouse_step = i;
     else if (!strcmp(key, "fullscreen")) g_cfg.fullscreen = i;
     else if (!strcmp(key, "resolution_scale")) g_cfg.resolution_scale = i;
+    else if (!strcmp(key, "graphics_card")) g_cfg.graphics_card = i;
     else if (!strcmp(key, "widescreen")) g_cfg.widescreen = i;
     else if (!strcmp(key, "subpixel")) g_cfg.subpixel = i;
     else if (!strcmp(key, "smooth_scaling")) g_cfg.smooth_scaling = i;
@@ -254,6 +270,8 @@ static void parse_line(const char *section, char *key, char *val) {
     else if (!strcmp(key, "no_reload")) g_cfg.no_reload = i;
     else if (!strcmp(key, "field_of_view")) g_cfg.field_of_view = i;
     else if (!strcmp(key, "perspective")) g_cfg.perspective = i;
+    else if (!strcmp(key, "smooth_textures")) g_cfg.smooth_textures = i;
+    else if (!strcmp(key, "true_color")) g_cfg.true_color = i;
     else if (!strcmp(key, "auto_resolution")) g_cfg.auto_resolution = i;
     else if (!strcmp(key, "brightness")) g_cfg.brightness = i < 50 ? 50 : i > 200 ? 200 : i;
     else if (!strcmp(key, "volume")) g_cfg.volume = i;
@@ -294,7 +312,7 @@ static void clamp(void) {
     if (g_cfg.look_limit > 85) g_cfg.look_limit = 85;
     if (g_cfg.menu_mouse_step < 5) g_cfg.menu_mouse_step = 5;
     if (g_cfg.resolution_scale < 1) g_cfg.resolution_scale = 1;
-    if (g_cfg.resolution_scale > 4) g_cfg.resolution_scale = 4;
+    if (g_cfg.resolution_scale > 8) g_cfg.resolution_scale = 8;
     if (g_cfg.field_of_view && g_cfg.field_of_view < 50) g_cfg.field_of_view = 50;
     if (g_cfg.field_of_view > 120) g_cfg.field_of_view = 120;
     if (g_cfg.volume < 0) g_cfg.volume = 0;
@@ -379,6 +397,7 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "menu_mouse_step")) snprintf(out, n, "%d", g_cfg.menu_mouse_step);
     else if (!strcmp(key, "fullscreen")) snprintf(out, n, "%d", g_cfg.fullscreen);
     else if (!strcmp(key, "resolution_scale")) snprintf(out, n, "%d", g_cfg.resolution_scale);
+    else if (!strcmp(key, "graphics_card")) snprintf(out, n, "%d", g_cfg.graphics_card);
     else if (!strcmp(key, "widescreen")) snprintf(out, n, "%d", g_cfg.widescreen);
     else if (!strcmp(key, "subpixel")) snprintf(out, n, "%d", g_cfg.subpixel);
     else if (!strcmp(key, "smooth_scaling")) snprintf(out, n, "%d", g_cfg.smooth_scaling);
@@ -394,6 +413,8 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "field_of_view")) snprintf(out, n, "%d", g_cfg.field_of_view);
     else if (!strcmp(key, "brightness")) snprintf(out, n, "%d", g_cfg.brightness);
     else if (!strcmp(key, "perspective")) snprintf(out, n, "%d", g_cfg.perspective);
+    else if (!strcmp(key, "smooth_textures")) snprintf(out, n, "%d", g_cfg.smooth_textures);
+    else if (!strcmp(key, "true_color")) snprintf(out, n, "%d", g_cfg.true_color);
     else if (!strcmp(key, "auto_resolution")) snprintf(out, n, "%d", g_cfg.auto_resolution);
     else if (!strcmp(key, "volume")) snprintf(out, n, "%d", g_cfg.volume);
     else if (!strcmp(key, "music_volume")) snprintf(out, n, "%d", g_cfg.music_volume);

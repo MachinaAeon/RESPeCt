@@ -3,6 +3,7 @@
  * original resolution (24-bit movie frames always come from the PS1's own
  * VRAM, since they're uploaded rather than drawn). */
 #include "render.h"
+#include "render_gpu.h"
 #include "rt.h"
 
 #include <math.h>
@@ -10,6 +11,10 @@
 #include <string.h>
 
 int g_opt_widescreen;
+/* The size the picture is shown at (the platform sets it; 0: as made) and
+ * whether to smooth it there: drawing on the graphics card, the picture is
+ * made at that size (render_gpu.c). */
+int g_display_w, g_display_h, g_display_smooth = 1;
 
 /* Once per frame: decide whether widescreen applies (in game, not movies). */
 void display_frame_update(void) {
@@ -181,6 +186,77 @@ static void close_cracks(uint32_t *out, const uint8_t *bare, int stride, int s, 
     }
 }
 
+/* Close model gaps, in models: hair-thin holes where the background shows
+ * between a model's parts (their seam's corners a fraction of a PS1 pixel
+ * apart, which the PS1's whole pixels shut; at a higher resolution they
+ * open and close as the model moves). A run under one PS1 pixel long of
+ * pixels well behind, or with no 3D, between two pixels of 3D at about the
+ * same depth, across or down, shows the pixel before it. A model's outline
+ * has 3D on one side only, so it's never widened; 2D drawn over the 3D
+ * (depth -1) is never touched.
+ * Off now (RT_HOLES=1: on, for comparisons): with the models' matrices in
+ * full precision (gte.c) the parts' seams no longer open, and what this
+ * filled were real gaps between parts, an arm and the torso a few pixels
+ * apart, row by row as wide as the run allows: jagged, flickering teeth
+ * along the outlines, worst at 8x (runs up to 7 pixels). */
+#define HOLE_BEHIND 64.0f                       /* GTE depth units */
+int display_holes(void) { static int on = -1; if (on < 0) on = getenv("RT_HOLES") != NULL; return on; }
+static void close_holes(uint32_t *out, const float *depth, int stride, int s, int X, int Y, int W, int H) {
+    static float *last_z;
+    static int *last_y, *run_y;
+    static size_t col_n;
+    if ((size_t)W > col_n) {
+        free(last_z); free(last_y); free(run_y);
+        col_n = (size_t)W;
+        last_z = malloc(col_n * sizeof *last_z); last_y = malloc(col_n * sizeof *last_y); run_y = malloc(col_n * sizeof *run_y);
+    }
+    if (!last_z || !last_y || !run_y) return;
+    int mw = 1024 * s, mh = 512 * s, maxrun = s - 1;
+    for (int x = 0; x < W; x++) last_y[x] = run_y[x] = -1;
+    for (int y = 0; y < H; y++) {
+        const float *zr = depth + (size_t)((Y + y) % mh) * stride;
+        uint32_t *o = out + (size_t)y * W;
+        /* across */
+        for (int x = 0; x < W - 1; ) {
+            float z = zr[(X + x) % mw];
+            if (z <= 0) { x++; continue; }
+            float iz = 1.0f / z, far = 1.0f / (iz + HOLE_BEHIND);    /* 1/z below this: well behind */
+            int j = x + 1;
+            while (j < W && j - x - 1 < maxrun) {
+                float zj = zr[(X + j) % mw];
+                if (zj < 0 || zj >= far) break;
+                j++;
+            }
+            if (j > x + 1 && j < W) {
+                float ze = zr[(X + j) % mw];
+                if (ze > 0 && fabsf(1.0f / ze - iz) < HOLE_BEHIND) {
+                    for (int k = x + 1; k < j; k++) o[k] = o[x];
+                    x = j;
+                    continue;
+                }
+            }
+            x++;
+        }
+        /* down: per column, the last 3D pixel and the run behind it */
+        for (int x = 0; x < W; x++) {
+            float z = zr[(X + x) % mw];
+            if (z < 0) { last_y[x] = run_y[x] = -1; continue; }   /* 2D over the 3D */
+            if (last_y[x] >= 0 && (z == 0 || 1.0f / z - 1.0f / last_z[x] > HOLE_BEHIND)) {
+                if (run_y[x] < 0) run_y[x] = y;                     /* behind the last 3D pixel */
+                if (y - run_y[x] + 1 > maxrun) last_y[x] = run_y[x] = -1;
+                continue;
+            }
+            if (z == 0) continue;
+            int r = run_y[x];
+            if (r >= 0 && fabsf(1.0f / z - 1.0f / last_z[x]) < HOLE_BEHIND) {
+                uint32_t c = out[(size_t)(r - 1) * W + x];
+                for (int k = r; k < y; k++) out[(size_t)k * W + x] = c;
+            }
+            last_z[x] = z; last_y[x] = y; run_y[x] = -1;
+        }
+    }
+}
+
 /* Brightness (%): a gamma curve, 100 = as the PlayStation shows it. Above
  * 100 lifts the dark parts most, as a TV's brightness does. */
 int g_brightness = 100;
@@ -240,19 +316,50 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
         return;
     }
     int stride;
-    const uint16_t *hv = render_hires(&stride);
-    const uint8_t *bare = render_bare();
     int W = d.w * s, H = d.h * s, X = d.x * s, Y = d.y * s;
-    *w = W;
-    *h = H;
-    for (int y = 0; y < H; y++) {
-        size_t ro = (size_t)((Y + y) % (512 * s)) * stride;
-        const uint16_t *row = hv + ro;
-        uint32_t *o = out + (size_t)y * W;
-        for (int x = 0; x < W; x++) {
-            int sx = (X + x) % (1024 * s);
-            o[x] = lut15[row[sx] & 0x7FFF];
+    if (render_on_gpu()) {                       /* made on the graphics card, to the window's size */
+        int ow = g_display_w, oh = g_display_h;
+        if (ow > 0 && oh > 0) {
+            while (ow > 2560 || oh > 1920) { ow = ow * 3 / 4; oh = oh * 3 / 4; }
+        } else if (W <= 2560 && H <= 1920) {
+            ow = W;
+            oh = H;
+        } else
+            ow = 0;
+        if (ow > 0) {
+            render_sync();
+            rgpu_picture(X, Y, W, H, g_gap_fill, gamma8, out, ow, oh, g_display_smooth);
+            *w = ow;
+            *h = oh;
+            return;
         }
     }
+    render_want(X, Y, W, H);
+    const uint16_t *hv = render_hires(&stride);
+    const uint8_t *bare = render_bare();
+    const uint16_t *low = render_low();
+    /* a wide screen mode at a high scale: every k-th pixel (the picture
+     * shown holds 2560 x 1920 at most) */
+    int k = 1;
+    while (W / k > 2560 || H / k > 1920) k++;
+    *w = W / k;
+    *h = H / k;
+    for (int y = 0; y < *h; y++) {
+        size_t ro = (size_t)((Y + y * k) % (512 * s)) * stride;
+        const uint16_t *row = hv + ro, *lrow = low ? low + ro : NULL;
+        uint32_t *o = out + (size_t)y * *w;
+        for (int x = 0; x < *w; x++) {
+            int sx = (X + x * k) % (1024 * s);
+            uint16_t c = row[sx], e = lrow ? lrow[sx] : 0;
+            if (e & 0x8000) {                /* drawn in 24-bit colour */
+                uint32_t r = ((c & 31) << 3) | (e & 7), g = (((c >> 5) & 31) << 3) | ((e >> 3) & 7), b = (((c >> 10) & 31) << 3) | ((e >> 6) & 7);
+                o[x] = gamma8[b] | ((uint32_t)gamma8[g] << 8) | ((uint32_t)gamma8[r] << 16);
+            } else
+                o[x] = lut15[c & 0x7FFF];
+        }
+    }
+    if (k > 1) return;
+    const float *depth = render_depth();
+    if (depth && display_holes()) close_holes(out, depth, stride, s, X, Y, W, H);
     if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);
 }
