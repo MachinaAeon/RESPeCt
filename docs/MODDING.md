@@ -36,7 +36,10 @@ byte for byte the files packed in the PS1 disc's archives: room models
 `*.TIM`), doors (`DOORNEW/...`), effects (`effect/*.HMD`). RESPeCt knows
 where each of these 726 files sits on the disc (`port/src/modfs_pc.h`) and
 puts a mod's copy in its place, so a mod made for the PC version's files
-works here unchanged. Paths are not case-sensitive.
+works here unchanged. The PC version's 2D pictures are BMP files; the 72
+that are pictures of the PS1 disc at the same size (maps, results, title
+and menu screens, fonts, effects) are converted as they load (below).
+Paths are not case-sensitive.
 
 ## Limits
 
@@ -49,8 +52,12 @@ works here unchanged. Paths are not case-sensitive.
   to match (`TEST.BIN`'s block table, `KERNEL.BIN`'s list of where the
   stage files are). A room's block can take up to 290816 bytes, the
   biggest the game itself loads into the memory it has for it
-  (0x80108000-0x80150000); the log says how big each changed room is. Other files that grow are refused, with how much
-  too big they are in the log.
+  (0x80108000-0x80150000); the log says how big each changed room is.
+  Doors (`DOORNEW/...`, in `B/DOORANM.BIN`) and effects (`effect/*.HMD`,
+  in `EFFECTX.BIN`) can grow the same way, each block up to the biggest
+  of its kind on the disc: a door's model up to 71680 bytes, its data up
+  to 69632, an effect set up to 20480. Other files that grow are refused,
+  with how much too big they are in the log.
 - **Code.** Files that hold game code (`KERNEL.BIN`, `TEST.BIN`, the
   overlays) can't be replaced: RESPeCt runs that code translated, not from
   the disc.
@@ -58,9 +65,27 @@ works here unchanged. Paths are not case-sensitive.
   their pictures go frame by frame and their sound channel by channel
   (below), and the game still plays the disc's stream for its timing.
 - **The PC version's other files.** Enemies (`ENEMnn.NAB/NAC`), items and
-  characters (`item`, `people`), 2D pictures (`.BMP`), sound (`.WAV`) and
-  movies (`.AVI`) are in other formats than the PS1 disc's, so they aren't
-  used. The log says so for each one.
+  characters (`item`, `people`), the BMPs the PS1 draws otherwise (text
+  is built from font sheets there), sound (`.WAV`) and movies (`.AVI`)
+  are in other formats than the PS1 disc's, so they aren't used as they
+  are. The log says so for each one. Sound and movies go in by the
+  disc's streams instead (below).
+
+## 2D pictures (the PC version's BMPs)
+
+A mod can hold the PC version's BMP by its path (`map/MAP00_1.BMP`,
+`RESULT/RANK_A.BMP`, or `RESOURCE/TITLE10.BMP` for the PC's `Resource`
+folder), edited or redrawn; PNG, JPG and TGA files work too under the
+same name. RESPeCt writes it into the PS1 picture it is
+(`port/src/modfs_bmp.h`) in that picture's own format:
+
+- the PS1's size (another size is scaled to it: for pictures with more
+  detail than the PS1 has, use a texture pack);
+- 16-bit colour, or a palette of 16 or 256 colours made for the new
+  picture; a picture with several palettes (a font's colours) keeps
+  them, and the new picture is drawn with the first one's colours;
+- see-through where a PNG's alpha is, and where the original was
+  see-through and the new picture is still black there.
 
 ## Music, voices and movies' sound
 
@@ -116,7 +141,9 @@ after the texture's hash in a `textures` folder.
 ## Tools
 
 - `tools/mod_pcnames.py` builds `port/src/modfs_pc.h` from a PC version's
-  `PSX_DATA` folder and the disc image.
+  `PSX_DATA` folder and the disc image, and `tools/mod_bmpnames.py`
+  `port/src/modfs_bmp.h` (which BMP is which of the disc's pictures; it
+  needs numpy).
 - The headless runner (`port/build/.../resurv_headless`) takes `RT_MODS=dir`
   for a mods folder, `RT_MOVIE_DUMP=dir` to write the movies' frames (as
   `movie_dump` does), and `RT_DUMP_FILE=lba:size=path` writes a disc file

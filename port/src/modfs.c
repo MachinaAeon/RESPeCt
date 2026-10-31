@@ -25,6 +25,7 @@
 #include "rt.h"
 #include "disc_ids.h"
 #include "modfs_pc.h"
+#include "modfs_bmp.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -53,7 +54,7 @@ unsigned long mz_crc32(unsigned long crc, const unsigned char *ptr, size_t buf_l
 static int nused, nmods;
 
 /* Files inside an archive that grow (done once every mod is in). */
-typedef struct { int fi; uint32_t offset, size; uint8_t *data; char what[300]; } Grow;
+typedef struct { int fi; uint32_t offset, size, orig; uint8_t *data; char what[300]; } Grow;
 static Grow grows[256];
 static int ngrows;
 static uint32_t vnext;                           /* sectors used past the end of the disc */
@@ -111,6 +112,7 @@ static Touched *touch_lba(uint32_t lba, uint32_t nsec, const char *name) {
 
 static int sound_apply(const char *mod, const char *rel, const char *up, const char *path);
 static int movie_apply(const char *mod, const char *rel, const char *up, const char *path);
+static int bmp_apply(const char *mod, const char *rel, const char *up, const char *path);
 
 static uint8_t *load(const char *path, long *n) {
     FILE *f = fopen(path, "rb");
@@ -122,6 +124,26 @@ static uint8_t *load(const char *path, long *n) {
     if (d && fread(d, 1, (size_t)*n, f) != (size_t)*n) { free(d); d = NULL; }
     fclose(f);
     return d;
+}
+
+/* The archives whose files can grow, besides the stages' (B/STGBGn.BIN):
+ * where KERNEL.BIN keeps their place on the disc (CdlLOC) and TEST.BIN
+ * their block table (the first sector of each block, then the end; the
+ * only copy of it in the game's code). A block can grow to the biggest
+ * of its kind the game itself loads (kinds: the block's number modulo
+ * `kinds`): the doors' are by turns a door's model, loaded below
+ * 0x80150000 (room_change.c), and its data at 0x80150000; the effects'
+ * blocks (shot_effects.c) all go to one buffer. */
+static const struct { const char *name; uint32_t loc, tab, kinds; } archives[] = {
+    {"B/DOORANM.BIN", 0x8005857Cu, 0x800A42F4u, 2},
+    {"EFFECTX.BIN", 0x80058544u, 0x800A6F1Cu, 1},
+};
+
+static int can_grow(const char *disc) {
+    if (!strncasecmp(disc, "B/STGBG", 7)) return 1;
+    for (size_t k = 0; k < sizeof archives / sizeof archives[0]; k++)
+        if (!strcasecmp(disc, archives[k].name)) return 1;
+    return 0;
 }
 
 static void apply(const char *mod, const char *rel, const char *path) {
@@ -180,11 +202,12 @@ static void apply(const char *mod, const char *rel, const char *path) {
             return;
         }
         if ((uint32_t)n > modfs_pc[i].size) {
-            if (!strncasecmp(modfs_pc[i].disc, "B/STGBG", 7) && ngrows < (int)(sizeof grows / sizeof grows[0])) {
-                Grow *g = &grows[ngrows++];       /* the room's block is laid out again (grow_all) */
+            if (can_grow(modfs_pc[i].disc) && ngrows < (int)(sizeof grows / sizeof grows[0])) {
+                Grow *g = &grows[ngrows++];       /* its block is laid out again (grow_all) */
                 g->fi = di;
                 g->offset = modfs_pc[i].offset;
                 g->size = (uint32_t)n;
+                g->orig = modfs_pc[i].size;
                 g->data = d;
                 snprintf(g->what, sizeof g->what, "%s/%s", mod, rel);
                 nused++;
@@ -202,12 +225,15 @@ static void apply(const char *mod, const char *rel, const char *path) {
         nused++;
         return;
     }
+    if (bmp_apply(mod, rel, up, path)) return;
     if (sound_apply(mod, rel, up, path)) return;
     if (movie_apply(mod, rel, up, path)) return;
     rt_log("mods: %s/%s: not a file of the disc or of the PC version's PSX_DATA: not used", mod, rel);
 }
 
 static uint32_t rd32(const uint8_t *p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
+static uint16_t rd16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] << 8); }
+static void wr16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
 static void wr32(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 static void wr32be(uint8_t *p, uint32_t v) { p[3] = (uint8_t)v; p[2] = (uint8_t)(v >> 8); p[1] = (uint8_t)(v >> 16); p[0] = (uint8_t)(v >> 24); }
 
@@ -253,10 +279,11 @@ static int iso_record(const char *path, uint32_t *sec, uint32_t *off) {
  * in STGBG2, 142 sectors). */
 #define OBJ_ROOM    (142u * 2048)
 
-/* The stage archives that have files growing: each room block they're in
- * laid out again (its header's offsets, then its files, packed as they
- * were), the archive moved past the end of the disc if it outgrew its
- * place, and TEST.BIN's block table changed to match. */
+/* The archives that have files growing: each block they're in laid out
+ * again (a room's or an effect set's header's offsets, then its files,
+ * packed as they were; or the one file a door's block is), the archive
+ * moved past the end of the disc if it outgrew its place, and TEST.BIN's
+ * block table changed to match. */
 static void grow_all(void) {
     if (!ngrows) return;
     Touched *test = touch(disc_index("TEST.BIN"));
@@ -268,7 +295,14 @@ static void grow_all(void) {
         Touched *t = touch(fi);
         const char *base = strrchr(disc_files[fi].name, '/') + 1;
         /* its block table, from TEST.BIN's list of the stages' files */
-        uint32_t tab = 0, v[64] = {0}, nb = 0, loc = 0;
+        uint32_t tab = 0, nb = 0, loc = 0, kinds = 1;
+        static uint32_t v[1024];
+        for (size_t k = 0; k < sizeof archives / sizeof archives[0]; k++)
+            if (!strcasecmp(disc_files[fi].name, archives[k].name)) {
+                tab = archives[k].tab - TEST_BASE;
+                loc = archives[k].loc;
+                kinds = archives[k].kinds;
+            }
         for (uint32_t k = 0; k < 18 && !tab; k++) {
             uint32_t np = rd32(test->data + STAGE_NAMES + 4 * k - TEST_BASE) - TEST_BASE;
             if (np >= test->nsec * 2048 - 32) continue;
@@ -279,8 +313,8 @@ static void grow_all(void) {
                 loc = rd32(test->data + STAGE_LOCS + 4 * k - TEST_BASE);
             }
         }
-        if (tab && tab < test->nsec * 2048 - 256) {
-            for (nb = 0; nb < 63; nb++) {
+        if (tab && tab < test->nsec * 2048 - 4096) {
+            for (nb = 0; nb < 1023; nb++) {
                 v[nb] = rd32(test->data + tab + 4 * nb);
                 if (nb && v[nb] < v[nb - 1]) { nb = 0; break; }
                 if (nb && v[nb] == t->nsec) break;
@@ -295,11 +329,20 @@ static void grow_all(void) {
                 }
             continue;
         }
-        uint8_t *out = malloc((size_t)t->nsec * 2048 + (size_t)nb * OBJ_ROOM);
-        uint32_t nv[64], cur = 0;
+        /* how big each kind of block can be */
+        uint32_t cap[4] = {OBJ_ROOM, OBJ_ROOM, OBJ_ROOM, OBJ_ROOM}, extra = 0;
+        if (kinds != 1 || strncasecmp(disc_files[fi].name, "B/STGBG", 7)) {
+            memset(cap, 0, sizeof cap);
+            for (uint32_t b = 0; b < nb; b++)
+                if ((v[b + 1] - v[b]) * 2048 > cap[b % kinds]) cap[b % kinds] = (v[b + 1] - v[b]) * 2048;
+        }
+        for (uint32_t b = 0; b < nb; b++) extra += cap[b % kinds];
+        uint8_t *out = malloc((size_t)t->nsec * 2048 + extra);
+        static uint32_t nv[1024];
+        uint32_t cur = 0;
         nv[0] = 0;
         for (uint32_t b = 0; b < nb; b++) {
-            uint32_t start = v[b] * 2048, len = (v[b + 1] - v[b]) * 2048;
+            uint32_t start = v[b] * 2048, len = (v[b + 1] - v[b]) * 2048, room = cap[b % kinds];
             const uint8_t *blk = t->data + start;
             int any = 0;
             for (int g = gi; g < ngrows; g++)
@@ -311,7 +354,22 @@ static void grow_all(void) {
                 if (off[i] < 4 + 4 * c || off[i] >= len || (i && off[i] < off[i - 1])) ok = 0;
             }
             uint32_t newlen = len;
-            if (ok) {                            /* laid out again */
+            const Grow *whole = NULL;                /* a block that's one file */
+            for (int g = gi; !ok && g < ngrows; g++)
+                if (grows[g].fi == fi && grows[g].offset == start && (grows[g].orig + 2047) / 2048 * 2048 == len) whole = &grows[g];
+            if (whole) {
+                newlen = (whole->size + 2047) & ~2047u;
+                if (newlen > room) {
+                    rt_log("mods: %s block %u would be %u bytes, more than the %u the game has for it: not used",
+                           disc_files[fi].name, b, newlen, room);
+                    newlen = len;
+                    whole = NULL;
+                } else {
+                    memcpy(out + cur, whole->data, whole->size);
+                    memset(out + cur + whole->size, 0, newlen - whole->size);
+                    ok = 1;
+                }
+            } else if (ok) {                     /* laid out again */
                 uint8_t *o = out + cur;
                 memcpy(o, blk, off[0]);
                 uint32_t at = off[0];
@@ -326,18 +384,18 @@ static void grow_all(void) {
                 }
                 newlen = (at + 2047) & ~2047u;
                 memset(o + at, 0, newlen - at);
-                if (newlen > OBJ_ROOM) {
-                    rt_log("mods: %s room %u would be %u bytes, more than the %u the game has for it: not used",
-                           disc_files[fi].name, b, newlen, OBJ_ROOM);
+                if (newlen > room) {
+                    rt_log("mods: %s block %u would be %u bytes, more than the %u the game has for it: not used",
+                           disc_files[fi].name, b, newlen, room);
                     ok = 0;
                     newlen = len;
                 }
             } else if (any)
-                rt_log("mods: %s room %u: its layout isn't one this knows: not used", disc_files[fi].name, b);
+                rt_log("mods: %s block %u: its layout isn't one this knows: not used", disc_files[fi].name, b);
             if (!ok) memcpy(out + cur, blk, len);
             for (int g = gi; g < ngrows; g++)
                 if (grows[g].fi == fi && grows[g].offset - start < len) {
-                    if (ok) rt_log("mods: %s: into %s room %u (%u bytes; the room %u -> %u bytes)", grows[g].what, disc_files[fi].name, b, grows[g].size, len, newlen);
+                    if (ok) rt_log("mods: %s: into %s block %u (%u bytes; the block %u -> %u bytes)", grows[g].what, disc_files[fi].name, b, grows[g].size, len, newlen);
                     else nused--;
                 }
             cur += newlen;
@@ -391,7 +449,6 @@ typedef struct {
 static Track tracks[128];
 static int ntracks;
 
-static uint16_t rd16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] << 8); }
 
 /* PCM WAV, 16 bits, mono or stereo, to stereo at rate (linear). */
 static int16_t *wav_load(const uint8_t *d, long n, uint32_t rate, uint32_t *frames, const char **why) {
@@ -507,6 +564,199 @@ int modfs_xa(uint32_t lba, const uint8_t *s) {
         return 1;
     }
     return 0;
+}
+
+/* ------------------------------------------------------------ pictures */
+
+/* The PC version's BMPs that are the disc's TIMs (modfs_bmp.h): the
+ * picture (BMP, PNG, JPG, TGA; a PNG's alpha is transparency) goes into
+ * the TIM's place in the TIM's own format and size (scaled to it if it's
+ * another, keeping the PS1's look: bigger pictures belong in a texture
+ * pack). Paletted TIMs get a palette made for the picture (median cut);
+ * a TIM with several palettes (a font's colours) keeps them, the picture
+ * drawn with the first one's colours. Black where the original was
+ * transparent stays transparent; other black is the darkest blue, which
+ * the PS1 doesn't treat as see-through. */
+static uint16_t to15(uint32_t rgba) {
+    uint16_t v = (uint16_t)(((rgba >> 3) & 31) | ((rgba >> 11) & 31) << 5 | ((rgba >> 19) & 31) << 10);
+    return v ? v : 0x0400;
+}
+
+static int qch;                                  /* the channel boxes are sorted on */
+static int cmp_ch(const void *a, const void *b) {
+    int x = (*(const uint16_t *)a >> (5 * qch)) & 31, y = (*(const uint16_t *)b >> (5 * qch)) & 31;
+    return x - y;
+}
+
+/* Up to n colours for the 15-bit colours c[0..count) (sorted in place). */
+static int median_cut(uint16_t *c, size_t count, uint16_t *pal, int n) {
+    struct { size_t at, len; } box[256];
+    int nb = 1;
+    box[0].at = 0;
+    box[0].len = count;
+    while (nb < n) {
+        int pick = -1, pch = 0, best = 0;
+        for (int i = 0; i < nb; i++) {           /* the box with the widest spread */
+            if (box[i].len < 2) continue;
+            for (int ch = 0; ch < 3; ch++) {
+                int lo = 31, hi = 0;
+                for (size_t k = 0; k < box[i].len; k++) {
+                    int v = (c[box[i].at + k] >> (5 * ch)) & 31;
+                    if (v < lo) lo = v;
+                    if (v > hi) hi = v;
+                }
+                if (hi - lo > best) { best = hi - lo; pick = i; pch = ch; }
+            }
+        }
+        if (pick < 0) break;
+        qch = pch;
+        qsort(c + box[pick].at, box[pick].len, sizeof *c, cmp_ch);
+        size_t half = box[pick].len / 2;
+        box[nb].at = box[pick].at + half;
+        box[nb].len = box[pick].len - half;
+        box[pick].len = half;
+        nb++;
+    }
+    for (int i = 0; i < nb; i++) {
+        uint32_t s[3] = {0, 0, 0};
+        for (size_t k = 0; k < box[i].len; k++)
+            for (int ch = 0; ch < 3; ch++) s[ch] += (c[box[i].at + k] >> (5 * ch)) & 31;
+        uint32_t m = box[i].len ? (uint32_t)box[i].len : 1;
+        pal[i] = (uint16_t)((s[0] + m / 2) / m | ((s[1] + m / 2) / m) << 5 | ((s[2] + m / 2) / m) << 10);
+        if (!pal[i]) pal[i] = 0x0400;
+    }
+    return nb;
+}
+
+static int nearest(const uint16_t *pal, int n, uint16_t v) {
+    int best = 0, bd = 1 << 30;
+    for (int i = 0; i < n; i++) {
+        int dr = (int)(pal[i] & 31) - (v & 31), dg = (int)((pal[i] >> 5) & 31) - ((v >> 5) & 31);
+        int db = (int)((pal[i] >> 10) & 31) - ((v >> 10) & 31);
+        int d = dr * dr * 3 + dg * dg * 4 + db * db * 2;
+        if (pal[i] && d < bd) { bd = d; best = i; }
+    }
+    return best;
+}
+
+static int bmp_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    size_t i = 0;
+    for (; i < sizeof modfs_bmp / sizeof modfs_bmp[0]; i++)
+        if (!strcmp(modfs_bmp[i].pc, up)) break;
+    if (i == sizeof modfs_bmp / sizeof modfs_bmp[0]) return 0;
+    int di = disc_index(modfs_bmp[i].disc);
+    Touched *t = di >= 0 ? touch(di) : NULL;
+    uint8_t *tim = t ? t->data + modfs_bmp[i].offset : NULL;
+    if (!tim || (uint32_t)mz_crc32(0, tim, modfs_bmp[i].size) != modfs_bmp[i].crc) {
+        /* it may be a picture an earlier mod changed: then the TIM's header is still the one expected */
+        if (!tim || rd32(tim) != 0x10) {
+            rt_log("mods: %s/%s: the disc's %s isn't the one expected there: not used", mod, rel, modfs_bmp[i].disc);
+            return 1;
+        }
+    }
+    long n = 0;
+    uint8_t *d = load(path, &n);
+    int w, h, c;
+    uint8_t *img = d ? stbi_load_from_memory(d, (int)n, &w, &h, &c, 4) : NULL;
+    free(d);
+    if (!img) {
+        rt_log("mods: %s/%s: couldn't read it as a picture: not used", mod, rel);
+        return 1;
+    }
+    /* the TIM: its palette (if any), then its pixels */
+    uint32_t flag = rd32(tim + 4), bpp = (uint32_t[]){4, 8, 16, 24}[flag & 3];
+    uint8_t *clut = flag & 8 ? tim + 8 : NULL;
+    uint32_t cw = clut ? rd16(clut + 8) : 0, chs = clut ? rd16(clut + 10) : 0;
+    uint8_t *pix = clut ? clut + rd32(clut) : tim + 8;
+    uint32_t tw = rd16(pix + 8) * 16 / bpp, th = rd16(pix + 10);
+    uint8_t *px = pix + 12;
+    if (bpp == 24 || (bpp < 16 && (!clut || cw < (1u << bpp)))) {
+        rt_log("mods: %s/%s: the TIM's format isn't one this writes: not used", mod, rel);
+        stbi_image_free(img);
+        return 1;
+    }
+    /* the picture at the TIM's size (nearest pixel when it's the same) */
+    uint32_t *rgba = malloc((size_t)tw * th * 4);
+    for (uint32_t y = 0; y < th; y++)
+        for (uint32_t x = 0; x < tw; x++) {
+            uint32_t x0 = x * (uint32_t)w / tw, x1 = (x + 1) * (uint32_t)w / tw, y0 = y * (uint32_t)h / th, y1 = (y + 1) * (uint32_t)h / th;
+            if (x1 <= x0) x1 = x0 + 1;
+            if (y1 <= y0) y1 = y0 + 1;
+            uint32_t s[4] = {0, 0, 0, 0}, m = 0;
+            for (uint32_t yy = y0; yy < y1; yy++)
+                for (uint32_t xx = x0; xx < x1; xx++, m++)
+                    for (int k = 0; k < 4; k++) s[k] += img[((size_t)yy * w + xx) * 4 + k];
+            rgba[y * tw + x] = (s[0] / m) | (s[1] / m) << 8 | (s[2] / m) << 16 | (s[3] / m) << 24;
+        }
+    stbi_image_free(img);
+    /* what the original shows at each pixel (its 15-bit colour; 0: see-through) */
+    const uint8_t *row0 = clut ? clut + 12 : NULL;
+    uint16_t *was = malloc((size_t)tw * th * 2);
+    for (uint32_t k = 0; k < tw * th; k++) {
+        uint32_t v;
+        if (bpp == 16) v = rd16(px + k * 2);
+        else if (bpp == 8) v = rd16(row0 + px[k] * 2);
+        else v = rd16(row0 + ((px[k / 2] >> (k & 1) * 4) & 15) * 2);
+        was[k] = (uint16_t)v;
+    }
+    uint16_t *col = malloc((size_t)tw * th * 2);  /* the new picture, 15-bit; 0 see-through */
+    size_t opaque = 0;
+    for (uint32_t k = 0; k < tw * th; k++) {
+        uint32_t p = rgba[k];
+        int clear = (p >> 24) < 128 || ((p & 0xFFFFFF) == 0 && was[k] == 0);
+        col[k] = clear ? 0 : to15(p);
+        opaque += !clear;
+    }
+    free(rgba);
+    uint16_t stp = 0;                            /* the original palette's semi-transparency bit, if all its colours have it */
+    if (clut) {
+        int with = 0, without = 0;
+        for (uint32_t k = 0; k < cw; k++) {
+            uint16_t v = rd16(row0 + k * 2);
+            if (v & 0x7FFF) { if (v & 0x8000) with++; else without++; }
+        }
+        if (with && !without) stp = 0x8000;
+    } else {
+        int with = 0, without = 0;
+        for (uint32_t k = 0; k < tw * th; k++)
+            if (was[k] & 0x7FFF) { if (was[k] & 0x8000) with++; else without++; }
+        if (with && !without) stp = 0x8000;
+    }
+    const char *how;
+    if (bpp == 16) {
+        for (uint32_t k = 0; k < tw * th; k++) wr16(px + k * 2, col[k] ? (uint16_t)(col[k] | stp) : 0);
+        how = "16-bit";
+    } else {
+        int ncol = 1 << bpp;
+        uint16_t pal[256];
+        if (chs == 1) {                          /* a palette for this picture: entry 0 see-through */
+            uint16_t *list = malloc((opaque ? opaque : 1) * 2);
+            size_t m = 0;
+            for (uint32_t k = 0; k < tw * th; k++) if (col[k]) list[m++] = col[k];
+            int got = m ? median_cut(list, m, pal + 1, ncol - 1) : 0;
+            free(list);
+            pal[0] = 0;
+            for (int k = 1 + got; k < ncol; k++) pal[k] = 0;
+            for (int k = 0; k < ncol; k++) wr16(row0 + k * 2, pal[k] ? (uint16_t)(pal[k] | stp) : 0);
+            how = bpp == 8 ? "256 colours" : "16 colours";
+        } else {                                 /* the TIM's own palettes kept */
+            for (int k = 0; k < ncol; k++) pal[k] = rd16(row0 + k * 2) & 0x7FFF;
+            how = "its own palettes";
+        }
+        int clear = -1;
+        for (int k = 0; k < ncol && clear < 0; k++) if (!pal[k]) clear = k;
+        for (uint32_t k = 0; k < tw * th; k++) {
+            int ix = col[k] ? nearest(pal, ncol, col[k]) : (clear >= 0 ? clear : nearest(pal, ncol, 0x0400));
+            if (bpp == 8) px[k] = (uint8_t)ix;
+            else px[k / 2] = (uint8_t)((px[k / 2] & (k & 1 ? 0x0F : 0xF0)) | ix << (k & 1) * 4);
+        }
+    }
+    free(col);
+    free(was);
+    rt_log("mods: %s/%s: into %s's picture at %u (%ux%u, %s%s)", mod, rel, modfs_bmp[i].disc, modfs_bmp[i].offset, tw, th, how,
+           (uint32_t)w != tw || (uint32_t)h != th ? ", scaled to the PS1's size" : "");
+    nused++;
+    return 1;
 }
 
 /* ------------------------------------------------------------ movies */
