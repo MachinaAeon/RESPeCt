@@ -214,6 +214,7 @@ static void load_now(const char *path, char *msg, size_t msgn) {
     render_sync();
     io.mode = SS_APPLY;
     visit_all(&io);
+    { void modfs_state_loaded(void); modfs_state_loaded(); }   /* what the mods change, if the save was made without them */
     for (int i = 0; i < io.nchunks; i++) free((void *)io.chunks[i].name);
     free(io.chunks);
     free(b);

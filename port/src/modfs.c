@@ -28,6 +28,7 @@
 #include "modfs_bmp.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,6 +114,8 @@ static Touched *touch_lba(uint32_t lba, uint32_t nsec, const char *name) {
 static int sound_apply(const char *mod, const char *rel, const char *up, const char *path);
 static int movie_apply(const char *mod, const char *rel, const char *up, const char *path);
 static int bmp_apply(const char *mod, const char *rel, const char *up, const char *path);
+static int enemy_apply(const char *mod, const char *rel, const char *up, const char *path);
+static void enemies_done(void);
 
 static uint8_t *load(const char *path, long *n) {
     FILE *f = fopen(path, "rb");
@@ -128,21 +131,27 @@ static uint8_t *load(const char *path, long *n) {
 
 /* The archives whose files can grow, besides the stages' (B/STGBGn.BIN):
  * where KERNEL.BIN keeps their place on the disc (CdlLOC) and TEST.BIN
- * their block table (the first sector of each block, then the end; the
- * only copy of it in the game's code). A block can grow to the biggest
- * of its kind the game itself loads (kinds: the block's number modulo
- * `kinds`): the doors' are by turns a door's model, loaded below
- * 0x80150000 (room_change.c), and its data at 0x80150000; the effects'
- * blocks (shot_effects.c) all go to one buffer. */
-static const struct { const char *name; uint32_t loc, tab, kinds; } archives[] = {
-    {"B/DOORANM.BIN", 0x8005857Cu, 0x800A42F4u, 2},
-    {"EFFECTX.BIN", 0x80058544u, 0x800A6F1Cu, 1},
+ * their block table (the first sector of each block, then the end). A
+ * block can grow to the biggest of its kind the game itself loads (kinds:
+ * the block's number modulo `kinds`), or to `cap`: the doors' are by
+ * turns a door's model, loaded below 0x80150000 (room_change.c), and its
+ * data at 0x80150000; the effects' blocks (shot_effects.c) all go to one
+ * buffer; an enemy's block (OBJ.DAT, type 30's in EV_OBJ.DAT) is read
+ * into 0x800F8000 and unpacked from there (room_loader.c), as big as the
+ * biggest of them (type 18's, 93 sectors). OBJ.DAT's table has copies in
+ * many of the game's modules (the overlays each have theirs): `copies`
+ * has every copy found in them changed too. */
+static const struct { const char *name; uint32_t loc, tab, kinds, cap; int copies; } archives[] = {
+    {"B/DOORANM.BIN", 0x8005857Cu, 0x800A42F4u, 2, 0, 0},
+    {"EFFECTX.BIN", 0x80058544u, 0x800A6F1Cu, 1, 0, 0},
+    {"OBJ.DAT", 0x80058530u, 0x800A0CD8u, 1, 93u * 2048, 1},
+    {"EV_OBJ.DAT", 0x80058534u, 0x800A195Cu, 1, 93u * 2048, 1},
 };
 
 static int can_grow(const char *disc) {
     if (!strncasecmp(disc, "B/STGBG", 7)) return 1;
     for (size_t k = 0; k < sizeof archives / sizeof archives[0]; k++)
-        if (!strcasecmp(disc, archives[k].name)) return 1;
+        if (!strcasecmp(disc, archives[k].name) && !archives[k].copies) return 1;
     return 0;
 }
 
@@ -226,6 +235,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
         return;
     }
     if (bmp_apply(mod, rel, up, path)) return;
+    if (enemy_apply(mod, rel, up, path)) return;
     if (sound_apply(mod, rel, up, path)) return;
     if (movie_apply(mod, rel, up, path)) return;
     rt_log("mods: %s/%s: not a file of the disc or of the PC version's PSX_DATA: not used", mod, rel);
@@ -279,6 +289,50 @@ static int iso_record(const char *path, uint32_t *sec, uint32_t *off) {
  * in STGBG2, 142 sectors). */
 #define OBJ_ROOM    (142u * 2048)
 
+/* A sector's place as the CD's position (BCD minute, second, frame). */
+static void bcd_msf(uint32_t lba, uint8_t msf[3]) {
+    uint32_t a = lba + 150;
+    msf[0] = (uint8_t)(a / 4500 / 10 * 16 + a / 4500 % 10);
+    msf[1] = (uint8_t)(a / 75 % 60 / 10 * 16 + a / 75 % 60 % 10);
+    msf[2] = (uint8_t)(a % 75 / 10 * 16 + a % 75 % 10);
+}
+
+/* What the mods change in the game's memory once it has read it (tables,
+ * where files are): a savestate made before them has the old in memory,
+ * so loading one puts the new back (modfs_state_loaded). At an address,
+ * or (0) wherever in RAM the old is found (the tables' copies in the
+ * overlays, loaded where the game puts them). */
+typedef struct { uint32_t addr, n; uint8_t *was, *now; } RamFix;
+static RamFix ramfixes[64];
+static int nramfix;
+
+static void ram_fix(uint32_t addr, const uint8_t *was, const uint8_t *now, uint32_t n) {
+    if (nramfix == (int)(sizeof ramfixes / sizeof ramfixes[0]) || !memcmp(was, now, n)) return;
+    RamFix *f = &ramfixes[nramfix++];
+    f->addr = addr;
+    f->n = n;
+    f->was = malloc(n);
+    f->now = malloc(n);
+    memcpy(f->was, was, n);
+    memcpy(f->now, now, n);
+}
+
+/* savestate.c: a savestate was loaded. */
+void modfs_state_loaded(void) {
+    int fixed = 0;
+    for (int i = 0; i < nramfix; i++) {
+        RamFix *f = &ramfixes[i];
+        if (f->addr) {
+            uint8_t *p = ram_ptr(f->addr);
+            if (!memcmp(p, f->was, f->n)) { memcpy(p, f->now, f->n); fixed++; }
+            continue;
+        }
+        for (uint32_t o = 0; o + f->n <= 0x200000; o += 4)
+            if (g_ram[o] == f->was[0] && !memcmp(g_ram + o, f->was, f->n)) { memcpy(g_ram + o, f->now, f->n); fixed++; }
+    }
+    if (fixed) rt_log("mods: the save was made without some of these mods: %d places in memory brought up to date", fixed);
+}
+
 /* The archives that have files growing: each block they're in laid out
  * again (a room's or an effect set's header's offsets, then its files,
  * packed as they were; or the one file a door's block is), the archive
@@ -295,13 +349,16 @@ static void grow_all(void) {
         Touched *t = touch(fi);
         const char *base = strrchr(disc_files[fi].name, '/') + 1;
         /* its block table, from TEST.BIN's list of the stages' files */
-        uint32_t tab = 0, nb = 0, loc = 0, kinds = 1;
+        uint32_t tab = 0, nb = 0, loc = 0, kinds = 1, fixed = 0;
+        int copies = 0;
         static uint32_t v[1024];
         for (size_t k = 0; k < sizeof archives / sizeof archives[0]; k++)
             if (!strcasecmp(disc_files[fi].name, archives[k].name)) {
                 tab = archives[k].tab - TEST_BASE;
                 loc = archives[k].loc;
                 kinds = archives[k].kinds;
+                fixed = archives[k].cap;
+                copies = archives[k].copies;
             }
         for (uint32_t k = 0; k < 18 && !tab; k++) {
             uint32_t np = rd32(test->data + STAGE_NAMES + 4 * k - TEST_BASE) - TEST_BASE;
@@ -331,12 +388,15 @@ static void grow_all(void) {
         }
         /* how big each kind of block can be */
         uint32_t cap[4] = {OBJ_ROOM, OBJ_ROOM, OBJ_ROOM, OBJ_ROOM}, extra = 0;
-        if (kinds != 1 || strncasecmp(disc_files[fi].name, "B/STGBG", 7)) {
+        if (fixed)
+            cap[0] = cap[1] = cap[2] = cap[3] = fixed;
+        else if (kinds != 1 || strncasecmp(disc_files[fi].name, "B/STGBG", 7)) {
             memset(cap, 0, sizeof cap);
             for (uint32_t b = 0; b < nb; b++)
                 if ((v[b + 1] - v[b]) * 2048 > cap[b % kinds]) cap[b % kinds] = (v[b + 1] - v[b]) * 2048;
         }
-        for (uint32_t b = 0; b < nb; b++) extra += cap[b % kinds];
+        for (int g = gi; g < ngrows; g++)        /* room for the blocks that grow */
+            if (grows[g].fi == fi) extra += cap[0] > cap[1] ? (cap[0] > cap[2] ? cap[0] : cap[2]) : (cap[1] > cap[2] ? cap[1] : cap[2]);
         uint8_t *out = malloc((size_t)t->nsec * 2048 + extra);
         static uint32_t nv[1024];
         uint32_t cur = 0;
@@ -355,15 +415,17 @@ static void grow_all(void) {
             }
             uint32_t newlen = len;
             const Grow *whole = NULL;                /* a block that's one file */
-            for (int g = gi; !ok && g < ngrows; g++)
+            for (int g = gi; g < ngrows; g++)       /* (the last mod wins) */
                 if (grows[g].fi == fi && grows[g].offset == start && (grows[g].orig + 2047) / 2048 * 2048 == len) whole = &grows[g];
             if (whole) {
                 newlen = (whole->size + 2047) & ~2047u;
+                if (newlen < len) newlen = len;   /* as it was, if it fits */
                 if (newlen > room) {
                     rt_log("mods: %s block %u would be %u bytes, more than the %u the game has for it: not used",
                            disc_files[fi].name, b, newlen, room);
                     newlen = len;
                     whole = NULL;
+                    ok = 0;
                 } else {
                     memcpy(out + cur, whole->data, whole->size);
                     memset(out + cur + whole->size, 0, newlen - whole->size);
@@ -405,31 +467,64 @@ static void grow_all(void) {
             if (grows[g].fi == fi) { free(grows[g].data); grows[g].fi = -1; }
         uint32_t nsec = cur / 2048;
         if (nsec == t->nsec && !memcmp(out, t->data, cur)) { free(out); continue; }
-        for (uint32_t b = 0; b <= nb; b++) wr32(test->data + tab + 4 * b, nv[b]);   /* the block table */
-        free(t->data);
-        t->data = out;
-        if (nsec > t->nsec) {                    /* past the end of the disc: its place in KERNEL.BIN's table and its directory entry told */
-            uint32_t sec, off;
-            Touched *dir = iso_record(disc_files[fi].name, &sec, &off) ? touch_lba(sec, 1, "directory") : NULL;
-            Touched *kern = touch(disc_index("KERNEL.BIN"));
-            uint32_t ko = kern ? loc - rd32(kern->data + 0x18) + 0x800 : 0;
-            uint32_t a = t->lba + 150;
-            uint8_t want[3] = {(uint8_t)(a / 4500 / 10 * 16 + a / 4500 % 10), (uint8_t)(a / 75 % 60 / 10 * 16 + a / 75 % 60 % 10),
-                               (uint8_t)(a % 75 / 10 * 16 + a % 75 % 10)};
+        /* past the end of the disc: its place in KERNEL.BIN's table and its directory entry told (checked first) */
+        uint32_t sec = 0, doff = 0, ko = 0;
+        Touched *dir = NULL, *kern = NULL;
+        if (nsec > t->nsec) {
+            dir = iso_record(disc_files[fi].name, &sec, &doff) ? touch_lba(sec, 1, "directory") : NULL;
+            kern = touch(disc_index("KERNEL.BIN"));
+            ko = kern ? loc - rd32(kern->data + 0x18) + 0x800 : 0;
+            uint8_t want[3];
+            bcd_msf(t->lba, want);
             if (!dir || !kern || ko + 4 > kern->nsec * 2048 || memcmp(kern->data + ko, want, 3)) {
                 rt_log("mods: %s: where the game finds it wasn't found: the bigger files in it not used", disc_files[fi].name);
+                free(out);
                 continue;
             }
+        }
+        uint8_t was[4096], now[4096];               /* the table, for saves made before (modfs_state_loaded) */
+        uint32_t tn = 4 * (nb + 1) <= sizeof was ? 4 * (nb + 1) : 0;
+        if (tn) memcpy(was, test->data + tab, tn);
+        if (copies) {                            /* the table's copies in the game's modules */
+            int found = 0;
+            for (size_t m = 0; m < sizeof disc_files / sizeof disc_files[0]; m++) {
+                if (!disc_files[m].hash || (int)m == disc_index("TEST.BIN")) continue;
+                Touched *mt = touch((int)m);
+                for (uint32_t o = 0; mt && o + 4 * (nb + 1) <= mt->nsec * 2048; o += 4) {
+                    if (memcmp(mt->data + o, test->data + tab, 4 * (nb + 1))) continue;
+                    if (o % 2048 < 32) continue;        /* where an overlay is told apart by its first bytes */
+                    for (uint32_t b = 0; b <= nb; b++) wr32(mt->data + o + 4 * b, nv[b]);
+                    found++;
+                }
+            }
+            for (uint32_t o = 0; o + 4 * (nb + 1) <= test->nsec * 2048; o += 4)
+                if (o != tab && !memcmp(test->data + o, test->data + tab, 4 * (nb + 1))) {
+                    for (uint32_t b = 0; b <= nb; b++) wr32(test->data + o + 4 * b, nv[b]);
+                    found++;
+                }
+            if (memcmp(v, nv, 4 * (nb + 1)))
+                rt_log("mods: %s: its block table changed in TEST.BIN and %d copies", disc_files[fi].name, found);
+        }
+        for (uint32_t b = 0; b <= nb; b++) wr32(test->data + tab + 4 * b, nv[b]);   /* the block table */
+        if (tn) {
+            memcpy(now, test->data + tab, tn);
+            ram_fix(TEST_BASE + tab, was, now, tn);
+            if (copies) ram_fix(0, was, now, tn);
+        }
+        free(t->data);
+        t->data = out;
+        if (nsec > t->nsec) {
+            uint8_t old[3], msf[3];
+            memcpy(old, kern->data + ko, 3);
             t->lba = vbase + vnext;
             vnext += nsec + 16;
-            a = t->lba + 150;
-            kern->data[ko] = (uint8_t)(a / 4500 / 10 * 16 + a / 4500 % 10);
-            kern->data[ko + 1] = (uint8_t)(a / 75 % 60 / 10 * 16 + a / 75 % 60 % 10);
-            kern->data[ko + 2] = (uint8_t)(a % 75 / 10 * 16 + a % 75 % 10);
-            wr32(dir->data + off + 2, t->lba);
-            wr32be(dir->data + off + 6, t->lba);
-            wr32(dir->data + off + 10, nsec * 2048);
-            wr32be(dir->data + off + 14, nsec * 2048);
+            bcd_msf(t->lba, msf);
+            memcpy(kern->data + ko, msf, 3);
+            ram_fix(loc, old, msf, 3);
+            wr32(dir->data + doff + 2, t->lba);
+            wr32be(dir->data + doff + 6, t->lba);
+            wr32(dir->data + doff + 10, nsec * 2048);
+            wr32be(dir->data + doff + 14, nsec * 2048);
         }
         t->nsec = nsec;
     }
@@ -1014,6 +1109,292 @@ const uint32_t *modfs_movie_picture(int *w, int *h) {
     return px;
 }
 
+/* ------------------------------------------------------------ enemies */
+
+/* The PC version's enemies (its nab folder: ENEMnn.NAB, the model, and
+ * ENEMnn.NAC, its animations, nn the enemy type) are the PS1's own data
+ * read out into floats: the NAC's commands are the PS1's animation
+ * script word for word and its keys the PS1's 20-byte keys (s32
+ * translation x,y,z, 0x7FFFFFFF for "unchanged", which the PC turns
+ * into 0; s16 rotation x,y,z; a zero), the NAB's textures the PS1's
+ * 16-bit TIMs as A1R5G5B5 (192-wide ones stretched to 256, nearest
+ * pixel). On the disc a type's data is one block of OBJ.DAT (type 30:
+ * EV_OBJ.DAT 0x196): a header (3, then where each part starts) and three
+ * parts packed with the game's LZSS: textures, animations (2: script,
+ * keys), model (HMD). A mod's NAB/NAC is written back into that: the
+ * script and keys, the textures; the model's shape (the NAB's polygons)
+ * isn't taken yet. What the PC loses (the 0x7FFFFFFF keys, the
+ * textures' semi-transparency bit) comes from the disc's. */
+
+/* The game's LZSS (kernel_files.c, 0x80016F78): a 32-bit size, then a
+ * flag byte per 8 items (bit set: a literal byte; clear: 16 bits,
+ * distance in the top 11, length - 3 in the low 5). */
+static uint8_t *lz_unpack(const uint8_t *s, uint32_t avail, uint32_t *n) {
+    if (avail < 4) return NULL;
+    uint32_t size = rd32(s), i = 4, o = 0, flags = 0;
+    if (size > 16u << 20) return NULL;
+    uint8_t *d = malloc(size + 64);
+    while (d && o < size) {
+        if (!(flags & 0x100)) {
+            if (i >= avail) break;
+            flags = s[i++] | 0xFF00u;
+        }
+        if (flags & 1) {
+            if (i >= avail) break;
+            d[o++] = s[i++];
+        } else {
+            if (i + 2 > avail) break;
+            uint32_t w = s[i] | s[i + 1] << 8, dist = w >> 5, len = (w & 31) + 3;
+            i += 2;
+            for (uint32_t k = 0; k < len && o < size + 34; k++, o++) d[o] = o >= dist ? d[o - dist] : 0;
+        }
+        flags >>= 1;
+    }
+    if (d && o < size) { free(d); return NULL; }
+    *n = size;
+    return d;
+}
+
+#define HASH(p) ((((uint32_t)in[p] << 8) ^ ((uint32_t)in[(p) + 1] << 4) ^ in[(p) + 2]) & 4095)
+static void lz_match(const uint8_t *in, uint32_t n, uint32_t i, const int32_t *head, const int32_t *prev, uint32_t *best,
+                     uint32_t *bdist) {
+    *best = 0;
+    if (i + 3 > n) return;
+    int32_t c = head[HASH(i)];
+    for (int tries = 0; c >= 0 && i - (uint32_t)c <= 2047 && tries < 128; tries++, c = prev[c]) {
+        if ((uint32_t)c >= i) continue;
+        uint32_t l = 0, max = n - i < 34 ? n - i : 34;
+        while (l < max && in[c + l] == in[i + l]) l++;
+        if (l > *best) { *best = l; *bdist = i - (uint32_t)c; if (l == 34) break; }
+    }
+}
+
+static uint8_t *lz_pack(const uint8_t *in, uint32_t n, uint32_t *outn) {
+    uint8_t *o = malloc(4 + (size_t)n + n / 8 + 16);
+    int32_t *head = malloc(4096 * sizeof *head), *prev = malloc(((size_t)n + 1) * sizeof *prev);
+    if (!o || !head || !prev) { free(o); free(head); free(prev); return NULL; }
+    for (int k = 0; k < 4096; k++) head[k] = -1;
+    wr32(o, n);
+    uint32_t w = 4, flagat = 0, item = 8, i = 0;
+    while (i < n) {
+        if (item == 8) { flagat = w++; o[flagat] = 0; item = 0; }
+        uint32_t best = 0, bdist = 0, next = 0, ndist = 0;
+        lz_match(in, n, i, head, prev, &best, &bdist);
+        if (best >= 3 && best < 34 && i + 1 < n) {   /* a longer one a byte on: a literal first */
+            uint32_t h = HASH(i);                    /* (i itself in reach for it) */
+            prev[i] = head[h];
+            head[h] = (int32_t)i;
+            lz_match(in, n, i + 1, head, prev, &next, &ndist);
+            head[h] = prev[i];
+            if (next > best + 1) best = 0;
+        }
+        uint32_t step = best >= 3 ? best : 1;
+        if (best >= 3) {
+            uint32_t v = bdist << 5 | (best - 3);
+            o[w++] = (uint8_t)v;
+            o[w++] = (uint8_t)(v >> 8);
+        } else {
+            o[flagat] |= (uint8_t)(1 << item);
+            o[w++] = in[i];
+        }
+        item++;
+        for (uint32_t k = 0; k < step; k++, i++)
+            if (i + 3 <= n) { uint32_t h = HASH(i); prev[i] = head[h]; head[h] = (int32_t)i; }
+    }
+#undef HASH
+    free(head);
+    free(prev);
+    *outn = w;
+    return o;
+}
+
+typedef struct { int type; uint8_t *nab, *nac; long nnab, nnac; char what[2][300]; } Enemy;
+static Enemy enemies[64];
+static int nenemies;
+
+/* nab/ENEM00.NAB, nab/ENEM00.NAC */
+static int enemy_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    if (strncmp(up, "NAB/ENEM", 8) || !isdigit((unsigned char)up[8]) || !isdigit((unsigned char)up[9]) || up[10] != '.') return 0;
+    int nac = !strcmp(up + 11, "NAC");
+    if (!nac && strcmp(up + 11, "NAB")) return 0;
+    int type = (up[8] - '0') * 10 + (up[9] - '0');
+    Enemy *e = NULL;
+    for (int i = 0; i < nenemies; i++) if (enemies[i].type == type) e = &enemies[i];
+    if (!e && nenemies < (int)(sizeof enemies / sizeof enemies[0])) {
+        e = &enemies[nenemies++];
+        memset(e, 0, sizeof *e);
+        e->type = type;
+    }
+    long n = 0;
+    uint8_t *d = e ? load(path, &n) : NULL;
+    if (!d) { rt_log("mods: %s/%s: couldn't read it", mod, rel); return 1; }
+    if (nac) { if (!e->nac) nused++; free(e->nac); e->nac = d; e->nnac = n; }    /* a later mod wins */
+    else { if (!e->nab) nused++; free(e->nab); e->nab = d; e->nnab = n; }
+    snprintf(e->what[nac], sizeof e->what[nac], "%s/%s", mod, rel);
+    return 1;
+}
+
+/* The NAC's animations into the PS1's (A: 2, script, keys). */
+static const char *nac_into(const uint8_t *nac, long n, uint8_t *A, uint32_t na) {
+    if (n < 8 || na < 12 || rd32(A) != 2) return "the disc's animations aren't laid out as expected";
+    uint32_t a0 = rd32(A + 4), a1 = rd32(A + 8);
+    if (a0 > a1 || a1 > na) return "the disc's animations aren't laid out as expected";
+    uint32_t ncmd = (a1 - a0) / 4, nkey = (na - a1) / 20, nk = rd32(nac);
+    if ((uint64_t)nk * 112 + 8 > (uint64_t)n) return "it's cut short";
+    uint32_t nc = rd32(nac + 4 + (size_t)nk * 112);
+    if (4 + (uint64_t)nk * 112 + 4 + (uint64_t)nc * 8 != (uint64_t)n) return "it's cut short or has more after it";
+    if (nc != ncmd || nk < nkey)
+        return "its animations aren't as many as the PS1's (new animations or keys can't be added; change the existing ones)";
+    const uint8_t *cmd = nac + 4 + (size_t)nk * 112 + 4;
+    for (uint32_t i = 0; i < ncmd; i++) wr32(A + a0 + 4 * i, rd32(cmd + 8 * i));
+    for (uint32_t k = 0; k < nkey; k++) {
+        const uint8_t *f = nac + 4 + (size_t)k * 112;
+        uint8_t *p = A + a1 + 20 * k;
+        float v[12];
+        memcpy(v, f, sizeof v);
+        for (int c = 0; c < 3; c++) {
+            int32_t t = (int32_t)lrintf(v[9 + c]);
+            if (!(rd32(p + 4 * c) == 0x7FFFFFFFu && t == 0)) wr32(p + 4 * c, (uint32_t)t);
+            wr16(p + 12 + 2 * c, (uint16_t)(int16_t)lrintf(v[5 + c]));
+        }
+    }
+    return NULL;
+}
+
+/* The NAB's textures into the PS1's 16-bit TIMs (in order, same height). */
+static const char *nab_into(const uint8_t *nab, long n, uint8_t *tex, uint32_t nt, int *ntex) {
+    if (n < 8) return "it's cut short";
+    uint64_t at = 8 + (uint64_t)rd32(nab) * 36;
+    if (at + 4 > (uint64_t)n) return "it's cut short";
+    uint32_t nm = rd32(nab + at);
+    at += 4;
+    uint32_t used = 0;                           /* TIMs taken, by offset order */
+    for (uint32_t m = 0; m < nm; m++) {
+        if (at + 352 > (uint64_t)n) return "it's cut short";
+        uint32_t ntx = rd32(nab + at + 8);
+        at += 352;
+        for (uint32_t t = 0; t < ntx; t++) {
+            if (at + 16 > (uint64_t)n) return "it's cut short";
+            uint32_t size = rd32(nab + at), W = rd32(nab + at + 8), H = rd32(nab + at + 12);
+            const uint8_t *px = nab + at + 16;
+            at += 16 + (uint64_t)size;
+            if (at > (uint64_t)n || (uint64_t)W * H * 2 > size) return "it's cut short";
+            uint32_t o = 0, k = 0;               /* the next 16-bit TIM of that height */
+            uint8_t *dst = NULL;
+            uint32_t w = 0;
+            for (; o + 20 <= nt && rd32(tex + o) == 0x10; k++) {
+                uint32_t flag = rd32(tex + o + 4), j = o + 8;
+                if (flag & 8) j += rd32(tex + j);
+                if (j + 12 > nt) break;
+                uint32_t il = rd32(tex + j), iw = rd16(tex + j + 8), ih = rd16(tex + j + 10);
+                if (!dst && k >= used && (flag & 3) == 2 && ih == H && iw <= W && iw && j + 12 + iw * ih * 2 <= nt) {
+                    dst = tex + j + 12;
+                    w = iw;
+                    used = k + 1;
+                }
+                o = j + il;
+            }
+            if (!dst) continue;                  /* a texture the PS1 has elsewhere */
+            for (uint32_t y = 0; y < H; y++)
+                for (uint32_t x = 0; x < w; x++) {
+                    uint16_t p = (uint16_t)rd16(px + 2 * ((size_t)y * W + (x * W + w - 1) / w));
+                    uint16_t was = (uint16_t)rd16(dst + 2 * ((size_t)y * w + x));
+                    uint16_t v = (uint16_t)(((p >> 10) & 31) | ((p >> 5) & 31) << 5 | (p & 31) << 10);
+                    if (v == (was & 0x7FFF)) v = was;                            /* as it was */
+                    else if (!(p & 0x8000)) v = 0;                               /* see-through */
+                    else v = (uint16_t)((v ? v : 0x0400) | (was & 0x8000));
+                    wr16(dst + 2 * ((size_t)y * w + x), v);
+                }
+            (*ntex)++;
+        }
+    }
+    return NULL;
+}
+
+/* Each enemy a mod changes, converted into its block (grown with the
+ * archive's other files that grow, grow_all). */
+static void enemies_done(void) {
+    for (int i = 0; i < nenemies; i++) {
+        Enemy *e = &enemies[i];
+        const char *what = e->nab ? e->what[0] : e->what[1];
+        int fi = disc_index(e->type == 30 ? "EV_OBJ.DAT" : "OBJ.DAT");
+        uint32_t blk = e->type == 30 ? 0x196 : (uint32_t)e->type;
+        Touched *test = touch(disc_index("TEST.BIN"));
+        Touched *t = fi >= 0 ? touch(fi) : NULL;
+        uint32_t tab = (e->type == 30 ? 0x800A195Cu : 0x800A0CD8u) - TEST_BASE;
+        uint32_t start = 0, len = 0;
+        if (t && test && e->type >= 0 && e->type <= 30) {
+            start = rd32(test->data + tab + 4 * blk) * 2048;
+            len = rd32(test->data + tab + 4 * blk + 4) * 2048 - start;
+        }
+        const uint8_t *b = t ? t->data + start : NULL;
+        if (!len || len > t->nsec * 2048 - start || rd32(b) != 3 || rd32(b + 4) != 16) {
+            rt_log("mods: %s: enemy type %d isn't one the PS1 keeps in this form (types 0-30 are): not used", what, e->type);
+            nused -= !!e->nab + !!e->nac;
+            goto next;
+        }
+        uint32_t off[4] = {rd32(b + 4), rd32(b + 8), rd32(b + 12), len};
+        if (off[0] > off[1] || off[1] > off[2] || off[2] > len) {
+            rt_log("mods: %s: the disc's enemy block isn't laid out as expected: not used", what);
+            nused -= !!e->nab + !!e->nac;
+            goto next;
+        }
+        uint8_t *part[3] = {NULL, NULL, NULL}, *was[3] = {NULL, NULL, NULL};
+        uint32_t plen[3] = {0, 0, 0};
+        int changed[3] = {0, 0, 0}, ntex = 0;
+        const char *why = NULL;
+        if (e->nab) {
+            part[0] = lz_unpack(b + off[0], off[1] - off[0], &plen[0]);
+            if (part[0] && (was[0] = malloc(plen[0]))) memcpy(was[0], part[0], plen[0]);
+            why = part[0] ? nab_into(e->nab, e->nnab, part[0], plen[0], &ntex) : "the disc's textures couldn't be unpacked";
+            if (why) { rt_log("mods: %s: %s: not used", e->what[0], why); nused--; }
+            else changed[0] = 1;
+        }
+        if (e->nac) {
+            part[1] = lz_unpack(b + off[1], off[2] - off[1], &plen[1]);
+            if (part[1] && (was[1] = malloc(plen[1]))) memcpy(was[1], part[1], plen[1]);
+            why = part[1] ? nac_into(e->nac, e->nnac, part[1], plen[1]) : "the disc's animations couldn't be unpacked";
+            if (why) { rt_log("mods: %s: %s: not used", e->what[1], why); nused--; }
+            else changed[1] = 1;
+        }
+        if (changed[0] || changed[1]) {
+            uint8_t *out = malloc((size_t)len * 2 + plen[0] + plen[1] + 64);
+            uint32_t at = 16;
+            wr32(out, 3);
+            for (int k = 0; k < 3; k++) {
+                wr32(out + 4 + 4 * k, at);
+                uint32_t pn = 0;
+                int same = !changed[k] || (was[k] && !memcmp(was[k], part[k], plen[k]));   /* the disc's packing kept */
+                uint8_t *pk = same ? NULL : lz_pack(part[k], plen[k], &pn);
+                if (pk) { memcpy(out + at, pk, pn); free(pk); }
+                else { pn = off[k + 1] - off[k]; memcpy(out + at, b + off[k], pn); }
+                at += (pn + 3) & ~3u;
+            }
+            if (ngrows < (int)(sizeof grows / sizeof grows[0])) {
+                Grow *g = &grows[ngrows++];
+                g->fi = fi;
+                g->offset = start;
+                g->size = at;
+                g->orig = len;
+                g->data = out;
+                snprintf(g->what, sizeof g->what, "enemy type %d (%s%s%s)", e->type, changed[0] ? e->what[0] : "",
+                         changed[0] && changed[1] ? ", " : "", changed[1] ? e->what[1] : "");
+                if (changed[0]) rt_log("mods: %s: its textures (%d) in place of enemy type %d's", e->what[0], ntex, e->type);
+                if (changed[1]) rt_log("mods: %s: its animations in place of enemy type %d's", e->what[1], e->type);
+                if (e->nab) rt_log("mods: %s: the model's shape isn't taken (only its textures)", e->what[0]);
+            } else {
+                free(out);
+                nused -= changed[0] + changed[1];
+            }
+        }
+        for (int k = 0; k < 3; k++) { free(part[k]); free(was[k]); }
+    next:
+        free(e->nab);
+        free(e->nac);
+    }
+    nenemies = 0;
+}
+
 static void walk(const char *mod, const char *dir, const char *rel) {
     DIR *d = opendir(dir);
     if (!d) return;
@@ -1069,6 +1450,7 @@ void modfs_open(void) {
         if (nused > before) nmods++;
         free(names[i]);
     }
+    enemies_done();
     grow_all();
     movie_done();
     if (nused) rt_log("mods: %d files from %d mods", nused, nmods);
