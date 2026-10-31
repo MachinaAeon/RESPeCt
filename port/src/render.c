@@ -51,7 +51,14 @@ unsigned g_margin_hist[7];
 static float g_margin_depth = 64;
 static double g_margin_area = 8;                /* PS1 pixels (RT_MARGIN_AREA) */               /* GTE depth units behind (RT_MARGIN_DEPTH) */
 static double g_overlap = 0.75;                 /* PS1 pixels (RT_OVERLAP) */
-static float g_depth_tol = 24;                  /* touching surfaces keep the PS1's order (RT_DEPTH_TOL) */
+/* Touching surfaces keep the PS1's order (RT_DEPTH_TOL, GTE depth units).
+ * 2 now, was 24 (or 0.4% of the distance): with the models' corners and
+ * depths in full precision (gte.c) a head and the shirt it pokes out of are
+ * told apart a few units apart, and with 24 the shirt, drawn later, came
+ * over the top of the head in some frames and not in others as the camera
+ * turned. */
+static float g_depth_tol = 2;
+static float g_depth_rel = 0;               /* ... or this share of the distance, if more (RT_DEPTH_REL) */
 static int g_fill_mark, g_sliver_mark;                          /* testing: RT_FILL_MARK fills the screen magenta (gaps show) */
 static int g_depth_any;                          /* testing: RT_DEPTH_ANY hides any model behind any */
 static int g_far_page = 1;                       /* RT_FAR_PAGE=0: off */
@@ -61,7 +68,7 @@ static int g_far_page = 1;                       /* RT_FAR_PAGE=0: off */
  * objects, and 128 let a torso 60-odd units behind its head be drawn over
  * it whenever the PS1's order put it later: the neck changed from frame
  * to frame as the camera moved. */
-static float g_cross_tol = 24;
+static float g_cross_tol = 2;
 static double g_margin_len = 6;                  /* longest edge (PS1 pixels) of a triangle given the gap margin; RT_MARGIN_LEN */
 int g_gap_fill = 1; 
 int g_persp = 1;                                /* Perspective-correct textures (setting) */
@@ -610,7 +617,7 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                     float zs = zrow[x];
                     if ((float)wz > zs * 0.88f && (float)wz < zs) {
                         float behind = 1.0f / (float)wz - 1.0f / zs;   /* in GTE depth units */
-                        float tol = 0.004f / zs;
+                        float tol = g_depth_rel / zs;
                         if (tol < g_depth_tol) tol = g_depth_tol;
                         if (behind > tol && (idrow[x] == id || g_depth_any)) goto next;
                         /* Another object's surface well in front (the
@@ -991,7 +998,7 @@ static int gpu_pack(void) {
 
 static void gpu_run(void) {
     int n = gpu_pack();
-    GpuParams gp = {g_depth_tol, g_cross_tol, g_margin_depth, g_true_color, g_far_page, g_depth_any, g_margin_any};
+    GpuParams gp = {g_depth_tol, g_cross_tol, g_margin_depth, g_depth_rel, g_true_color, g_far_page, g_depth_any, g_margin_any};
     rgpu_draw(gops, n, gpool, gpool_n, &g_vram[0][0], &gp);
     gpu_dirty = 1;
 }
@@ -1121,6 +1128,7 @@ void render_init(int scale, int threads) {
     g_margin_any = getenv("RT_MARGIN_ANY") != NULL;
     if (getenv("RT_NO_GAP_FILL")) g_gap_fill = 0;
     if (getenv("RT_DEPTH_TOL")) g_depth_tol = (float)atof(getenv("RT_DEPTH_TOL"));
+    if (getenv("RT_DEPTH_REL")) g_depth_rel = (float)atof(getenv("RT_DEPTH_REL"));
     if (getenv("RT_FAR_PAGE")) g_far_page = atoi(getenv("RT_FAR_PAGE"));
     if (getenv("RT_CROSS_TOL")) g_cross_tol = (float)atof(getenv("RT_CROSS_TOL"));
     g_margin_log = getenv("RT_MARGIN_LOG") != NULL;

@@ -65,7 +65,7 @@
 
 cbuffer Params : register(b0) {
     uint S, W, H, true_color;
-    float depth_tol, cross_tol, margin_depth, pad0;
+    float depth_tol, cross_tol, margin_depth, depth_rel;
     uint far_page, depth_any, margin_any, ntiles;
     int cp_sx, cp_sy, cp_dx, cp_dy;              // copies (high-res pixels)
     uint cp_w, cp_h, cp_mset, cp_mchk;
@@ -279,7 +279,7 @@ void tri(int x, int y) {
         float zs = zv;
         if ((float)wz > zs * 0.88f && (float)wz < zs) {
             float behind = 1.0f / (float)wz - 1.0f / zs;
-            float tol = 0.004f / zs;
+            float tol = depth_rel / zs;
             if (tol < depth_tol) tol = depth_tol;
             if (behind > tol && (idv == id || depth_any)) return;
             if (cross_tol > 0 && !semi && behind > cross_tol && behind > tol) return;

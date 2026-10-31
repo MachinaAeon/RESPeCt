@@ -43,6 +43,7 @@ static int clamp5(int16_t v) { int x = v >> 7; return x < 0 ? 0 : x > 31 ? 31 : 
 static void moving_push(uint32_t word, float x, float y, float z);   /* precision, below */
 static void matrix_written(int r, uint32_t v);                        /* precise matrices, below */
 static int prec_rot, prec_trans;
+static float sxy_fz[3];                                 /* depths for the picture, below */
 static int precise_view(const int64_t m[3], int16_t vx, int16_t vy, int16_t vz, double out[3]);
 static void moving_frac(uint32_t word, float *x, float *y);
 
@@ -60,7 +61,7 @@ uint32_t gte_read_data(int r) {
     case 12: case 13: case 14: case 15: {
         int k = r == 15 ? 2 : r - 12;
         uint32_t w = pack(G.sx[k], G.sy[k]);
-        moving_push(w, G.fx[k], G.fy[k], (float)G.sz[k + 1]);
+        moving_push(w, G.fx[k], G.fy[k], sxy_fz[k] >= 0 ? sxy_fz[k] : (float)G.sz[k + 1]);
         return w;
     }
     case 16: case 17: case 18: case 19: return G.sz[r - 16];
@@ -89,12 +90,14 @@ void gte_write_data(int r, uint32_t v) {
     case 8: case 9: case 10: case 11: G.ir[r - 8] = lo; break;
     case 12: case 13: case 14:
         G.sx[r - 12] = lo; G.sy[r - 12] = hi; G.fx[r - 12] = lo; G.fy[r - 12] = hi;
+        sxy_fz[r - 12] = -1;
         moving_frac(v, &G.fx[r - 12], &G.fy[r - 12]);     /* a point read back: its fractions too */
         break;
     case 15:
         G.sx[0] = G.sx[1]; G.sy[0] = G.sy[1]; G.fx[0] = G.fx[1]; G.fy[0] = G.fy[1];
         G.sx[1] = G.sx[2]; G.sy[1] = G.sy[2]; G.fx[1] = G.fx[2]; G.fy[1] = G.fy[2];
         G.sx[2] = lo; G.sy[2] = hi; G.fx[2] = lo; G.fy[2] = hi;
+        sxy_fz[0] = sxy_fz[1]; sxy_fz[1] = sxy_fz[2]; sxy_fz[2] = -1;
         moving_frac(v, &G.fx[2], &G.fy[2]);
         break;
     case 16: case 17: case 18: case 19: G.sz[r - 16] = (uint16_t)v; break;
@@ -263,7 +266,13 @@ static int precise_nclip(void) {
     return 1;
 }
 
-static void push_sxy(int32_t x, int32_t y, float fx, float fy) {
+/* The SXY stack's depths for the high-resolution picture: the model's
+ * matrix in full precision where there is one, else SZ (whole units; -1:
+ * not known, SZ then). Two surfaces a few units apart (a head against the
+ * shirt it pokes out of) are told apart by these. */
+static float sxy_fz[3] = {-1, -1, -1};
+
+static void push_sxy(int32_t x, int32_t y, float fx, float fy, float fz) {
     int whole = whole_corner();
     if (x < -0x400) { if (!whole) { G.flag |= 1u << 14; fx = -1024.0f; } x = -0x400; }
     else if (x > 0x3FF) { if (!whole) { G.flag |= 1u << 14; fx = 1023.0f; } x = 0x3FF; }
@@ -272,7 +281,8 @@ static void push_sxy(int32_t x, int32_t y, float fx, float fy) {
     G.sx[0] = G.sx[1]; G.sy[0] = G.sy[1]; G.fx[0] = G.fx[1]; G.fy[0] = G.fy[1];
     G.sx[1] = G.sx[2]; G.sy[1] = G.sy[2]; G.fx[1] = G.fx[2]; G.fy[1] = G.fy[2];
     G.sx[2] = (int16_t)x; G.sy[2] = (int16_t)y; G.fx[2] = fx; G.fy[2] = fy;
-    precise_record((int16_t)x, (int16_t)y, fx, fy, (float)G.sz[3]);
+    sxy_fz[0] = sxy_fz[1]; sxy_fz[1] = sxy_fz[2]; sxy_fz[2] = fz;
+    precise_record((int16_t)x, (int16_t)y, fx, fy, fz);
 }
 
 static uint8_t unr_table[0x101];
@@ -348,13 +358,17 @@ static void rtp(int i, int last) {
     chk_mac(0, y);
     float fx = (float)((double)x / 65536.0), fy = (float)((double)y / 65536.0);
     double pv[3];
+    float fz = (float)G.sz[3];
     if (sf_shift == 12 && precise_view(m, v.x, v.y, v.z, pv) && pv[2] >= 1.0) {
         /* the corner from the model's matrix in full precision (below) */
         double k = projection_h() / pv[2];
         fx = (float)(pv[0] * k * (g_widescreen ? 0.75 : 1.0) + G.ofx / 65536.0);
         fy = (float)(pv[1] * k + G.ofy / 65536.0);
+        static int whole_z = -1;                 /* RT_INT_Z: SZ's whole units, for comparisons */
+        if (whole_z < 0) whole_z = getenv("RT_INT_Z") != NULL;
+        if (!whole_z && pv[2] < 65535) fz = (float)pv[2];
     }
-    push_sxy((int32_t)(x >> 16), (int32_t)(y >> 16), fx, fy);
+    push_sxy((int32_t)(x >> 16), (int32_t)(y >> 16), fx, fy, fz);
     if (last) {
         int64_t d = (int64_t)n * G.dqa + G.dqb;
         chk_mac(0, d);

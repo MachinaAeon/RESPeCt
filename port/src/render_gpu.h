@@ -54,7 +54,7 @@ enum {
 #define GF_BIGFILL  (1u << 23)
 
 typedef struct {
-    float depth_tol, cross_tol, margin_depth;
+    float depth_tol, cross_tol, margin_depth, depth_rel;
     int true_color, far_page, depth_any, margin_any;
 } GpuParams;
 

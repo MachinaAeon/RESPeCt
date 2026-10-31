@@ -52,7 +52,7 @@ static int S, W, H;
 
 typedef struct {
     uint32_t S, W, H, true_color;
-    float depth_tol, cross_tol, margin_depth, pad0;
+    float depth_tol, cross_tol, margin_depth, depth_rel;
     uint32_t far_page, depth_any, margin_any, ntiles;
     int32_t cp_sx, cp_sy, cp_dx, cp_dy;
     uint32_t cp_w, cp_h, cp_mset, cp_mchk;
@@ -339,7 +339,7 @@ void rgpu_draw(const uint32_t *ops, int n, const uint16_t *pool, size_t npool, c
 
     K.S = (uint32_t)S; K.W = (uint32_t)W; K.H = (uint32_t)H;
     K.true_color = (uint32_t)gp->true_color;
-    K.depth_tol = gp->depth_tol; K.cross_tol = gp->cross_tol; K.margin_depth = gp->margin_depth;
+    K.depth_tol = gp->depth_tol; K.cross_tol = gp->cross_tol; K.margin_depth = gp->margin_depth; K.depth_rel = gp->depth_rel;
     K.far_page = (uint32_t)gp->far_page; K.depth_any = (uint32_t)gp->depth_any; K.margin_any = (uint32_t)gp->margin_any;
     K.ntiles = (uint32_t)nt_touched;
     consts_put();
