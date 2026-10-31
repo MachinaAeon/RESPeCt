@@ -193,8 +193,14 @@ static void close_cracks(uint32_t *out, const uint8_t *bare, int stride, int s, 
  * pixels well behind, or with no 3D, between two pixels of 3D at about the
  * same depth, across or down, shows the pixel before it. A model's outline
  * has 3D on one side only, so it's never widened; 2D drawn over the 3D
- * (depth -1) is never touched. */
+ * (depth -1) is never touched.
+ * Off now (RT_HOLES=1: on, for comparisons): with the models' matrices in
+ * full precision (gte.c) the parts' seams no longer open, and what this
+ * filled were real gaps between parts, an arm and the torso a few pixels
+ * apart, row by row as wide as the run allows: jagged, flickering teeth
+ * along the outlines, worst at 8x (runs up to 7 pixels). */
 #define HOLE_BEHIND 64.0f                       /* GTE depth units */
+int display_holes(void) { static int on = -1; if (on < 0) on = getenv("RT_HOLES") != NULL; return on; }
 static void close_holes(uint32_t *out, const float *depth, int stride, int s, int X, int Y, int W, int H) {
     static float *last_z;
     static int *last_y, *run_y;
@@ -354,6 +360,6 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
     }
     if (k > 1) return;
     const float *depth = render_depth();
-    if (depth) close_holes(out, depth, stride, s, X, Y, W, H);
+    if (depth && display_holes()) close_holes(out, depth, stride, s, X, Y, W, H);
     if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);
 }

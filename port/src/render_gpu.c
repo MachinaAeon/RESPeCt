@@ -452,11 +452,14 @@ void rgpu_picture(int x, int y, int w, int h, int gaps, const uint8_t gamma8[256
     ID3D11DeviceContext_CSSetShaderResources(ctx, 0, 6, srv);
     ID3D11DeviceContext_CSSetShader(ctx, cs_pic_color, NULL, 0);
     ID3D11DeviceContext_Dispatch(ctx, ((UINT)w + 15) / 16, ((UINT)h + 15) / 16, 1);
-    if (gaps) {
+    extern int display_holes(void);
+    if (gaps && display_holes()) {                 /* off: see display.c */
         ID3D11DeviceContext_CSSetShader(ctx, cs_holes_across, NULL, 0);
         ID3D11DeviceContext_Dispatch(ctx, ((UINT)h + 63) / 64, 1, 1);
         ID3D11DeviceContext_CSSetShader(ctx, cs_holes_down, NULL, 0);
         ID3D11DeviceContext_Dispatch(ctx, ((UINT)w + 63) / 64, 1, 1);
+    }
+    if (gaps) {
         ID3D11DeviceContext_CSSetShader(ctx, cs_cracks_across, NULL, 0);
         ID3D11DeviceContext_Dispatch(ctx, ((UINT)h + 63) / 64, 1, 1);
         ID3D11DeviceContext_CSSetShader(ctx, cs_cracks_down, NULL, 0);
