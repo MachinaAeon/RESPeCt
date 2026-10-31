@@ -12,7 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define GOP_WORDS 128
+#define GOP_WORDS 144
 
 /* kinds */
 enum { GK_TRI, GK_RECT, GK_FILL, GK_ZCLEAR, GK_UPLOAD };
@@ -27,7 +27,9 @@ enum {
     GO_BIAS = 24,                                /* 3 ints */
     GO_EX = 28, GO_EY = 34, GO_EC = 40, GO_MB = 46,   /* 3 doubles each */
     GO_PL = 52,                                  /* 12 planes of 3 doubles: PR PG PB PU PV PW QW QU QV QR QG QB */
-    GO_SQ0 = 124, GO_SQK = 126                   /* rectangles squeezed (widescreen): doubles */
+    GO_SQ0 = 124, GO_SQK = 126,                  /* rectangles squeezed (widescreen): doubles */
+    GO_HD_OFFSET = 128, GO_HD_W, GO_HD_H,
+    GO_HD_OX, GO_HD_OY, GO_HD_KX, GO_HD_KY       /* RGBA buffer, dimensions, float mapping */
 };
 
 /* flags */
@@ -52,6 +54,7 @@ enum {
 #define GF_SQ       (1u << 21)
 #define GF_ZT       (1u << 22)
 #define GF_BIGFILL  (1u << 23)
+#define GF_HD       (1u << 24)
 
 typedef struct {
     float depth_tol, cross_tol, margin_depth, depth_rel;
@@ -60,6 +63,11 @@ typedef struct {
 
 int rgpu_init(int scale);                        /* 0: no usable card (the CPU draws) */
 void rgpu_set_scale(int scale);
+struct HdImg;
+/* Image pointers are valid until texpack_frame. Copy pixels before drawing,
+ * then forget source identities at that synchronized lifetime boundary. */
+int rgpu_hd_add(const struct HdImg *image, uint32_t *offset);
+void rgpu_hd_reset(void);
 /* Run a batch: ops (n of them, GOP_WORDS each), the pixels uploads take
  * (pool), the PS1's VRAM as it is now (textures). */
 void rgpu_draw(const uint32_t *ops, int n, const uint16_t *pool, size_t npool, const uint16_t *vram, const GpuParams *gp);

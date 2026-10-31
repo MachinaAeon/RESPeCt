@@ -887,6 +887,15 @@ static void gop_prim_common(uint32_t *w, const RPrim *p) {
     w[GO_FLAGS] = (p->textured ? GF_TEX : 0) | (p->raw ? GF_RAW : 0) | (p->semi ? GF_SEMI : 0) |
                   ((uint32_t)(p->abr & 3) << GF_ABR_SH) | ((uint32_t)(p->depth & 3) << GF_DEPTH_SH) |
                   (p->mask_set ? GF_MSET : 0) | (p->mask_check ? GF_MCHK : 0) | (p->zt ? GF_ZT : 0);
+    if (p->textured && p->hd && rgpu_hd_add(p->hd, &w[GO_HD_OFFSET])) {
+        w[GO_FLAGS] |= GF_HD;
+        w[GO_HD_W] = (uint32_t)p->hd->w;
+        w[GO_HD_H] = (uint32_t)p->hd->h;
+        memcpy(&w[GO_HD_OX], &p->hd_ox, sizeof(float));
+        memcpy(&w[GO_HD_OY], &p->hd_oy, sizeof(float));
+        memcpy(&w[GO_HD_KX], &p->hd_kx, sizeof(float));
+        memcpy(&w[GO_HD_KY], &p->hd_ky, sizeof(float));
+    }
     w[GO_TEX] = (uint32_t)(p->tx & 0xFFFF) | ((uint32_t)p->ty << 16);
     w[GO_CLUT] = (uint32_t)(p->clut_x & 0xFFFF) | ((uint32_t)p->clut_y << 16);
     w[GO_TWIN] = (uint32_t)(p->twmx & 0xFF) | ((uint32_t)(p->twmy & 0xFF) << 8) | ((uint32_t)(p->twox & 0xFF) << 16) |
@@ -1136,6 +1145,7 @@ void render_sync(void) {
     nq = 0;
     memset(tex_tiles, 0, sizeof tex_tiles);
     memset(drawn_tiles, 0, sizeof drawn_tiles);
+    rgpu_hd_reset();                             /* no queued references survive cache eviction */
     texpack_frame();
 }
 

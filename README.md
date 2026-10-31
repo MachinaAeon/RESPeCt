@@ -37,8 +37,8 @@ isn't code-signed. Click **More info → Run anyway**.
 RESPeCt draws the game with your CPU unless you turn on **F1 › Video ›
 Graphics card**: then the graphics card draws it (Direct3D 11), much
 faster, and resolutions up to 8x become available. Drawn larger than your
-screen, the picture is shrunk to fit and edges come out smooth. (HD
-texture packs aren't drawn on the graphics card yet.) With the CPU the
+screen, the picture is shrunk to fit and edges come out smooth. HD
+texture packs work on both the graphics card and CPU. With the CPU the
 resolution setting matters most: the first start picks a resolution
 to suit your CPU, and if the game still can't keep up it lowers it by
 itself (with a message). You can change it any time in **F1 › Video ›

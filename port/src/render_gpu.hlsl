@@ -3,7 +3,7 @@
 // queue's order, as render.c's raster_tri / raster_rect / run_ops do for
 // that pixel. Word offsets and flags: render_gpu.h.
 
-#define OPW 128
+#define OPW 144
 #define GK_TRI 0
 #define GK_RECT 1
 #define GK_FILL 2
@@ -42,6 +42,13 @@
 #define GO_PL 52
 #define GO_SQ0 124
 #define GO_SQK 126
+#define GO_HD_OFFSET 128
+#define GO_HD_W 129
+#define GO_HD_H 130
+#define GO_HD_OX 131
+#define GO_HD_OY 132
+#define GO_HD_KX 133
+#define GO_HD_KY 134
 
 #define GF_TEX (1u << 0)
 #define GF_RAW (1u << 1)
@@ -62,6 +69,7 @@
 #define GF_SQ (1u << 21)
 #define GF_ZT (1u << 22)
 #define GF_BIGFILL (1u << 23)
+#define GF_HD (1u << 24)
 
 cbuffer Params : register(b0) {
     uint S, W, H, true_color;
@@ -77,6 +85,7 @@ StructuredBuffer<uint> vram : register(t1);      // the PS1's VRAM, two pixels a
 StructuredBuffer<uint> pool : register(t2);      // uploads' pixels, one a word
 StructuredBuffer<uint4> tiles : register(t3);    // tile x, y, first bin, bins
 StructuredBuffer<uint> bins : register(t4);      // op indices
+StructuredBuffer<uint> hd_pixels : register(t5); // replacement RGBA8; native VRAM stays unchanged
 RWStructuredBuffer<uint> hl : register(u0);      // high-res pixel | 24-bit colour low bits << 16
 RWStructuredBuffer<uint> bare : register(u1);
 RWStructuredBuffer<float> zb : register(u2);
@@ -225,18 +234,56 @@ bool smooth_texel(float U, float V2, float4 lo, out float3 rgb, out bool stp) {
     return true;
 }
 
-// render.c shade_hd() for the game's own textures (no texture packs here)
+// Match render.c hd_texel: nearest alpha classification, then bilinear
+// colour with transparent neighbours excluded and atlas bounds clamped.
+uint hd_pixel(int x, int y) {
+    int w = OI(GO_HD_W), h = OI(GO_HD_H);
+    return hd_pixels[O(GO_HD_OFFSET) + (uint)(clamp(y, 0, h - 1) * w + clamp(x, 0, w - 1))];
+}
+
+bool hd_texel(float U, float V2, float4 lo, out float3 rgb, out bool stp) {
+    rgb = 0; stp = false;
+    float ox = asfloat(O(GO_HD_OX)), oy = asfloat(O(GO_HD_OY));
+    float kx = asfloat(O(GO_HD_KX)), ky = asfloat(O(GO_HD_KY));
+    precise float fx = ox + U * kx, fy = oy + V2 * ky;
+    uint n = hd_pixel((int)fx, (int)fy), alpha = n >> 24;
+    if (alpha < 64) return false;
+    precise float x_lo = ox + lo.x * kx + 0.5f, x_hi = ox + lo.y * kx - 0.5f;
+    precise float y_lo = oy + lo.z * ky + 0.5f, y_hi = oy + lo.w * ky - 0.5f;
+    if (x_hi >= x_lo) fx = fx < x_lo ? x_lo : fx > x_hi ? x_hi : fx;
+    if (y_hi >= y_lo) fy = fy < y_lo ? y_lo : fy > y_hi ? y_hi : fy;
+    fx -= 0.5f; fy -= 0.5f;
+    int x0 = (int)floor(fx), y0 = (int)floor(fy);
+    float ax = fx - (float)x0, ay = fy - (float)y0;
+    uint q[4] = {hd_pixel(x0,y0), hd_pixel(x0+1,y0), hd_pixel(x0,y0+1), hd_pixel(x0+1,y0+1)};
+    float wt[4] = {(1-ax)*(1-ay), ax*(1-ay), (1-ax)*ay, ax*ay};
+    precise float r = 0, g = 0, b = 0, sum = 0;
+    [unroll] for (int i = 0; i < 4; i++) {
+        if ((q[i] >> 24) < 64) continue;
+        r += wt[i] * (float)(q[i] & 255);
+        g += wt[i] * (float)((q[i] >> 8) & 255);
+        b += wt[i] * (float)((q[i] >> 16) & 255);
+        sum += wt[i];
+    }
+    if (sum <= 0) { r = (float)(n & 255); g = (float)((n >> 8) & 255); b = (float)((n >> 16) & 255); sum = 1; }
+    rgb = float3(r / sum, g / sum, b / sum);
+    stp = alpha < 192;
+    return true;
+}
+
+// render.c shade_hd(), for native smoothing and replacement textures.
 void shade_smooth(int r, int g, int b, float U, float V2, float4 lo, int x, int y) {
     float3 c;
     bool stp;
-    if (!smooth_texel(U, V2, lo, c, stp)) return;
+    if (fl & GF_HD) { if (!hd_texel(U, V2, lo, c, stp)) return; }
+    else if (!smooth_texel(U, V2, lo, c, stp)) return;
     if ((fl & GF_SEMI) && !stp && (texel((int)U, (int)V2) & 0x8000)) stp = true;
     if (!(fl & GF_RAW)) c *= float3((float)r, (float)g, (float)b) * (1.0f / 128);
     if (true_color) {
         put8((int)(c.x + 0.5f), (int)(c.y + 0.5f), (int)(c.z + 0.5f), stp, (fl & GF_SEMI) && stp);
         return;
     }
-    float dt = ((float)bayer4[(y & 3) * 4 + (x & 3)] + 0.5f) * (1.0f / 16) - 0.5f;
+    float dt = ((float)bayer4[(y & 3) * 4 + (x & 3)] + 0.5f) * (1.0f / 16) - ((fl & GF_HD) ? 0.0f : 0.5f);
     int o0 = clamp((int)(c.x * (31.0f / 255.0f) + dt), 0, 31);
     int o1 = clamp((int)(c.y * (31.0f / 255.0f) + dt), 0, 31);
     int o2 = clamp((int)(c.z * (31.0f / 255.0f) + dt), 0, 31);
@@ -305,7 +352,7 @@ void tri(int x, int y) {
         cg = clamp8(((int)(PLV(1, x0, y) * 65536.0) + 32768 + (x - x0) * OI(GO_DG)) >> 16);
         cb = clamp8(((int)(PLV(2, x0, y) * 65536.0) + 32768 + (x - x0) * OI(GO_DB)) >> 16);
     }
-    if (fl & GF_SMOOTH) {
+    if (fl & (GF_SMOOTH | GF_HD)) {
         float U = (float)u * (1.0f / 65536), V2 = (float)vv * (1.0f / 65536);
         float ulo = (float)umin, uhi = (float)umax + 0.999f, vlo = (float)vmin, vhi = (float)vmax + 0.999f;
         U = U < ulo ? ulo : U > uhi ? uhi : U;
@@ -331,7 +378,16 @@ void rect(int x, int y) {
     int u = (fl & GF_FLIPX) ? u0 - i : u0 + i;
     int v = (fl & GF_FLIPY) ? v0 - j : v0 + j;
     uint col = O(GO_COLOR);
-    shade(col & 0xFF, (col >> 8) & 0xFF, (col >> 16) & 0xFF, u, v);
+    if (fl & GF_HD) {
+        float fi = (fl & GF_SQ) ? (float)(((double)x + 0.5 - OD(GO_SQ0)) * OD(GO_SQK)) : (float)(x - x0 + 0.5f) / (float)s;
+        float fj = (float)(y - y0 + 0.5f) / (float)s;
+        fi -= (float)i; fj -= (float)j;
+        float4 lo = float4((fl & GF_FLIPX) ? u0 - OI(GO_RW) + 1 : u0, (fl & GF_FLIPX) ? u0 + 1 : u0 + OI(GO_RW),
+                           (fl & GF_FLIPY) ? v0 - OI(GO_RH) + 1 : v0, (fl & GF_FLIPY) ? v0 + 1 : v0 + OI(GO_RH));
+        shade_smooth(col & 255, (col >> 8) & 255, (col >> 16) & 255,
+                     (float)u + ((fl & GF_FLIPX) ? 1-fi : fi), (float)v + ((fl & GF_FLIPY) ? 1-fj : fj), lo, x, y);
+    } else
+        shade(col & 0xFF, (col >> 8) & 0xFF, (col >> 16) & 0xFF, u, v);
 }
 
 // fills, depth clears, uploads: is (x, y) in the area (wrapping)? Its texel there.

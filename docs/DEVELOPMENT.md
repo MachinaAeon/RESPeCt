@@ -341,8 +341,40 @@ precision so they come out exactly as the CPU's 64-bit integers. The
 picture shown is made there too (24-bit colour, brightness, Close model
 gaps) and at the window's size, shrunk by area. The PS1's own VRAM stays on
 the CPU (the game reads it); the card gets a copy with every batch for
-textures. HD texture packs aren't drawn on the card yet (it shows the
-game's own textures, smoothed). Frames from
+textures. Replacement images are copied into a separate RGBA8 shader
+buffer and referenced by each primitive's original texpack mapping. The
+shader mirrors the CPU's bilinear sampler, atlas bounds, alpha classes,
+lighting and PS1 blend modes. Native VRAM and the texture matcher are
+unchanged. Image identities are shared within a synchronized drawing queue
+and reset before texpack_frame can evict decoded images. GPU transfers are
+bounded to 128 MiB per queue; allocation failure or a larger queue uses the
+original texture and logs a warning. The CPU staging arena and GPU buffer
+retain their capacity for reuse.
+
+An old save state without tracked texture uploads still needs a room load
+before its textures can match the pack, on either renderer. This change
+does not reconstruct those missing upload records.
+
+`port/tests/run-gpu-hd.ps1` builds and executes the production CPU/D3D11
+rasterizers with synthetic images (no game assets). It checks rectangles,
+triangles, alpha thresholds, blending, lighting, atlas limits, perspective,
+multiple images and cache renewal at 2x, 3x and 4x, with HD on/off and
+24-bit colour on/off. Native VRAM and STP must match exactly; filtered
+24-bit RGB permits at most one rounding step. A usable D3D11 device with
+double precision is required (exit 2 means unavailable). This does not
+replace testing the real pack and gameplay.
+
+Validation of GPU HD support: 158 synthetic CPU/GPU comparisons passed.
+Three filtered Gouraud cases differ by one RGB level in a few pixels,
+within the declared rounding tolerance; STP and native VRAM match exactly.
+A controlled 21-frame arcade-room replay with the real pack at 2x produced
+an identical CPU HD/GPU HD displayed frame and identical native VRAM with
+HD on and off. GPU HD was also observed in the Windows frontend at 8x.
+Interactive F2 and live renderer switching with HD, other hardware, and
+full-game pack compatibility remain unverified by these checks. Actual
+allocation failure during buffer growth has not been fault-injected.
+
+Frames from
 the headless runner with `RT_GPU=1` are identical to the CPU's;
 `RT_GPU_AT=frame:on` switches while running, `RT_SHOW=w,h` makes the picture
 at a window's size.

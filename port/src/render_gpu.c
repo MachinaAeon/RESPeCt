@@ -12,6 +12,7 @@
 #include <dxgi.h>
 
 #include "render_gpu.h"
+#include "texpack.h"
 #include "rt.h"
 
 #include <stdlib.h>
@@ -44,7 +45,7 @@ typedef struct {
 } Buf;
 
 static Buf b_hl, b_bare, b_z, b_zid, b_tmp;      /* the picture; scratch */
-static Buf b_ops, b_vram, b_pool, b_tiles, b_bins;
+static Buf b_ops, b_vram, b_pool, b_tiles, b_bins, b_hd;
 static Buf b_gamma, b_pic, b_pmask, b_pic2;      /* the picture shown */
 static ID3D11Buffer *staging, *pic_staging;
 static UINT staging_n, pic_staging_n;
@@ -111,6 +112,65 @@ static void buf_put(Buf *b, const void *data, UINT n) {
     if (!n) return;
     D3D11_BOX box = {0, 0, 0, n * b->stride, 1, 1};
     ID3D11DeviceContext_UpdateSubresource(ctx, (ID3D11Resource *)b->buf, 0, &box, data, 0, 0);
+}
+
+/* Keep RGBA pixels independent of texpack cache ownership. The arena is
+ * bounded by D3D11's guaranteed 128 MiB resource size. One image is copied
+ * once per synchronized queue, even when hundreds of primitives use it. */
+#define HD_MAX_WORDS (128u * 1024u * 1024u / 4u)
+typedef struct { const HdImg *image; const uint32_t *px; int w, h; uint32_t offset; } HdRef;
+static HdRef *hd_refs;
+static size_t hd_count, hd_refs_cap;
+static uint32_t *hd_arena;
+static UINT hd_used, hd_cap;
+static int hd_warned;
+
+void rgpu_hd_reset(void) { hd_count = 0; hd_used = 0; }
+
+int rgpu_hd_add(const HdImg *im, uint32_t *offset) {
+    if (!dev || !im || !im->px || im->w <= 0 || im->h <= 0) return 0;
+    for (size_t i = 0; i < hd_count; i++) {
+        const HdRef *r = &hd_refs[i];
+        if (r->image == im && r->px == im->px && r->w == im->w && r->h == im->h) {
+            *offset = r->offset;
+            return 1;
+        }
+    }
+    size_t pixels = (size_t)im->w * (size_t)im->h;
+    if (pixels > HD_MAX_WORDS - hd_used) goto failed;
+    UINT end = hd_used + (UINT)pixels;
+    if (hd_count == hd_refs_cap) {
+        size_t cap = hd_refs_cap ? hd_refs_cap * 2 : 64;
+        HdRef *refs = realloc(hd_refs, cap * sizeof *refs);
+        if (!refs) goto failed;
+        hd_refs = refs; hd_refs_cap = cap;
+    }
+    if (end > hd_cap) {
+        UINT cap = hd_cap ? hd_cap : 1024;
+        while (cap < end) cap *= 2;
+        uint32_t *arena = realloc(hd_arena, (size_t)cap * 4);
+        if (!arena) goto failed;
+        hd_arena = arena; hd_cap = cap;
+    }
+    memcpy(hd_arena + hd_used, im->px, pixels * 4);
+    if (b_hd.n < end) {
+        /* Allocate transactionally: existing descriptors must remain valid
+         * if this image cannot be transferred. */
+        Buf next = {0};
+        if (!buf_make(&next, hd_cap, 4, 0, NULL)) { buf_free(&next); goto failed; }
+        buf_put(&next, hd_arena, end);
+        buf_free(&b_hd); b_hd = next;
+    } else {
+        D3D11_BOX box = {hd_used * 4, 0, 0, end * 4, 1, 1};
+        ID3D11DeviceContext_UpdateSubresource(ctx, (ID3D11Resource *)b_hd.buf, 0, &box, im->px, 0, 0);
+    }
+    *offset = hd_used;
+    hd_refs[hd_count++] = (HdRef){im, im->px, im->w, im->h, hd_used};
+    hd_used = end;
+    return 1;
+failed:
+    if (!hd_warned) { rt_log("gpu: HD texture transfer failed; using original texture (128 MiB batch limit)"); hd_warned = 1; }
+    return 0;
 }
 
 static void consts_put(void) {
@@ -214,6 +274,7 @@ int rgpu_init(int scale) {
     if (FAILED(ID3D11Device_CreateBuffer(dev, &cd, NULL, &cb_scale))) return 0;
     if (!buf_make(&b_gamma, 256, 4, 0, NULL)) return 0;
     if (!buf_make(&b_vram, 1024 * 512 / 2, 4, 0, NULL)) return 0;
+    if (!buf_make(&b_hd, 1, 4, 0, NULL)) return 0;
     S = scale;
     W = 1024 * S;
     H = 512 * S;
@@ -347,8 +408,8 @@ void rgpu_draw(const uint32_t *ops, int n, const uint16_t *pool, size_t npool, c
     K.far_page = (uint32_t)gp->far_page; K.depth_any = (uint32_t)gp->depth_any; K.margin_any = (uint32_t)gp->margin_any;
     K.ntiles = (uint32_t)nt_touched;
     consts_put();
-    ID3D11ShaderResourceView *srv[5] = {b_ops.srv, b_vram.srv, b_pool.srv, b_tiles.srv, b_bins.srv};
-    ID3D11DeviceContext_CSSetShaderResources(ctx, 0, 5, srv);
+    ID3D11ShaderResourceView *srv[6] = {b_ops.srv, b_vram.srv, b_pool.srv, b_tiles.srv, b_bins.srv, b_hd.srv};
+    ID3D11DeviceContext_CSSetShaderResources(ctx, 0, 6, srv);
     bind_picture();
     ID3D11DeviceContext_CSSetShader(ctx, cs_draw, NULL, 0);
     UINT gx = nt_touched < 32768 ? (UINT)nt_touched : 32768, gy = (UINT)((nt_touched + 32767) / 32768);
@@ -508,6 +569,8 @@ void rgpu_write(const uint16_t *hires, const uint16_t *low, const uint8_t *bare,
 
 #else
 #include "render_gpu.h"
+int rgpu_hd_add(const struct HdImg *im, uint32_t *offset) { (void)im; (void)offset; return 0; }
+void rgpu_hd_reset(void) {}
 int rgpu_init(int scale) { (void)scale; return 0; }
 void rgpu_set_scale(int scale) { (void)scale; }
 void rgpu_draw(const uint32_t *ops, int n, const uint16_t *pool, size_t npool, const uint16_t *vram, const GpuParams *gp) {

@@ -846,7 +846,7 @@ static void menu_build(void) {
     add_item(0, IT_BOOL, "Skip intro", &g_cfg.skip_intro, 0, 1, 1, "Fast-forward the logos and warnings at startup.");
     add_item(1, IT_BOOL, "Fullscreen", &g_cfg.fullscreen, 0, 1, 1, "F11 or Alt+Enter also switches.");
     add_item(1, IT_BOOL, "Graphics card", &g_cfg.graphics_card, 0, 1, 1,
-             "Draw with the graphics card (Direct3D 11): much faster, and resolutions up to 8x. HD texture packs: not yet.");
+             "Draw with the graphics card (Direct3D 11): much faster, and resolutions up to 8x. HD texture packs are supported.");
     add_item(1, IT_SCALE, "Resolution", &g_cfg.resolution_scale, 1, 8, 1,
              "Internal rendering resolution. Higher is sharper and needs a faster PC (above 4x: graphics card).");
     add_item(1, IT_BOOL, "Widescreen (experimental)", &g_cfg.widescreen, 0, 1, 1,
