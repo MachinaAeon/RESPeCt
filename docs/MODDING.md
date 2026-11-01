@@ -131,17 +131,17 @@ and 17 on the PS1 and go there. 31 to 33, the bosses loaded in one piece,
 take all of it too, with these differences:
 
 - their skin (the polygons shared between bones, which keep the body in
-  one piece as it moves) can have its vertices moved but not polygons
-  added; each bone's own polygons can be added or taken away;
+  one piece as it moves) is built again when polygons are added or taken
+  away, each bone's part of it with its own vertices and normals; each
+  bone's own polygons too. New skin polygons can't go on a material that
+  is a sheet of small textures (type 33's: which one they'd use isn't
+  known); moving its vertices is fine;
 - their animations can grow, laid out again after the model (a boss can
   grow by 160 KB in all);
-- their textures are 8-bit pictures, in several copies on the disc (one
-  for each stage they're in): all of them change, with a palette made
-  for the new picture where the texture has a palette row of its own,
-  the nearest of the existing colours where it shares one. Some of the
-  PC's textures were redrawn and aren't on the PS1 disc (one of type 32's,
-  13 of type 33's small ones): those aren't used; the log says how many
-  places each NAB's textures went to.
+- their textures are 8-bit pictures inside their own model (type 33's are
+  17 small ones the PC stretched to powers of two): each changed picture
+  gets a palette made for it (type 33's share one, made for all of
+  them), and the copies of them elsewhere on the disc change too.
 
 ## Music, voices and movies' sound
 

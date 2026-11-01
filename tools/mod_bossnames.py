@@ -2,12 +2,11 @@
 """Where the bosses' textures (enemy types 31-33) are on the PS1 disc.
 
 The PC version's ENEM31-33.NAB have each texture as a picture; on the
-PS1 they are parts of 8-bit TIMs (OBJ.DAT, EV_OBJ.DAT), drawn with one
-of the TIM's palette rows, often in several copies (one for each stage
-the boss is in). This finds, for each of the NAB's textures, every TIM
+PS1 copies of some are also parts of 8-bit TIMs elsewhere (OBJ.DAT,
+EV_OBJ.DAT), drawn with one of the TIM's palette rows. This finds, for each of the NAB's textures, every TIM
 it is a part of, and writes port/src/modfs_boss.h, so a mod's NAB puts
-its textures there (port/src/modfs.c). Some of the PC's are redrawn and
-not on the disc; those aren't listed.
+its textures there too (port/src/modfs.c; the ones the game loads with
+the boss are pictures inside its own model, which modfs.c finds there).
 
 Usage: mod_bossnames.py <the PC version's nab folder> <disc .cue/.bin> [out.h]
 Needs numpy.
