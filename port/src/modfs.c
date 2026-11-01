@@ -2107,14 +2107,192 @@ static uint8_t *enemy_skin(uint8_t *tex, uint32_t nt) {
     return NULL;
 }
 
+/* A boss's shape (types 31-33: one HMD, EV_OBJ.DAT) from its NAB, in
+ * place. Its textured polygons are of two kinds: each bone's own (as the
+ * other enemies', from the unit's header: 4, polygons, vertices,
+ * normals), and the shared skin (type bit 0x1000000; header: 5,
+ * polygons, vertices, a buffer, normals, a buffer) whose vertices each
+ * belong to a bone and are kept in that bone's space. The NAB's
+ * triangles: for each material the skin's, then the bones', each in the
+ * HMD's order (GT4 as two). The skin's corners are in the model's space
+ * in the NAB: back through their bone's rest matrix (the NAB node's 3rd
+ * 4x4 matrix; the bone from the NAB's per-vertex data), z negated. Only
+ * what differs from where the disc's data lands is written. UVs only for
+ * materials with one texture (a material of several small ones keeps the
+ * disc's). NULL, or why not. */
+static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t hw, int *ntri, int *moved, int *keptuv, int *changed) {
+    uint32_t nv = rd32(nab), nf = rd32(nab + 4);
+    uint64_t at = 8 + (uint64_t)nv * 36;
+    if (n < 8 || at + 4 > (uint64_t)n) return "it's cut short";
+    struct { uint32_t page, w, h, nt, bpp; } mat[8];
+    uint32_t nm = rd32(nab + at);
+    at += 4;
+    if (nm > 8) return "it has more materials than this reads";
+    for (uint32_t m = 0; m < nm; m++) {
+        if (at + 352 > (uint64_t)n) return "it's cut short";
+        mat[m].page = rd32(nab + at + 4) & 0x1F;
+        mat[m].nt = rd32(nab + at + 8);
+        uint32_t b = rd32(nab + at + 80);
+        mat[m].bpp = b == 4 || b == 8 ? b : 16;
+        mat[m].w = mat[m].h = 0;
+        at += 352;
+        for (uint32_t t = 0; t < mat[m].nt; t++) {
+            if (at + 16 > (uint64_t)n) return "it's cut short";
+            if (!mat[m].w) { mat[m].w = rd32(nab + at + 8); mat[m].h = rd32(nab + at + 12); }
+            at += 16 + (uint64_t)rd32(nab + at);
+        }
+    }
+    if (at + 4 > (uint64_t)n) return "it's cut short";
+    uint32_t ng = rd32(nab + at);
+    at += 4;
+    for (uint32_t g = 0; g < ng && g < 4096; g++) {
+        if (at + 28 > (uint64_t)n) return "it's cut short";
+        at += 24 + (rd32(nab + at) ? 4 : 0) + 4;
+    }
+    uint64_t aux = at;                           /* per vertex: 15 words, the 1st's top half its bone */
+    at += (uint64_t)nv * 60 + (uint64_t)nf * 20;
+    if (at + 4 > (uint64_t)n) return "it's cut short";
+    uint32_t nq = rd32(nab + at);
+    at += 4;
+    for (uint32_t q = 0; q < nq && q < 256; q++) {
+        if (at + 96 > (uint64_t)n) return "it's cut short";
+        at += 96 + (uint64_t)rd32(nab + at + 12) * 8;
+    }
+    at += 4;                                     /* (a value), then two lists */
+    for (int l = 0; l < 2; l++) {
+        if (at + 4 > (uint64_t)n) return "it's cut short";
+        uint32_t c = rd32(nab + at);
+        at += 4;
+        for (uint32_t e = 0; e < c && e < 65536; e++) {
+            if (at + 12 > (uint64_t)n) return "it's cut short";
+            at += 12 + (uint64_t)rd32(nab + at + 4) * 12;
+        }
+    }
+    at += 12;
+    if (at + 4 > (uint64_t)n) return "it's cut short";
+    uint32_t nnode = rd32(nab + at) + 1;
+    at += 4;
+    uint64_t nodes = at;
+    if (nodes + (uint64_t)nnode * 264 > (uint64_t)n) return "it's cut short";
+#define HW(i) ((uint32_t)(i) < hw ? rd32(h + 4 * (uint32_t)(i)) : 0xFFFFFFFFu)
+    uint8_t *was = malloc((size_t)hw * 4);
+    if (!was) return "out of memory";
+    memcpy(was, h, (size_t)hw * 4);
+    uint32_t tri = 0;
+    *moved = *keptuv = 0;
+    for (uint32_t m = 0; m < nm; m++)
+        for (int shared = 1; shared >= 0; shared--)
+            for (uint32_t bi = 0; bi < HW(3) && bi < 64; bi++)
+                for (uint32_t p = HW(4 + bi), guard = 0; p && p != 0xFFFFFFFFu && guard < 64; p = HW(p), guard++) {
+                    uint32_t nt = HW(p + 2) & 0xFFFF, hdr = HW(p + 1), base = HW(hdr + 1) & 0x7FFFFFFF;
+                    for (uint32_t t = 0; t < nt && t < 4096; t++) {
+                        uint32_t ty = HW(p + 3 + 3 * t), sz = HW(p + 4 + 3 * t), idx = HW(p + 5 + 3 * t);
+                        if ((ty & 0xFF) != 0x0D && (ty & 0xFF) != 0x15) continue;
+                        if (ty & 0xFE000000u || !(ty & 0x1000000) != !shared) continue;
+                        int quad = (ty & 0x10) != 0;
+                        uint32_t vs = HW(hdr + 2) & 0x7FFFFFFF, ns = HW(hdr + (shared ? 4 : 3)) & 0x7FFFFFFF;
+                        for (uint32_t k = 0; k < ((sz >> 16) & 0x7FFF); k++) {
+                            uint32_t w0 = base + idx + k * (quad ? 7 : 6);
+                            if (w0 + 7 > hw) { memcpy(h, was, (size_t)hw * 4); free(was); return "the disc's model isn't laid out as expected"; }
+                            uint8_t *a = h + 4 * w0;
+                            uint32_t pg = (rd32(a + 4) >> 16) & 0x1F, best = nm;
+                            for (uint32_t q = 0; q < nm; q++)
+                                if ((mat[q].page & 0x10) == (pg & 0x10) && (mat[q].page & 0xF) <= (pg & 0xF) &&
+                                    (best == nm || (mat[q].page & 0xF) > (mat[best].page & 0xF)))
+                                    best = q;
+                            if (best != m) continue;
+                            static const int corners[2][3] = {{0, 1, 2}, {3, 2, 1}};
+                            for (int half = 0; half < (quad ? 2 : 1); half++, tri++) {
+                                if (tri >= nv / 3) { memcpy(h, was, (size_t)hw * 4); free(was); return "it has fewer polygons than the PS1's model (for the bosses they can be moved, not added or taken away)"; }
+                                for (int c = 0; c < 3; c++) {
+                                    int corner = corners[half][c];
+                                    uint32_t ni, vi;
+                                    if (!quad) { ni = rd16(a + 12 + 4 * corner); vi = rd16(a + 14 + 4 * corner); }
+                                    else if (!corner) { ni = rd16(a + 10); vi = rd16(a + 14); }
+                                    else { ni = rd16(a + 16 + 4 * (corner - 1)); vi = rd16(a + 18 + 4 * (corner - 1)); }
+                                    if (vs + 2 * vi + 2 > hw || ns + 2 * ni + 2 > hw) { memcpy(h, was, (size_t)hw * 4); free(was); return "the disc's model isn't laid out as expected"; }
+                                    uint32_t ci = 3 * tri + (uint32_t)c;
+                                    float f[9];
+                                    memcpy(f, nab + 8 + (size_t)ci * 36, sizeof f);
+                                    uint8_t *pv = h + 4 * (size_t)vs + 8 * vi, *pn = h + 4 * (size_t)ns + 8 * ni;
+                                    const uint8_t *ov = was + 4 * (size_t)vs + 8 * vi, *on = was + 4 * (size_t)ns + 8 * ni;
+                                    int16_t pos[3], nor[3];
+                                    if (!shared) {
+                                        pos[0] = sat16(f[0]); pos[1] = sat16(f[1]); pos[2] = sat16(-f[2]);
+                                        nor[0] = sat16(f[3]); nor[1] = sat16(f[4]); nor[2] = sat16(-f[5]);
+                                    } else {
+                                        uint32_t bone = rd32(nab + aux + (uint64_t)ci * 60) >> 16;
+                                        if (bone >= nnode) { memcpy(h, was, (size_t)hw * 4); free(was); return "a vertex's bone isn't one of its own"; }
+                                        float M[16];
+                                        memcpy(M, nab + nodes + (uint64_t)bone * 264 + 128, sizeof M);
+                                        /* where the disc's lands: M (x, y, -z) + t; the same for the normal, no t */
+                                        int same_p = 1, same_n = 1;
+                                        for (int r = 0; r < 3; r++) {
+                                            float lp = 0, ln = 0;
+                                            for (int x = 0; x < 3; x++) {
+                                                float sp = (float)(int16_t)rd16(ov + 2 * x), sn = (float)(int16_t)rd16(on + 2 * x);
+                                                if (x == 2) { sp = -sp; sn = -sn; }
+                                                lp += M[4 * r + x] * sp;
+                                                ln += M[4 * r + x] * sn;
+                                            }
+                                            lp += M[4 * r + 3];
+                                            if (lrintf(lp) != lrintf(f[r])) same_p = 0;
+                                            if (lrintf(ln) != lrintf(f[3 + r])) same_n = 0;
+                                        }
+                                        /* back: M^-1 (p - t), z negated */
+                                        double A[9], inv[9];
+                                        for (int x = 0; x < 9; x++) A[x] = M[4 * (x / 3) + x % 3];
+                                        double det = A[0] * (A[4] * A[8] - A[5] * A[7]) - A[1] * (A[3] * A[8] - A[5] * A[6]) + A[2] * (A[3] * A[7] - A[4] * A[6]);
+                                        if (fabs(det) < 1e-9) { memcpy(h, was, (size_t)hw * 4); free(was); return "a bone's rest matrix can't be turned back"; }
+                                        inv[0] = (A[4] * A[8] - A[5] * A[7]) / det; inv[1] = (A[2] * A[7] - A[1] * A[8]) / det; inv[2] = (A[1] * A[5] - A[2] * A[4]) / det;
+                                        inv[3] = (A[5] * A[6] - A[3] * A[8]) / det; inv[4] = (A[0] * A[8] - A[2] * A[6]) / det; inv[5] = (A[2] * A[3] - A[0] * A[5]) / det;
+                                        inv[6] = (A[3] * A[7] - A[4] * A[6]) / det; inv[7] = (A[1] * A[6] - A[0] * A[7]) / det; inv[8] = (A[0] * A[4] - A[1] * A[3]) / det;
+                                        double dp[3] = {f[0] - M[3], f[1] - M[7], f[2] - M[11]};
+                                        for (int r = 0; r < 3; r++) {
+                                            double lp = inv[3 * r] * dp[0] + inv[3 * r + 1] * dp[1] + inv[3 * r + 2] * dp[2];
+                                            double ln = inv[3 * r] * f[3] + inv[3 * r + 1] * f[4] + inv[3 * r + 2] * f[5];
+                                            if (r == 2) { lp = -lp; ln = -ln; }
+                                            pos[r] = same_p ? (int16_t)rd16(ov + 2 * r) : sat16((float)lp);
+                                            nor[r] = same_n ? (int16_t)rd16(on + 2 * r) : sat16((float)ln);
+                                        }
+                                    }
+                                    for (int x = 0; x < 3; x++) {
+                                        if ((int16_t)rd16(ov + 2 * x) != pos[x]) { wr16(pv + 2 * x, (uint16_t)pos[x]); (*moved)++; }
+                                        if ((int16_t)rd16(on + 2 * x) != nor[x]) wr16(pn + 2 * x, (uint16_t)nor[x]);
+                                    }
+                                    if (mat[m].nt != 1) { *keptuv = 1; continue; }
+                                    uint32_t per = 64 * (16 / mat[m].bpp);   /* pixels a texture page is wide */
+                                    long u = lrintf(f[7] * (float)mat[m].w) - (long)per * (long)((pg & 0xF) - (mat[m].page & 0xF));
+                                    long v = lrintf(f[8] * (float)(mat[m].h ? mat[m].h : 256));
+                                    uint8_t nu = (uint8_t)(u < 0 ? 0 : u > 255 ? 255 : u), nv8 = (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v);
+                                    size_t ua = (size_t)(a - h) + 4 * (size_t)corner;
+                                    if (was[ua] != nu) a[4 * corner] = nu;
+                                    if (was[ua + 1] != nv8) a[4 * corner + 1] = nv8;
+                                }
+                            }
+                        }
+                    }
+                }
+#undef HW
+    *ntri = (int)tri;
+    if (tri != nv / 3) {
+        memcpy(h, was, (size_t)hw * 4);
+        free(was);
+        return "it has more polygons than the PS1's model (for the bosses they can be moved, not added or taken away)";
+    }
+    *changed = memcmp(h, was, (size_t)hw * 4) != 0;
+    free(was);
+    return NULL;
+}
+
 /* Types 31 to 33 (the bosses loaded whole: EV_OBJ.DAT 0x190 to 0x192)
  * are one HMD, not packed, with their animation inside: its script and
  * keys where the animation unit's header says (its 4th and 5th words).
  * The NAC's go in place (as many commands and keys as the PS1's), each
  * key where the disc's commands that take it point, 5 words (T, R) or 6
  * (T, R, then a scale of which the PC keeps the 2nd and 3rd, swapped).
- * Their shape is in another form (shared vertices) and their textures
- * are the room's, so from the NAB only its animation tables go in. */
+ * From the NAB its shape (boss_shape) and animation tables; their
+ * textures are the room's. */
 static void enemy_whole(Enemy *e) {
     int fi = disc_index("EV_OBJ.DAT");
     Touched *test = touch(disc_index("TEST.BIN")), *t = touch(fi);
@@ -2183,10 +2361,17 @@ static void enemy_whole(Enemy *e) {
         }
     }
     if (e->data[0]) {
-        const char *why = nab_seqs(e->data[0], e->n[0], h, (hw * 4) | 0x80000000u);
-        if (why) { note("mods: %s: its animation tables: %s: not used", e->what[0], why); nused--; }
-        else note("mods: %s: its animation tables in place of enemy type %d's (its shape and textures aren't taken: "
-                  "type %d's model is in another form, its textures are the room's)", e->what[0], e->type, e->type);
+        int ntri = 0, moved = 0, keptuv = 0, changed = 0;
+        const char *why = boss_shape(e->data[0], e->n[0], h, hw, &ntri, &moved, &keptuv, &changed);
+        if (why) note("mods: %s: its shape: %s: not used", e->what[0], why);
+        else if (changed)
+            note("mods: %s: its shape in place of enemy type %d's (%d polygons; %d vertex coordinates moved%s)", e->what[0], e->type, ntri,
+                 moved, keptuv ? "; its UVs kept: its materials have several textures each" : "");
+        const char *why2 = nab_seqs(e->data[0], e->n[0], h, (hw * 4) | 0x80000000u);
+        if (why2) note("mods: %s: its animation tables: %s: not used", e->what[0], why2);
+        else note("mods: %s: its animation tables in place of enemy type %d's (its textures are the room's: change those there)",
+                  e->what[0], e->type);
+        if (why && why2) nused--;
     }
     if (e->data[2]) { note("mods: %s: enemy type %d's textures are the room's: change those: not used", e->what[2], e->type); nused--; }
 #undef HW

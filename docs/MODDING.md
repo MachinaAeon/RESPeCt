@@ -128,9 +128,11 @@ new animations aren't used unless they take an existing one's place.
 
 **Types.** 0 to 30 take all of the above. The PC's 34 to 37 are types 16
 and 17 on the PS1 and go there. 31 to 33, the bosses loaded in one piece,
-take their animations and tables in place (as many commands and keys as
-the PS1's); their models are in another form (shared vertices) and their
-textures are the room's (change those through the room's files).
+take their shape, animations and tables in place: vertices moved (their
+skin, shared between bones, too), not polygons added, and as many
+commands and keys as the PS1's. Type 33's UVs stay the disc's (its
+materials are sheets of several small textures). Their textures are the
+room's: change those through the room's files.
 
 ## Music, voices and movies' sound
 
