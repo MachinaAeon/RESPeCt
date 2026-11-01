@@ -128,11 +128,20 @@ new animations aren't used unless they take an existing one's place.
 
 **Types.** 0 to 30 take all of the above. The PC's 34 to 37 are types 16
 and 17 on the PS1 and go there. 31 to 33, the bosses loaded in one piece,
-take their shape, animations and tables in place: vertices moved (their
-skin, shared between bones, too), not polygons added, and as many
-commands and keys as the PS1's. Type 33's UVs stay the disc's (its
-materials are sheets of several small textures). Their textures are the
-room's: change those through the room's files.
+take all of it too, with these differences:
+
+- their skin (the polygons shared between bones, which keep the body in
+  one piece as it moves) can have its vertices moved but not polygons
+  added; each bone's own polygons can be added or taken away;
+- their animations can grow, laid out again after the model (a boss can
+  grow by 160 KB in all);
+- their textures are 8-bit pictures, in several copies on the disc (one
+  for each stage they're in): all of them change, with a palette made
+  for the new picture where the texture has a palette row of its own,
+  the nearest of the existing colours where it shares one. Some of the
+  PC's textures were redrawn and aren't on the PS1 disc (one of type 32's,
+  13 of type 33's small ones): those aren't used; the log says how many
+  places each NAB's textures went to.
 
 ## Music, voices and movies' sound
 
@@ -197,6 +206,8 @@ disc image:
   packed archives;
 - `tools/mod_bmpnames.py` (`port/src/modfs_bmp.h`): which BMP is which of
   the disc's pictures (needs numpy);
+- `tools/mod_bossnames.py` (`port/src/modfs_boss.h`): where the
+  bosses' textures are on the disc (needs numpy and the PC's `nab`);
 - `tools/xa_dump.py`: every sound channel as WAV (as `extract` does).
 
 The headless runner (`port/build/.../resurv_headless`) takes `RT_MODS=dir`

@@ -27,6 +27,7 @@
 #include "modfs_pc.h"
 #include "modfs_bmp.h"
 #include "modfs_pack.h"
+#include "modfs_boss.h"
 
 #include <ctype.h>
 #include <stdarg.h>
@@ -71,7 +72,7 @@ static void note(const char *fmt, ...) {
 }
 
 /* Files inside an archive that grow (done once every mod is in). */
-typedef struct { int fi; uint32_t offset, size, orig; uint8_t *data; char what[300]; } Grow;
+typedef struct { int fi; uint32_t offset, size, orig, cap; uint8_t *data; char what[300]; } Grow;   /* cap: its own limit (0: its kind's) */
 static Grow grows[256];
 static int ngrows;
 static uint32_t vnext;                           /* sectors used past the end of the disc */
@@ -237,6 +238,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
                 g->offset = modfs_pc[i].offset;
                 g->size = (uint32_t)n;
                 g->orig = modfs_pc[i].size;
+                g->cap = 0;
                 g->data = d;
                 snprintf(g->what, sizeof g->what, "%s/%s", mod, rel);
                 nused++;
@@ -439,6 +441,7 @@ static void grow_all(void) {
             for (int g = gi; g < ngrows; g++)       /* (the last mod wins) */
                 if (grows[g].fi == fi && grows[g].offset == start && (grows[g].orig + 2047) / 2048 * 2048 == len) whole = &grows[g];
             if (whole) {
+                if (whole->cap) room = whole->cap;
                 newlen = (whole->size + 2047) & ~2047u;
                 if (newlen < len) newlen = len;   /* as it was, if it fits */
                 if (newlen > room) {
@@ -1369,6 +1372,7 @@ static void packs_done(void) {
                 g->offset = p->start;
                 g->size = at;
                 g->orig = p->len;
+                g->cap = 0;
                 g->data = out;
                 snprintf(g->what, sizeof g->what, "%s", p->what);
             } else
@@ -1738,7 +1742,7 @@ static const char *nab_shape(const uint8_t *nab, long n, uint8_t *B, uint32_t nb
  * measured leaves 213 KB). */
 #define MODEL_GROWTH (48u * 1024)
 
-typedef struct { uint32_t page, w, h; } NabMat;
+typedef struct { uint32_t page, w, h, per; } NabMat;   /* per: pixels a texture page is wide (64 at 16 bits, 128 at 8) */
 typedef struct { uint32_t start, count, node, mat; } NabGroup;   /* mat ~0u: untextured */
 
 /* The NAB's materials and groups; NULL, or why not. */
@@ -1752,6 +1756,7 @@ static const char *nab_layout(const uint8_t *nab, long n, NabMat *mat, uint32_t 
         if (at + 352 > (uint64_t)n) return "it's cut short";
         uint32_t ntx = rd32(nab + at + 8);
         mat[m].page = rd32(nab + at + 4) & 0x1F;
+        { uint32_t d = nab[at + 92]; mat[m].per = d == 8 ? 128 : d == 4 ? 256 : 64; }   /* (its first texture's depth) */
         mat[m].w = mat[m].h = 0;
         at += 352;
         for (uint32_t t = 0; t < ntx; t++) {
@@ -1920,7 +1925,7 @@ static uint8_t *nab_rebuild(const uint8_t *nab, long n, const uint8_t *B, uint32
                     v[c] = lrintf(f[8] * (float)hm2);
                     if (u[c] < lo) lo = u[c];
                 }
-                long off = lo < 0 ? 0 : lo / 64;     /* the texture page from where its UVs start */
+                long off = lo < 0 ? 0 : lo / (long)mm->per;   /* the texture page from where its UVs start */
                 if ((mm->page & 0xF) + off > 15) off = 15 - (mm->page & 0xF);
                 /* its place: the first free run it fits in, else after the end */
                 uint32_t pw = quad ? 7 : 6, at = 0, run = 0;
@@ -1934,7 +1939,7 @@ static uint8_t *nab_rebuild(const uint8_t *nab, long n, const uint8_t *B, uint32
                 uint8_t *pk = H + 4 * (size_t)at;
                 memset(pk, 0, 4 * pw);
                 for (int c = 0; c < nc; c++) {
-                    long uu = u[c] - 64 * off, vv = v[c];
+                    long uu = u[c] - (long)mm->per * off, vv = v[c];
                     pk[4 * c] = (uint8_t)(uu < 0 ? 0 : uu > 255 ? 255 : uu);
                     pk[4 * c + 1] = (uint8_t)(vv < 0 ? 0 : vv > 255 ? 255 : vv);
                 }
@@ -1959,7 +1964,7 @@ static uint8_t *nab_rebuild(const uint8_t *nab, long n, const uint8_t *B, uint32
         uint32_t uw = 3 + 3 * nt, unit = hn;
         hn += uw;
         uint8_t *u8 = H + 4 * (size_t)unit;
-        wr32(u8, 0xFFFFFFFFu);
+        wr32(u8, p && p != 0xFFFFFFFFu ? HW(p) : 0xFFFFFFFFu);   /* (the block's next unit, if it had one) */
         wr32(u8 + 4, p && p != 0xFFFFFFFFu ? HW(p + 1) : hdr);
         wr32(u8 + 8, 0x80000000u | nt);
         uint32_t e = 12;
@@ -2117,14 +2122,25 @@ static uint8_t *enemy_skin(uint8_t *tex, uint32_t nt) {
  * HMD's order (GT4 as two). The skin's corners are in the model's space
  * in the NAB: back through their bone's rest matrix (the NAB node's 3rd
  * 4x4 matrix; the bone from the NAB's per-vertex data), z negated. Only
- * what differs from where the disc's data lands is written. UVs only for
- * materials with one texture (a material of several small ones keeps the
- * disc's). NULL, or why not. */
-static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t hw, int *ntri, int *moved, int *keptuv, int *changed) {
+ * what differs from where the disc's data lands is written. A material
+ * that is a sheet of small textures (type 33's) has each one's place in
+ * the page in its record, and the NAB's UVs count from it, in its used
+ * size; a polygon's texture is the one the disc's UVs are in. NULL, or
+ * why not. */
+static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t hw, int skin_only, int *ntri, int *moved, int *keptuv,
+                              int *changed) {
+    static NabMat nmat[8];
+    static NabGroup grp[256];
+    uint32_t nmg = 0, ng = 0;
+    const char *bad = nab_layout(nab, n, nmat, &nmg, grp, &ng);
+    if (bad) return bad;
+    uint32_t gi[8][65], go[8][65];              /* each (material, node)'s next group and how far into it */
+    memset(gi, 0, sizeof gi);
+    memset(go, 0, sizeof go);
     uint32_t nv = rd32(nab), nf = rd32(nab + 4);
     uint64_t at = 8 + (uint64_t)nv * 36;
     if (n < 8 || at + 4 > (uint64_t)n) return "it's cut short";
-    struct { uint32_t page, w, h, nt, bpp; } mat[8];
+    struct { uint32_t page, w, h, nt, bpp; int32_t rect[10][4]; } mat[8];   /* rect: a sheet's textures (u, v, w, h in the page) */
     uint32_t nm = rd32(nab + at);
     at += 4;
     if (nm > 8) return "it has more materials than this reads";
@@ -2132,9 +2148,17 @@ static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t h
         if (at + 352 > (uint64_t)n) return "it's cut short";
         mat[m].page = rd32(nab + at + 4) & 0x1F;
         mat[m].nt = rd32(nab + at + 8);
-        uint32_t b = rd32(nab + at + 80);
+        uint32_t b = nab[at + 92];               /* its first texture's depth */
         mat[m].bpp = b == 4 || b == 8 ? b : 16;
         mat[m].w = mat[m].h = 0;
+        for (uint32_t t = 0; t < mat[m].nt && t < 10; t++) {   /* each texture's place: VRAM x, y, depth, used width, height */
+            uint32_t x = rd16(nab + at + 12 + 2 * t), y = rd16(nab + at + 52 + 2 * t), d = nab[at + 92 + t];
+            d = d == 4 || d == 8 ? d : 16;
+            mat[m].rect[t][0] = (int32_t)((x - (mat[m].page & 0xF) * 64) * (16 / d));
+            mat[m].rect[t][1] = (int32_t)(y - ((mat[m].page >> 4) & 1) * 256);
+            mat[m].rect[t][2] = (int32_t)rd32(nab + at + 192 + 4 * t);
+            mat[m].rect[t][3] = (int32_t)rd32(nab + at + 272 + 4 * t);
+        }
         at += 352;
         for (uint32_t t = 0; t < mat[m].nt; t++) {
             if (at + 16 > (uint64_t)n) return "it's cut short";
@@ -2143,9 +2167,9 @@ static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t h
         }
     }
     if (at + 4 > (uint64_t)n) return "it's cut short";
-    uint32_t ng = rd32(nab + at);
+    uint32_t ng2 = rd32(nab + at);
     at += 4;
-    for (uint32_t g = 0; g < ng && g < 4096; g++) {
+    for (uint32_t g = 0; g < ng2 && g < 4096; g++) {
         if (at + 28 > (uint64_t)n) return "it's cut short";
         at += 24 + (rd32(nab + at) ? 4 : 0) + 4;
     }
@@ -2178,7 +2202,7 @@ static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t h
     uint8_t *was = malloc((size_t)hw * 4);
     if (!was) return "out of memory";
     memcpy(was, h, (size_t)hw * 4);
-    uint32_t tri = 0;
+    uint32_t tri = 0, used = 0;
     *moved = *keptuv = 0;
     for (uint32_t m = 0; m < nm; m++)
         for (int shared = 1; shared >= 0; shared--)
@@ -2201,9 +2225,19 @@ static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t h
                                     (best == nm || (mat[q].page & 0xF) > (mat[best].page & 0xF)))
                                     best = q;
                             if (best != m) continue;
+                            if (skin_only && !shared) continue;
                             static const int corners[2][3] = {{0, 1, 2}, {3, 2, 1}};
-                            for (int half = 0; half < (quad ? 2 : 1); half++, tri++) {
-                                if (tri >= nv / 3) { memcpy(h, was, (size_t)hw * 4); free(was); return "it has fewer polygons than the PS1's model (for the bosses they can be moved, not added or taken away)"; }
+                            uint32_t node = shared ? 0 : bi;
+                            for (int half = 0; half < (quad ? 2 : 1); half++) {
+                                /* the NAB's next triangle of this material and node */
+                                while (gi[m][node] < ng && (grp[gi[m][node]].mat != m || grp[gi[m][node]].node != node ||
+                                                            go[m][node] >= grp[gi[m][node]].count)) {
+                                    gi[m][node]++;
+                                    go[m][node] = 0;
+                                }
+                                if (gi[m][node] >= ng) { memcpy(h, was, (size_t)hw * 4); free(was); return "it has fewer polygons than the PS1's model (for the bosses' skin they can be moved, not added or taken away)"; }
+                                tri = grp[gi[m][node]].start + go[m][node]++;
+                                used++;
                                 for (int c = 0; c < 3; c++) {
                                     int corner = corners[half][c];
                                     uint32_t ni, vi;
@@ -2260,10 +2294,26 @@ static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t h
                                         if ((int16_t)rd16(ov + 2 * x) != pos[x]) { wr16(pv + 2 * x, (uint16_t)pos[x]); (*moved)++; }
                                         if ((int16_t)rd16(on + 2 * x) != nor[x]) wr16(pn + 2 * x, (uint16_t)nor[x]);
                                     }
-                                    if (mat[m].nt != 1) { *keptuv = 1; continue; }
-                                    uint32_t per = 64 * (16 / mat[m].bpp);   /* pixels a texture page is wide */
-                                    long u = lrintf(f[7] * (float)mat[m].w) - (long)per * (long)((pg & 0xF) - (mat[m].page & 0xF));
-                                    long v = lrintf(f[8] * (float)(mat[m].h ? mat[m].h : 256));
+                                    long u, v;
+                                    if (mat[m].nt > 1) {     /* a sheet: the texture the disc's UVs are in, the NAB's counted in it */
+                                        uint32_t nc = quad ? 4 : 3, tx = 10;
+                                        for (uint32_t q = 0; q < mat[m].nt && q < 10 && tx == 10; q++) {
+                                            int in = 1;
+                                            for (uint32_t cc = 0; cc < nc && in; cc++) {
+                                                int32_t ou = was[(size_t)(a - h) + 4 * cc], ov8 = was[(size_t)(a - h) + 4 * cc + 1];
+                                                in = ou >= mat[m].rect[q][0] && ou <= mat[m].rect[q][0] + mat[m].rect[q][2] &&
+                                                     ov8 >= mat[m].rect[q][1] && ov8 <= mat[m].rect[q][1] + mat[m].rect[q][3];
+                                            }
+                                            if (in) tx = q;
+                                        }
+                                        if (tx == 10) { *keptuv = 1; continue; }
+                                        u = mat[m].rect[tx][0] + lrintf(f[7] * (float)mat[m].rect[tx][2]);
+                                        v = mat[m].rect[tx][1] + lrintf(f[8] * (float)mat[m].rect[tx][3]);
+                                    } else {
+                                        uint32_t per = 64 * (16 / mat[m].bpp);   /* pixels a texture page is wide */
+                                        u = lrintf(f[7] * (float)mat[m].w) - (long)per * (long)((pg & 0xF) - (mat[m].page & 0xF));
+                                        v = lrintf(f[8] * (float)(mat[m].h ? mat[m].h : 256));
+                                    }
                                     uint8_t nu = (uint8_t)(u < 0 ? 0 : u > 255 ? 255 : u), nv8 = (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v);
                                     size_t ua = (size_t)(a - h) + 4 * (size_t)corner;
                                     if (was[ua] != nu) a[4 * corner] = nu;
@@ -2274,16 +2324,229 @@ static const char *boss_shape(const uint8_t *nab, long n, uint8_t *h, uint32_t h
                     }
                 }
 #undef HW
-    *ntri = (int)tri;
-    if (tri != nv / 3) {
+    *ntri = (int)used;
+    uint32_t want = 0;
+    for (uint32_t g = 0; g < ng; g++) if (grp[g].mat != ~0u && (!skin_only || !grp[g].node)) want += grp[g].count;
+    if (used != want) {
         memcpy(h, was, (size_t)hw * 4);
         free(was);
-        return "it has more polygons than the PS1's model (for the bosses they can be moved, not added or taken away)";
+        return "it has more polygons than the PS1's model (for the bosses' skin they can be moved, not added or taken away)";
     }
     *changed = memcmp(h, was, (size_t)hw * 4) != 0;
     free(was);
     return NULL;
 }
+
+/* A boss's textures (types 31-33) from its NAB: each of the NAB's that is
+ * on the disc (modfs_boss.h) goes into the part of the 8-bit TIM it is,
+ * in every copy of it. A palette row only that texture is drawn with is
+ * made again for it (median cut); a shared one keeps its colours, the
+ * nearest taken. Pixels as the disc's stay as they were; see-through
+ * where the NAB's alpha is 0. The number of textures written, or -1 and
+ * why. */
+static int boss_textures(int type, const uint8_t *nab, long n, const char **why) {
+    /* the NAB's textures, by material and number */
+    struct { uint32_t mat, tex, w, h; const uint8_t *px; } tx[64];
+    uint32_t ntx = 0;
+    uint64_t at = 8 + (uint64_t)rd32(nab) * 36;
+    if (n < 8 || at + 4 > (uint64_t)n) { *why = "it's cut short"; return -1; }
+    uint32_t nm = rd32(nab + at);
+    at += 4;
+    for (uint32_t m = 0; m < nm && m < 64; m++) {
+        if (at + 352 > (uint64_t)n) { *why = "it's cut short"; return -1; }
+        uint32_t nt = rd32(nab + at + 8);
+        at += 352;
+        for (uint32_t t = 0; t < nt; t++) {
+            if (at + 16 > (uint64_t)n) { *why = "it's cut short"; return -1; }
+            uint32_t size = rd32(nab + at), W = rd32(nab + at + 8), H = rd32(nab + at + 12);
+            if (at + 16 + size > (uint64_t)n || (uint64_t)W * H * 2 > size) { *why = "it's cut short"; return -1; }
+            if (ntx < 64) tx[ntx++] = (typeof(tx[0])){m, t, W, H, nab + at + 16};
+            at += 16 + (uint64_t)size;
+        }
+    }
+    /* the TIMs as they are on the disc (checked before any is changed) */
+    int ok[sizeof modfs_boss / sizeof modfs_boss[0]];
+    uint8_t *tim[sizeof modfs_boss / sizeof modfs_boss[0]];
+    Touched *test = touch(disc_index("TEST.BIN"));
+    for (size_t i = 0; i < sizeof modfs_boss / sizeof modfs_boss[0]; i++) {
+        ok[i] = 0;
+        tim[i] = NULL;
+        if (modfs_boss[i].type != type || !test) continue;
+        int fi = disc_index(modfs_boss[i].disc);
+        Touched *t = touch(fi);
+        uint32_t tab = archive_table(fi);
+        if (!t || !tab) continue;
+        uint32_t start = rd32(test->data + tab - TEST_BASE + 4 * modfs_boss[i].block) * 2048 + modfs_boss[i].offset;
+        if (start + modfs_boss[i].len > t->nsec * 2048) continue;
+        tim[i] = t->data + start;
+        ok[i] = (uint32_t)mz_crc32(0, tim[i], modfs_boss[i].len) == modfs_boss[i].crc;
+    }
+    int done = 0;
+    for (size_t i = 0; i < sizeof modfs_boss / sizeof modfs_boss[0]; i++) {
+        if (!ok[i]) continue;
+        const typeof(tx[0]) *src = NULL;
+        for (uint32_t k = 0; k < ntx; k++)
+            if (tx[k].mat == (uint32_t)modfs_boss[i].mat && tx[k].tex == (uint32_t)modfs_boss[i].tex) src = &tx[k];
+        uint32_t w = modfs_boss[i].w, h = modfs_boss[i].h;
+        if (!src || src->w < w || src->h < h) continue;
+        uint8_t *t8 = tim[i];
+        uint32_t cw = rd16(t8 + 16), chs = rd16(t8 + 18);
+        uint8_t *row = t8 + 20 + 2 * (size_t)cw * modfs_boss[i].row, *pix = t8 + 8 + rd32(t8 + 8);
+        uint32_t tw = rd16(pix + 8) * 2, th = rd16(pix + 10);
+        if (cw != 256 || modfs_boss[i].row >= chs || modfs_boss[i].x + w > tw || modfs_boss[i].y + h > th) continue;
+        uint8_t *idx = pix + 12;
+        /* the NAB's pixels (15-bit, 0 see-through), and whether any differs from the disc's */
+        uint16_t *col = malloc((size_t)w * h * 2);
+        if (!col) continue;
+        int differs = 0;
+        size_t opaque = 0;
+        for (uint32_t y = 0; y < h; y++)
+            for (uint32_t x = 0; x < w; x++) {
+                uint16_t p = (uint16_t)rd16(src->px + 2 * ((size_t)y * src->w + x));
+                uint16_t v = (uint16_t)(((p >> 10) & 31) | ((p >> 5) & 31) << 5 | (p & 31) << 10);
+                uint8_t was = idx[(size_t)(modfs_boss[i].y + y) * tw + modfs_boss[i].x + x];
+                uint16_t wc = (uint16_t)(rd16(row + 2 * was) & 0x7FFF);
+                if (v == wc) { col[y * w + x] = 0x8000 | was; continue; }   /* as it was: its own index (top bit) */
+                if (!(p & 0x8000)) v = 0;
+                else if (!v) v = 0x0400;
+                col[y * w + x] = v;
+                differs = 1;
+                opaque += v != 0;
+            }
+        if (!differs) { free(col); continue; }
+        uint16_t pal[256];
+        for (int k = 0; k < 256; k++) pal[k] = (uint16_t)(rd16(row + 2 * k) & 0x7FFF);
+        if (modfs_boss[i].own) {                 /* a palette made for the new picture: index 0 see-through */
+            uint16_t *list = malloc((opaque + w * h + 1) * 2);
+            size_t m = 0;
+            for (uint32_t k = 0; list && k < w * h; k++) {
+                uint16_t c = col[k] & 0x8000 ? pal[col[k] & 0xFF] : col[k];
+                if (c) list[m++] = c;
+            }
+            int got = list && m ? median_cut(list, m, pal + 1, 255) : 0;
+            free(list);
+            pal[0] = 0;
+            for (int k = 1 + got; k < 256; k++) pal[k] = 0;
+            uint16_t stp = 0;
+            for (int k = 0; k < 256; k++) if (rd16(row + 2 * k) & 0x8000) stp = 0x8000;
+            for (uint32_t k = 0; k < w * h; k++)
+                if (col[k] & 0x8000) col[k] = (uint16_t)(rd16(row + 2 * (col[k] & 0xFF)) & 0x7FFF);   /* (by colour now) */
+            for (int k = 0; k < 256; k++) wr16(row + 2 * k, pal[k] ? (uint16_t)(pal[k] | stp) : 0);
+        }
+        int clear = -1;
+        for (int k = 0; k < 256 && clear < 0; k++) if (!pal[k]) clear = k;
+        for (uint32_t y = 0; y < h; y++)
+            for (uint32_t x = 0; x < w; x++) {
+                uint16_t c = col[y * w + x];
+                int ix = c & 0x8000 ? (int)(c & 0xFF) : c ? nearest(pal, 256, c) : (clear >= 0 ? clear : nearest(pal, 256, 0x0400));
+                idx[(size_t)(modfs_boss[i].y + y) * tw + modfs_boss[i].x + x] = (uint8_t)ix;
+            }
+        free(col);
+        done++;
+    }
+    return done;
+}
+
+/* Whether the NAB has the boss's polygons, material by material, skin and
+ * each bone's: 1 the same, 0 another number of the bones' (they're built
+ * again), -1 another number of the skin's. */
+static int boss_same_layout(const uint8_t *nab, long n, const uint8_t *h, uint32_t hw) {
+    static NabMat mat[8];
+    static NabGroup grp[256];
+    uint32_t nm = 0, ng = 0;
+    if (nab_layout(nab, n, mat, &nm, grp, &ng)) return -1;
+#define HW(i) ((uint32_t)(i) < hw ? rd32(h + 4 * (uint32_t)(i)) : 0xFFFFFFFFu)
+    static uint32_t ps1[8][65], pc[8][65];
+    memset(ps1, 0, sizeof ps1);
+    memset(pc, 0, sizeof pc);
+    for (uint32_t bi = 0; bi < HW(3) && bi < 64; bi++)
+        for (uint32_t p = HW(4 + bi), guard = 0; p && p != 0xFFFFFFFFu && guard < 64; p = HW(p), guard++) {
+            uint32_t nt = HW(p + 2) & 0xFFFF, base = HW(HW(p + 1) + 1) & 0x7FFFFFFF;
+            for (uint32_t t = 0; t < nt && t < 4096; t++) {
+                uint32_t ty = HW(p + 3 + 3 * t), sz = HW(p + 4 + 3 * t), idx = HW(p + 5 + 3 * t);
+                if (((ty & 0xFF) != 0x0D && (ty & 0xFF) != 0x15) || ty & 0xFE000000u) continue;
+                int quad = (ty & 0x10) != 0, shared = (ty & 0x1000000) != 0;
+                for (uint32_t k = 0; k < ((sz >> 16) & 0x7FFF); k++) {
+                    uint32_t pg = (HW(base + idx + k * (quad ? 7 : 6) + 1) >> 16) & 0x1F, best = nm;
+                    for (uint32_t q = 0; q < nm; q++)
+                        if ((mat[q].page & 0x10) == (pg & 0x10) && (mat[q].page & 0xF) <= (pg & 0xF) &&
+                            (best == nm || (mat[q].page & 0xF) > (mat[best].page & 0xF)))
+                            best = q;
+                    if (best < nm) ps1[best][shared ? 0 : bi] += quad ? 2 : 1;
+                }
+            }
+        }
+#undef HW
+    for (uint32_t g = 0; g < ng; g++)
+        if (grp[g].mat != ~0u && grp[g].node < 65 && grp[g].mat < 8) pc[grp[g].mat][grp[g].node] += grp[g].count;
+    for (uint32_t m = 0; m < 8; m++)
+        if (ps1[m][0] != pc[m][0]) return -1;
+    return !memcmp(ps1, pc, sizeof ps1);
+}
+
+/* The bones' polygons of a boss built again from its NAB: nab_rebuild on a
+ * model made of the HMD and its bones' vertices and normals (the first
+ * bone unit's header: 4, polygons, vertices, normals, coordinates); the
+ * new vertices and normals and a copy of that header pointing at them go
+ * after the new HMD's end, and the rebuilt units take that header. The
+ * new HMD (malloc'd) and its words, or NULL and why. */
+static uint8_t *boss_rebuild(const uint8_t *nab, long n, const uint8_t *h, uint32_t hw, uint32_t *outw, int *ntri, const char **why) {
+#define HW(i) ((uint32_t)(i) < hw ? rd32(h + 4 * (uint32_t)(i)) : 0xFFFFFFFFu)
+    uint32_t hdr = 0;
+    for (uint32_t bi = 0; bi < HW(3) && bi < 64 && !hdr; bi++)
+        for (uint32_t p = HW(4 + bi), guard = 0; p && p != 0xFFFFFFFFu && guard < 64 && !hdr; p = HW(p), guard++) {
+            uint32_t ty = HW(p + 3);
+            if (((ty & 0xFF) == 0x0D || (ty & 0xFF) == 0x15) && !(ty & 0xFF000000u) && HW(HW(p + 1)) == 4) hdr = HW(p + 1);
+        }
+    *why = "the disc's model isn't laid out as expected";
+    if (!hdr) return NULL;
+    uint32_t vs = HW(hdr + 2) & 0x7FFFFFFF, ns = HW(hdr + 3) & 0x7FFFFFFF, ve = hw, ne = hw;
+    for (uint32_t w = HW(2); w < hw && w < HW(2) + 256; w++) {   /* each section ends where the next one starts */
+        uint32_t v = HW(w);
+        if (!(v & 0x80000000u) || v == 0xFFFFFFFFu) continue;
+        v &= 0x7FFFFFFF;
+        if (v > vs && v < ve) ve = v;
+        if (v > ns && v < ne) ne = v;
+    }
+    if (vs >= ve || ns >= ne || ve > hw || ne > hw) return NULL;
+    uint32_t nS = (ve - vs) / 2, nN = (ne - ns) / 2, b0n = 8 + 8 * (nS + nN), nb = 12 + b0n + hw * 4;
+    uint8_t *B = malloc(nb);
+    if (!B) { *why = "out of memory"; return NULL; }
+    wr32(B, 2); wr32(B + 4, 12); wr32(B + 8, 12 + b0n);
+    wr32(B + 12, 2); wr32(B + 16, 2 + nS * 2);
+    memcpy(B + 20, h + 4 * (size_t)vs, (size_t)nS * 8);
+    memcpy(B + 20 + (size_t)nS * 8, h + 4 * (size_t)ns, (size_t)nN * 8);
+    memcpy(B + 12 + b0n, h, (size_t)hw * 4);
+    uint32_t nn = 0;
+    uint8_t *RB = nab_rebuild(nab, n, B, nb, 0, &nn, ntri, why);
+    free(B);
+    if (!RB) return NULL;
+    uint32_t o0 = rd32(RB + 4), o1 = rd32(RB + 8), vb = o0 + rd32(RB + o0) * 4, nb2 = o0 + rd32(RB + o0 + 4) * 4;
+    uint32_t cs = (nb2 - vb) / 8, cn = (o1 - nb2) / 8, hw2 = (nn - o1) / 4, hn = HW(hdr) + 1;
+    uint32_t total = hw2 + 2 * cs + 2 * cn + hn;
+    uint8_t *H = malloc((size_t)total * 4);
+    if (!H) { free(RB); *why = "out of memory"; return NULL; }
+    memcpy(H, RB + o1, (size_t)hw2 * 4);
+    uint32_t sv = hw2, sn = hw2 + 2 * cs, sh = sn + 2 * cn;
+    memcpy(H + 4 * (size_t)sv, RB + vb, (size_t)cs * 8);
+    memcpy(H + 4 * (size_t)sn, RB + nb2, (size_t)cn * 8);
+    for (uint32_t k = 0; k < hn; k++) wr32(H + 4 * (size_t)(sh + k), HW(hdr + k));
+    wr32(H + 4 * (size_t)(sh + 2), 0x80000000u | sv);
+    wr32(H + 4 * (size_t)(sh + 3), 0x80000000u | sn);
+    for (uint32_t bi = 0; bi < HW(3) && bi < 64; bi++) {   /* the rebuilt units take the new header */
+        uint32_t p = rd32(H + 4 * (4 + bi));
+        if (p != HW(4 + bi) && p && p < hw2 && rd32(H + 4 * (size_t)(p + 1)) == hdr) wr32(H + 4 * (size_t)(p + 1), sh);
+    }
+    free(RB);
+#undef HW
+    *outw = total;
+    *why = NULL;
+    return H;
+}
+
+/* How much a boss (one in its room) can grow by when its animations are
+ * laid out again after its model's end (the disc's stay where they were). */
+#define BOSS_GROWTH (160u * 1024)
 
 /* Types 31 to 33 (the bosses loaded whole: EV_OBJ.DAT 0x190 to 0x192)
  * are one HMD, not packed, with their animation inside: its script and
@@ -2313,31 +2576,40 @@ static void enemy_whole(Enemy *e) {
         return;
     }
     uint32_t hdr = HW(unit + 1), sc = HW(hdr + 3) & 0x7FFFFFFF, ky = HW(hdr + 4) & 0x7FFFFFFF;
+    uint8_t *extra = NULL;                       /* script and keys laid out again, to go after the HMD's end */
+    uint32_t extra_w = 0, extra_sc = 0;
     if (e->data[1]) {
         const uint8_t *nac = e->data[1];
         long n = e->n[1];
         uint32_t nk = n >= 8 ? rd32(nac) : 0, nc = 0;
+        uint32_t size = e->type == 31 ? 5 : 6;  /* a key's words: T, R (and a scale, for 32 and 33) */
         const char *why = NULL;
         if (!nk || (uint64_t)nk * 112 + 8 > (uint64_t)n) why = "it's cut short";
         else {
             nc = rd32(nac + 4 + (size_t)nk * 112);
             if (4 + (uint64_t)nk * 112 + 4 + (uint64_t)nc * 8 != (uint64_t)n) why = "it's cut short or has more after it";
-            else if (sc + nc > ky || ky >= hw) why = "it has other commands than the PS1's (for this type they can only be changed)";
+            else if (ky >= hw || sc > ky) why = "the disc's animations aren't laid out as expected";
         }
-        /* where each key is: from the disc's commands that take it, the key's size from their steps */
-        uint32_t *at = why ? NULL : malloc(nk * 4), size = 5;
+        const uint8_t *cmd = nac + 4 + (size_t)nk * 112 + 4;
+        /* in place when the script is as long as the disc's and each key the NAC's commands take is one
+         * the disc's commands at the same places take; else laid out again */
+        uint32_t *at = why ? NULL : malloc(nk * 4);
         if (!why && !at) why = "out of memory";
+        int again = 0;
         if (!why) {
             memset(at, 0xFF, nk * 4);
-            uint32_t prev = ~0u;
-            for (uint32_t i = 1; i < nc; i++) {
-                uint32_t key = rd32(nac + 4 + (size_t)nk * 112 + 4 + 8 * i + 4), w = HW(sc + i);
-                if (key == 0xFFFFFFFFu || key >= nk) continue;
-                at[key] = w & 0xFFFF;
-                if (prev != ~0u && (w & 0xFFFF) == prev + 6) size = 6;
-                prev = w & 0xFFFF;
+            again = nc != ky - sc;
+            for (uint32_t i = 1; i < nc && !again; i++) {
+                uint32_t key = rd32(cmd + 8 * i + 4);
+                if (key == 0xFFFFFFFFu) continue;
+                if (key >= nk) { again = 1; break; }
+                at[key] = HW(sc + i) & 0xFFFF;
             }
-            for (uint32_t i = 0; i < nc; i++) wr32(h + 4 * (sc + i), rd32(nac + 4 + (size_t)nk * 112 + 4 + 8 * i));
+            for (uint32_t k = 0; k < nk && !again; k++)
+                if (at[k] == 0xFFFFFFFFu) again = 1;
+        }
+        if (!why && !again) {
+            for (uint32_t i = 0; i < nc; i++) wr32(h + 4 * (sc + i), rd32(cmd + 8 * i));
             for (uint32_t k = 0; k < nk; k++) {
                 if (at[k] == 0xFFFFFFFFu || ky + at[k] + size > hw) continue;
                 uint8_t *q = h + 4 * (ky + at[k]);
@@ -2353,27 +2625,137 @@ static void enemy_whole(Enemy *e) {
                     wr16(q + 20, (uint16_t)(int16_t)lrintf(v[2]));
                 }
             }
-            free(at);
             note("mods: %s: its animations in place of enemy type %d's", e->what[1], e->type);
-        } else {
+        } else if (!why) {
+            /* laid out again: the script, then the keys in the NAC's order (a command's key at index x size);
+             * a key that kept its values takes the disc's "unchanged" channels and first scale value */
+            uint32_t keys = nk;                  /* (the bosses' commands take every key of their NAC, the last too) */
+            if (keys * size > 0xFFFF) why = "it has more keys than the PS1's commands can point at";
+            else if ((nc + keys * size) * 4 > BOSS_GROWTH) why = "its animations laid out again would take more than the 160 KB a boss can grow by";
+            else if (!e->data[0]) why = "it has other commands or keys than the PS1's, and the NAB that says where each animation starts isn't in the mod";
+            else {
+                extra_w = nc + keys * size;
+                extra = calloc(extra_w, 4);
+                uint32_t *find = malloc(32768 * 4);
+                if (!extra || !find) { free(extra); free(find); extra = NULL; why = "out of memory"; }
+                else {
+                    memset(find, 0xFF, 32768 * 4);
+                    uint32_t region = hw - ky < 13107 * size ? (hw - ky) / size : 13107;
+                    for (uint32_t k = 0; k < region; k++) {
+                        const uint8_t *q = h + 4 * (ky + k * size);
+                        uint32_t hsh = 0;
+                        for (int c = 0; c < 3; c++) hsh = hsh * 31 + (rd32(q + 4 * c) == 0x7FFFFFFFu ? 0 : rd32(q + 4 * c));
+                        for (int c = 0; c < 3; c++) hsh = hsh * 31 + rd16(q + 12 + 2 * c);
+                        for (hsh &= 32767; find[hsh] != 0xFFFFFFFFu; hsh = (hsh + 1) & 32767) {}
+                        find[hsh] = k;
+                    }
+                    for (uint32_t i = 0; i < nc && !why; i++) {
+                        uint32_t w = rd32(cmd + 8 * i), key = rd32(cmd + 8 * i + 4);
+                        if (i && key != 0xFFFFFFFFu) {
+                            if (key >= keys) { why = "a command takes a key it doesn't have"; break; }
+                            w = (w & 0xFFFF0000u) | (key * size);
+                        }
+                        wr32(extra + 4 * i, w);
+                    }
+                    for (uint32_t k = 0; k < keys && !why; k++) {
+                        float v[12];
+                        memcpy(v, nac + 4 + (size_t)k * 112, sizeof v);
+                        uint8_t *q = extra + 4 * (nc + k * size);
+                        int32_t t3[3];
+                        uint16_t r3[3];
+                        uint32_t hsh = 0;
+                        for (int c = 0; c < 3; c++) { t3[c] = (int32_t)lrintf(v[9 + c]); hsh = hsh * 31 + (uint32_t)t3[c]; }
+                        for (int c = 0; c < 3; c++) { r3[c] = (uint16_t)(int16_t)lrintf(v[5 + c]); hsh = hsh * 31 + r3[c]; }
+                        const uint8_t *was = NULL;
+                        for (hsh &= 32767; find[hsh] != 0xFFFFFFFFu && !was; hsh = (hsh + 1) & 32767) {
+                            const uint8_t *o = h + 4 * (ky + find[hsh] * size);
+                            int same = 1;
+                            for (int c = 0; c < 3 && same; c++)
+                                same = (rd32(o + 4 * c) == 0x7FFFFFFFu ? 0 : (int32_t)rd32(o + 4 * c)) == t3[c] && rd16(o + 12 + 2 * c) == r3[c];
+                            if (same) was = o;
+                        }
+                        for (int c = 0; c < 3; c++) {
+                            wr32(q + 4 * c, (uint32_t)(was && rd32(was + 4 * c) == 0x7FFFFFFFu && t3[c] == 0 ? 0x7FFFFFFF : t3[c]));
+                            wr16(q + 12 + 2 * c, r3[c]);
+                        }
+                        if (size == 6) {
+                            wr16(q + 18, was ? rd16(was + 18) : 4096);
+                            wr16(q + 20, (uint16_t)(int16_t)lrintf(v[2]));
+                            wr16(q + 22, (uint16_t)(int16_t)lrintf(v[1]));
+                        }
+                    }
+                    free(find);
+                    extra_sc = nc;
+                    if (why) { free(extra); extra = NULL; }
+                }
+            }
+            if (!why) note("mods: %s: its animations in place of enemy type %d's (laid out again after the model: %u commands, %u keys)",
+                           e->what[1], e->type, nc, nk);
+        }
+        free(at);
+        if (why) {
             note("mods: %s: %s: not used", e->what[1], why);
             nused--;
         }
     }
+    uint8_t *cur = h;                            /* the HMD the rest goes into: the disc's, or one built again */
+    uint32_t curw = hw;
     if (e->data[0]) {
-        int ntri = 0, moved = 0, keptuv = 0, changed = 0;
-        const char *why = boss_shape(e->data[0], e->n[0], h, hw, &ntri, &moved, &keptuv, &changed);
+        int ntri = 0, moved = 0, keptuv = 0, changed = 0, same = boss_same_layout(e->data[0], e->n[0], h, hw);
+        const char *why = NULL;
+        if (same == 0) {                         /* the bones' polygons added or taken away */
+            uint32_t nw = 0;
+            int nt2 = 0;
+            uint8_t *nh = boss_rebuild(e->data[0], e->n[0], h, hw, &nw, &nt2, &why);
+            if (nh) {
+                cur = nh;
+                curw = nw;
+                models_grown = 1;
+                note("mods: %s: its bones' polygons built again (%d triangles; the model %u -> %u bytes)", e->what[0], nt2, hw * 4, nw * 4);
+            } else
+                note("mods: %s: its bones' polygons: %s: not used", e->what[0], why);
+            why = NULL;
+        }
+        if (same < 0) why = "its skin (the polygons shared between bones) has polygons added or taken away: they can be moved, not added";
+        else why = boss_shape(e->data[0], e->n[0], cur, curw, cur != h, &ntri, &moved, &keptuv, &changed);
         if (why) note("mods: %s: its shape: %s: not used", e->what[0], why);
         else if (changed)
-            note("mods: %s: its shape in place of enemy type %d's (%d polygons; %d vertex coordinates moved%s)", e->what[0], e->type, ntri,
-                 moved, keptuv ? "; its UVs kept: its materials have several textures each" : "");
-        const char *why2 = nab_seqs(e->data[0], e->n[0], h, (hw * 4) | 0x80000000u);
+            note("mods: %s: its %s in place of enemy type %d's (%d polygons; %d vertex coordinates moved%s)", e->what[0],
+                 cur != h ? "skin" : "shape", e->type, ntri, moved, keptuv ? "; some UVs kept: they weren't in one of its textures" : "");
+        const char *why2 = nab_seqs(e->data[0], e->n[0], cur, (curw * 4) | 0x80000000u);
         if (why2) note("mods: %s: its animation tables: %s: not used", e->what[0], why2);
-        else note("mods: %s: its animation tables in place of enemy type %d's (its textures are the room's: change those there)",
-                  e->what[0], e->type);
+        else note("mods: %s: its animation tables in place of enemy type %d's", e->what[0], e->type);
+        const char *why3 = NULL;
+        int nt = boss_textures(e->type, e->data[0], e->n[0], &why3);
+        if (nt < 0) note("mods: %s: its textures: %s: not used", e->what[0], why3);
+        else if (nt) note("mods: %s: its textures in place of enemy type %d's (%d places on the disc; the ones the PC redrew aren't on it)",
+                          e->what[0], e->type, nt);
         if (why && why2) nused--;
     }
-    if (e->data[2]) { note("mods: %s: enemy type %d's textures are the room's: change those: not used", e->what[2], e->type); nused--; }
+    if (e->data[2]) { note("mods: %s: give enemy type %d's textures in its NAB: not used", e->what[2], e->type); nused--; }
+    if (extra || cur != h) {
+        uint8_t *nh = malloc((size_t)(curw + extra_w) * 4);
+        if (nh && ngrows < (int)(sizeof grows / sizeof grows[0])) {
+            memcpy(nh, cur, (size_t)curw * 4);
+            if (extra) {
+                memcpy(nh + 4 * (size_t)curw, extra, (size_t)extra_w * 4);
+                wr32(nh + 4 * (hdr + 3), 0x80000000u | curw);          /* where the script and the keys start now */
+                wr32(nh + 4 * (hdr + 4), 0x80000000u | (curw + extra_sc));
+            }
+            Grow *g = &grows[ngrows++];
+            g->fi = fi;
+            g->offset = start;
+            g->size = (curw + extra_w) * 4;
+            g->orig = hw * 4;
+            g->cap = (hw * 4 + BOSS_GROWTH + 2047) & ~2047u;
+            models_grown = 1;                    /* (the log says if a room's memory comes near its end) */
+            g->data = nh;
+            snprintf(g->what, sizeof g->what, "%s", extra ? e->what[1] : e->what[0]);
+        } else
+            free(nh);
+        free(extra);
+        if (cur != h) free(cur);
+    }
 #undef HW
 }
 
