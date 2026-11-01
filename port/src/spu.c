@@ -535,6 +535,19 @@ static void mix_sample(void) {
         vcr = cr;
         if (cnt & 4) { rl += cl; rr += cr; }
     }
+    {                                                         /* a mod's music (modfs.c): as the sequences' voices, after the main volume */
+        void modfs_music(int32_t *l, int32_t *r);
+        int32_t ml, mr;
+        modfs_music(&ml, &mr);
+        if ((cnt & 0xC000) == 0xC000) {
+            ml = ml * vol_reg(0x180) >> 15;
+            mr = mr * vol_reg(0x182) >> 15;
+            l += ml;
+            r += mr;
+            vcl += ml;
+            vcr += mr;
+        }
+    }
     /* reverb at half rate (22.05 kHz): the input is the average of two
      * samples and the output goes linearly from one result to the next,
      * instead of skipping / repeating samples (which adds a harsh hiss). */

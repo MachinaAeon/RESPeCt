@@ -18,16 +18,20 @@
  * game code (the game runs translated, from what it read) can't be
  * replaced, nor streams whole; their sound goes by channel instead:
  * X/BGM_32.STR/05.wav is what the game plays from that file's channel 5
- * (music, voices, a movie's sound), sample for sample in step with the
- * disc's, so loops, cuts and the end stay the game's; and their pictures
- * by frame: M/OPENING.STR/0042.png is shown when the game shows that
- * stream's frame 42. What is and isn't used is in the log. */
+ * (music, voices, a movie's sound; the PC version's wav/Scene05_1.wav and
+ * the like by their PC names, modfs_wav.h), sample for sample in step
+ * with the disc's, so loops, cuts and the end stay the game's; and their
+ * pictures by frame: M/OPENING.STR/0042.png is shown when the game shows
+ * that stream's frame 42. The sound banks go by sound (NOISE/012/03.wav),
+ * the rooms' music by sequence (NOISE/236/music1.seq, or .wav for a
+ * recording). What is and isn't used is in the log. */
 #include "rt.h"
 #include "disc_ids.h"
 #include "modfs_pc.h"
 #include "modfs_bmp.h"
 #include "modfs_pack.h"
 #include "modfs_boss.h"
+#include "modfs_wav.h"
 
 #include <ctype.h>
 #include <stdarg.h>
@@ -130,6 +134,8 @@ static Touched *touch_lba(uint32_t lba, uint32_t nsec, const char *name) {
 }
 
 static int sound_apply(const char *mod, const char *rel, const char *up, const char *path);
+static int sfx_apply(const char *mod, const char *rel, const char *up, const char *path);
+static void sfx_done(void);
 static int movie_apply(const char *mod, const char *rel, const char *up, const char *path);
 static int bmp_apply(const char *mod, const char *rel, const char *up, const char *path);
 static int enemy_apply(const char *mod, const char *rel, const char *up, const char *path);
@@ -151,22 +157,25 @@ static uint8_t *load(const char *path, long *n) {
 
 /* The archives whose files can grow, besides the stages' (B/STGBGn.BIN):
  * where KERNEL.BIN keeps their place on the disc (CdlLOC) and TEST.BIN
- * their block table (the first sector of each block, then the end). A
- * block can grow to the biggest of its kind the game itself loads (kinds:
- * the block's number modulo `kinds`), or to `cap`: the doors' are by
- * turns a door's model, loaded below 0x80150000 (room_change.c), and its
- * data at 0x80150000; the effects' blocks (shot_effects.c) all go to one
- * buffer; an enemy's block (OBJ.DAT, type 30's in EV_OBJ.DAT) is read
- * into 0x800F8000 and unpacked from there (room_loader.c), as big as the
- * biggest of them (type 18's, 93 sectors). OBJ.DAT's table has copies in
- * many of the game's modules (the overlays each have theirs): `copies`
- * has every copy found in them changed too. */
+ * their block table (the first sector of each block, then the end; the
+ * sound banks', NOISE.BIN's, is in KERNEL.BIN). A block can grow to the
+ * biggest of its kind the game itself loads (kinds: the block's number
+ * modulo `kinds`), or to `cap`: the doors' are by turns a door's model,
+ * loaded below 0x80150000 (room_change.c), and its data at 0x80150000;
+ * the effects' blocks (shot_effects.c) all go to one buffer; an enemy's
+ * block (OBJ.DAT, type 30's in EV_OBJ.DAT) is read into 0x800F8000 and
+ * unpacked from there (room_loader.c), as big as the biggest of them
+ * (type 18's, 93 sectors); a room's sound set (NOISE.BIN: its bank and
+ * music) is read where the room's block is (room_sound.c). OBJ.DAT's
+ * table has copies in many of the game's modules (the overlays each have
+ * theirs): `copies` has every copy found in them changed too. */
 static const struct { const char *name; uint32_t loc, tab, kinds, cap; int copies; } archives[] = {
     {"B/DOORANM.BIN", 0x8005857Cu, 0x800A42F4u, 2, 0, 0},
     {"EFFECTX.BIN", 0x80058544u, 0x800A6F1Cu, 1, 0, 0},
     {"OBJ.DAT", 0x80058530u, 0x800A0CD8u, 1, 93u * 2048, 1},
     {"EV_OBJ.DAT", 0x80058534u, 0x800A195Cu, 1, 93u * 2048, 1},
     {"ITEMDAT.DAT", 0x8005855Cu, 0x800A3EDCu, 1, 0, 1},
+    {"NOISE.BIN", 0x80058510u, 0x80058D2Cu, 1, 142u * 2048, 0},
 };
 
 static int can_grow(const char *disc) {
@@ -259,6 +268,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
     if (bmp_apply(mod, rel, up, path)) return;
     if (enemy_apply(mod, rel, up, path)) return;
     if (pack_apply(mod, rel, up, path)) return;
+    if (sfx_apply(mod, rel, up, path)) return;
     if (sound_apply(mod, rel, up, path)) return;
     if (movie_apply(mod, rel, up, path)) return;
     note("mods: %s/%s: not a file of the disc or of the PC version's PSX_DATA: not used", mod, rel);
@@ -372,12 +382,15 @@ static void grow_all(void) {
         Touched *t = touch(fi);
         const char *base = strrchr(disc_files[fi].name, '/') + 1;
         /* its block table, from TEST.BIN's list of the stages' files */
-        uint32_t tab = 0, nb = 0, loc = 0, kinds = 1, fixed = 0;
+        uint32_t tab = 0, nb = 0, loc = 0, kinds = 1, fixed = 0, tbase = TEST_BASE;
         int copies = 0;
         static uint32_t v[1024];
+        Touched *tf = test;                      /* the file the table is in */
         for (size_t k = 0; k < sizeof archives / sizeof archives[0]; k++)
             if (!strcasecmp(disc_files[fi].name, archives[k].name)) {
-                tab = archives[k].tab - TEST_BASE;
+                if (archives[k].tab < TEST_BASE && (tf = touch(disc_index("KERNEL.BIN")))) tbase = rd32(tf->data + 0x18) - 0x800;
+                if (!tf) tf = test;
+                tab = archives[k].tab - tbase;
                 loc = archives[k].loc;
                 kinds = archives[k].kinds;
                 fixed = archives[k].cap;
@@ -393,9 +406,9 @@ static void grow_all(void) {
                 loc = rd32(test->data + STAGE_LOCS + 4 * k - TEST_BASE);
             }
         }
-        if (tab && tab < test->nsec * 2048 - 4096) {
+        if (tab && tab < tf->nsec * 2048 - 4096) {
             for (nb = 0; nb < 1023; nb++) {
-                v[nb] = rd32(test->data + tab + 4 * nb);
+                v[nb] = rd32(tf->data + tab + 4 * nb);
                 if (nb && v[nb] < v[nb - 1]) { nb = 0; break; }
                 if (nb && v[nb] == t->nsec) break;
             }
@@ -508,7 +521,7 @@ static void grow_all(void) {
         }
         uint8_t was[4096], now[4096];               /* the table, for saves made before (modfs_state_loaded) */
         uint32_t tn = 4 * (nb + 1) <= sizeof was ? 4 * (nb + 1) : 0;
-        if (tn) memcpy(was, test->data + tab, tn);
+        if (tn) memcpy(was, tf->data + tab, tn);
         if (copies) {                            /* the table's copies in the game's modules */
             int found = 0;
             for (size_t m = 0; m < sizeof disc_files / sizeof disc_files[0]; m++) {
@@ -529,10 +542,10 @@ static void grow_all(void) {
             if (memcmp(v, nv, 4 * (nb + 1)))
                 note("mods: %s: its block table changed in TEST.BIN and %d copies", disc_files[fi].name, found);
         }
-        for (uint32_t b = 0; b <= nb; b++) wr32(test->data + tab + 4 * b, nv[b]);   /* the block table */
+        for (uint32_t b = 0; b <= nb; b++) wr32(tf->data + tab + 4 * b, nv[b]);   /* the block table */
         if (tn) {
-            memcpy(now, test->data + tab, tn);
-            ram_fix(TEST_BASE + tab, was, now, tn);
+            memcpy(now, tf->data + tab, tn);
+            ram_fix(tbase + tab, was, now, tn);
             if (copies) ram_fix(0, was, now, tn);
         }
         free(t->data);
@@ -600,37 +613,60 @@ static int16_t *wav_load(const uint8_t *d, long n, uint32_t rate, uint32_t *fram
     return pcm;
 }
 
-/* X/BGM_32.STR/05.wav: channel 5 of that stream. */
+/* X/BGM_32.STR/05.wav: channel 5 of that stream; wav/Scene05_1.wav (the
+ * PC's name): the channel it is. */
 static int sound_apply(const char *mod, const char *rel, const char *up, const char *path) {
     const char *sl = strrchr(up, '/');
     if (!sl || strcasecmp(up + strlen(up) - 4, ".WAV")) return 0;
     char stream[512];
-    snprintf(stream, sizeof stream, "%.*s", (int)(sl - up), up);
+    long chan = -1;
+    for (size_t i = 0; i < sizeof modfs_wav / sizeof modfs_wav[0]; i++)
+        if (!strcmp(modfs_wav[i].pc, up)) {
+            snprintf(stream, sizeof stream, "%s", modfs_wav[i].stream);
+            chan = modfs_wav[i].chan;
+        }
+    if (chan < 0) snprintf(stream, sizeof stream, "%.*s", (int)(sl - up), up);
     int fi = disc_index(stream);
     if (fi < 0 || !strstr(stream, ".STR")) return 0;
     char *end;
-    long chan = strtol(sl + 1, &end, 10);
-    if (end == sl + 1 || strcasecmp(end, ".WAV") || chan < 0 || chan > 31) {
+    if (chan < 0 && ((chan = strtol(sl + 1, &end, 10)), end == sl + 1 || strcasecmp(end, ".WAV") || chan < 0 || chan > 31)) {
         note("mods: %s/%s: name it by the channel's number (00.wav to 31.wav): not used", mod, rel);
         return 1;
     }
-    /* the channel's sectors, in order, and how they're coded */
+    /* the channel's sectors, in order, and how they're coded (each stream read once: which channel
+     * each of its sectors is, 0xFF not sound, and its coding byte) */
+    static struct { int fi; uint8_t *chan, *coding; } scans[16];
+    static int nscans;
     uint32_t lba = disc_files[fi].lba, nsec = (disc_files[fi].size + 2047) / 2048, count = 0, rate = 0, per = 0;
+    int si = 0;
+    while (si < nscans && scans[si].fi != fi) si++;
+    if (si == nscans) {
+        if (nscans == 16) { free(scans[0].chan); free(scans[0].coding); memmove(scans, scans + 1, sizeof scans[0] * 15); nscans--; si = nscans; }
+        scans[si].fi = fi;
+        scans[si].chan = malloc(nsec);
+        scans[si].coding = malloc(nsec);
+        uint8_t sec[2352];
+        disc_only = 1;
+        for (uint32_t k = 0; scans[si].chan && scans[si].coding && k < nsec; k++) {
+            scans[si].chan[k] = 0xFF;
+            if (!cd_read_sector_raw(lba + k, sec) || sec[15] != 2 || !(sec[18] & 0x04) || sec[17] >= 32) continue;
+            scans[si].chan[k] = sec[17];
+            scans[si].coding[k] = sec[19];
+        }
+        disc_only = 0;
+        nscans++;
+    }
     int32_t *index = malloc(nsec * sizeof *index);
-    uint8_t sec[2352];
-    disc_only = 1;
-    for (uint32_t k = 0; index && k < nsec; k++) {
+    for (uint32_t k = 0; index && scans[si].chan && k < nsec; k++) {
         index[k] = -1;
-        if (!cd_read_sector_raw(lba + k, sec)) continue;
-        if (sec[15] != 2 || !(sec[18] & 0x04) || sec[17] != chan) continue;
+        if (scans[si].chan[k] != chan) continue;
         index[k] = (int32_t)count++;
         if (!rate) {
-            uint8_t c = sec[19];
+            uint8_t c = scans[si].coding[k];
             rate = (c >> 2) & 1 ? 18900 : 37800;
             per = (((c >> 4) & 3) == 1 ? 4 : 8) * 28 * 18 / ((c & 3) == 1 ? 2 : 1);
         }
     }
-    disc_only = 0;
     if (!count) {
         note("mods: %s/%s: %s has no sound on channel %ld: not used", mod, rel, stream, chan);
         free(index);
@@ -683,6 +719,542 @@ int modfs_xa(uint32_t lba, const uint8_t *s) {
         return 1;
     }
     return 0;
+}
+
+/* ------------------------------------------------------------ sound effects */
+
+/* The sound effects (and the instruments the music plays) are the sound
+ * banks in NOISE.BIN. Its blocks (KERNEL.BIN's table at 0x80058D2C: the
+ * first sector of each, then the end) are each [n, n offsets]: a bank's
+ * attributes (VAB header) at the first, its waveforms (SPU ADPCM, one
+ * after another, their sizes in the header) at the last, a room's music
+ * (sequences) in between. NOISE/012/03.wav is waveform 3 of block 12,
+ * and of every other bank that has the very same one (many share their
+ * sounds), at the rate its tones play it at note 60 (centre note C, fine
+ * tune s: 44100 * 2^((60 - C + s/128) / 12)). A bank goes whole into the
+ * sound chip's memory (512 KB, shared with the other banks open), so it
+ * can't grow: a sound can be longer than the original by what the mods'
+ * other sounds for that bank leave free. It ends, or repeats, as the
+ * original did (from the WAV's own loop start if it has one, a smpl
+ * chunk; else from the original's). */
+#define NOISE_TABLE 0x80058D2Cu
+
+typedef struct { uint32_t block, vag; uint8_t *wav; long n; int places, cut, bad; double secs; uint32_t rate; char what[600]; } Sfx;   /* cut: in how many banks */
+static Sfx *sfxs;
+static int nsfx;
+
+/* A bank in NOISE.BIN: its block (at, n bytes), header and body (offsets in the block), programs, waveforms, their size table. */
+typedef struct { uint32_t at, n, vh, body, ps, vs, tab; } Bank;
+
+static int bank_at(const uint8_t *d, uint32_t at, uint32_t n, Bank *b) {
+    if (n < 16) return 0;
+    uint32_t c = rd32(d + at);
+    if (c < 2 || c > 8 || 4 + 4 * c > n) return 0;
+    uint32_t vh = rd32(d + at + 4), body = rd32(d + at + 4 * c);
+    if (vh != 4 + 4 * c || vh + 32 > n || memcmp(d + at + vh, "pBAV", 4) || body > n) return 0;
+    uint32_t ps = rd16(d + at + vh + 18), vs = rd16(d + at + vh + 22), tab = vh + 32 + 2048 + 512 * ps;
+    if (ps > 128 || vs > 255 || tab + 512 > body) return 0;
+    uint64_t sum = 0;
+    for (uint32_t i = 1; i <= vs; i++) sum += rd16(d + at + tab + 2 * i) * 8u;
+    if (body + sum > n) return 0;
+    *b = (Bank){at, n, vh, body, ps, vs, tab};
+    return 1;
+}
+
+static uint32_t vag_size(const uint8_t *d, const Bank *b, uint32_t v) { return rd16(d + b->at + b->tab + 2 * v) * 8u; }
+static uint32_t vag_off(const uint8_t *d, const Bank *b, uint32_t v) {   /* in NOISE.BIN */
+    uint32_t o = b->at + b->body;
+    for (uint32_t i = 1; i < v; i++) o += vag_size(d, b, i);
+    return o;
+}
+
+/* The rate waveform v plays at, by the first tone that uses it. */
+static uint32_t vag_rate(const uint8_t *d, const Bank *b, uint32_t v) {
+    const uint8_t *tone = d + b->at + b->vh + 32 + 2048;
+    for (uint32_t k = 0; k < 16 * b->ps; k++, tone += 32)
+        if (rd16(tone + 22) == v) return (uint32_t)(44100.0 * pow(2.0, (60.0 - tone[4] + tone[5] / 128.0) / 12.0) + 0.5);
+    return 22050;
+}
+
+/* A waveform's blocks (16 bytes, 28 samples each): a silent one before
+ * the sound (lead), the sound (its last flagged "end", 1; "repeat", 2, if
+ * it loops, its loop start flagged 4, from), and what's after (tail: the
+ * silent block a sound that doesn't loop ends in). */
+typedef struct { uint32_t lead, data, tail, loop, from; } Shape;
+static Shape vag_shape(const uint8_t *v, uint32_t nb) {
+    static const uint8_t zero[16];
+    Shape s = {0, 0, 0, 0, 0};
+    s.lead = nb > 1 && !memcmp(v, zero, 16);
+    uint32_t j = s.lead;
+    while (j + 1 < nb && !(v[16 * j + 1] & 1)) j++;
+    s.data = j + 1 - s.lead;
+    s.tail = nb - 1 - j;
+    s.loop = !s.tail && (v[16 * j + 1] & 2);
+    for (uint32_t k = s.lead; k <= j; k++)
+        if (v[16 * k + 1] & 4) { s.from = k - s.lead; break; }
+    return s;
+}
+
+static int16_t *vag_decode(const uint8_t *v, uint32_t nb) {   /* every block's 28 samples */
+    static const int pos[5] = {0, 60, 115, 98, 122}, neg[5] = {0, 0, -52, -55, -60};
+    int16_t *o = malloc((size_t)nb * 28 * 2 + 2);
+    int32_t h0 = 0, h1 = 0;
+    for (uint32_t k = 0; o && k < nb; k++) {
+        const uint8_t *b = v + 16 * k;
+        int shift = b[0] & 15, f = (b[0] >> 4) & 7;
+        if (f > 4) f = 0;
+        if (shift > 12) shift = 9;
+        for (int i = 0; i < 28; i++) {
+            int n = (b[2 + i / 2] >> ((i & 1) * 4)) & 15;
+            int32_t s = (((n & 8 ? n - 16 : n) * 4096) >> shift) + ((h0 * pos[f] + h1 * neg[f] + 32) >> 6);
+            s = s < -32768 ? -32768 : s > 32767 ? 32767 : s;
+            h1 = h0;
+            h0 = s;
+            o[28 * k + i] = (int16_t)s;
+        }
+    }
+    return o;
+}
+
+/* 28 samples as one block (flags left 0): of the five filters and the
+ * steps that fit, the one closest to them as the SPU decodes it; h: the
+ * last two samples decoded, moved on. */
+static void adpcm_block(const int16_t *x, int32_t h[2], uint8_t out[16]) {
+    static const int pos[5] = {0, 60, 115, 98, 122}, neg[5] = {0, 0, -52, -55, -60};
+    int64_t best = -1;
+    int32_t b0 = h[0], b1 = h[1];
+    for (int f = 0; f < 5; f++) {
+        int32_t p0 = h[0], p1 = h[1], peak = 0;
+        for (int i = 0; i < 28; i++) {
+            int32_t r = x[i] - ((p0 * pos[f] + p1 * neg[f] + 32) >> 6);
+            if (r < 0) r = -r;
+            if (r > peak) peak = r;
+            p1 = p0;
+            p0 = x[i];
+        }
+        int s0 = 0;
+        while (s0 < 12 && peak > (7 << s0)) s0++;
+        for (int s = s0; s <= s0 + 1 && s <= 12; s++) {
+            uint8_t t[16] = {(uint8_t)(f << 4 | (12 - s)), 0};
+            int32_t g0 = h[0], g1 = h[1];
+            int64_t err = 0;
+            for (int i = 0; i < 28; i++) {
+                int32_t pr = (g0 * pos[f] + g1 * neg[f] + 32) >> 6, q = (x[i] - pr + ((1 << s) >> 1)) >> s;
+                q = q < -8 ? -8 : q > 7 ? 7 : q;
+                int32_t v = q * (1 << s) + pr;
+                v = v < -32768 ? -32768 : v > 32767 ? 32767 : v;
+                err += (int64_t)(x[i] - v) * (x[i] - v);
+                g1 = g0;
+                g0 = v;
+                t[2 + i / 2] |= (uint8_t)((q & 15) << ((i & 1) * 4));
+            }
+            if (best < 0 || err < best) { best = err; memcpy(out, t, 16); b0 = g0; b1 = g1; }
+        }
+    }
+    h[0] = b0;
+    h[1] = b1;
+}
+
+/* A WAV's rate and its first loop's start (a smpl chunk), -1 none. */
+static int64_t wav_loop(const uint8_t *d, long n, uint32_t *rate) {
+    int64_t from = -1;
+    *rate = 0;
+    for (long o = 12; o + 8 <= n;) {
+        uint32_t len = rd32(d + o + 4);
+        if (!memcmp(d + o, "fmt ", 4) && o + 16 <= n) *rate = rd32(d + o + 12);
+        if (!memcmp(d + o, "smpl", 4) && len >= 60 && o + 8 + 60 <= n && rd32(d + o + 8 + 28)) from = rd32(d + o + 8 + 44);
+        o += 8 + len + (len & 1);
+    }
+    return from;
+}
+
+static uint32_t noise_banks(Touched *t, uint32_t *v, Bank **bk);
+static int music_apply(const char *mod, const char *rel, unsigned blk, unsigned part, const char *path);
+
+/* NOISE/012/music1.seq: a room's sound set's first sequence (its music),
+ * as the disc has it (pQES), in its place; bigger, its block laid out
+ * again (grow_all). */
+static int seq_apply(const char *mod, const char *rel, unsigned blk, unsigned part, const char *path) {
+    int fi = disc_index("NOISE.BIN");
+    Touched *t = touch(fi);
+    static uint32_t v[1024];
+    Bank *bk = NULL;
+    uint32_t nb = noise_banks(t, v, &bk), c = 0, at = 0, len = 0;
+    if (blk < nb && bk[blk].vs) {
+        at = v[blk] * 2048;
+        c = rd32(t->data + at);
+    }
+    free(bk);
+    if (part < 1 || part + 2 > c) {
+        note("mods: %s/%s: NOISE.BIN's block %u has no music %u: not used", mod, rel, blk, part);
+        return 1;
+    }
+    uint32_t off = rd32(t->data + at + 4 + 4 * part);
+    len = rd32(t->data + at + 8 + 4 * part) - off;
+    long n = 0;
+    uint8_t *d = load(path, &n);
+    if (!d || n < 16 || memcmp(d, "pQES", 4)) {
+        note("mods: %s/%s: %s: not used", mod, rel, d ? "not a sequence (pQES)" : "couldn't read it");
+        free(d);
+        return 1;
+    }
+    if ((uint32_t)n <= len) {
+        memset(t->data + at + off, 0, len);
+        memcpy(t->data + at + off, d, (size_t)n);
+        free(d);
+        note("mods: %s/%s: into NOISE.BIN block %u (%ld bytes)", mod, rel, blk, n);
+        nused++;
+        return 1;
+    }
+    if (ngrows == (int)(sizeof grows / sizeof grows[0])) {
+        note("mods: %s/%s: too many files growing: not used", mod, rel);
+        free(d);
+        return 1;
+    }
+    Grow *g = &grows[ngrows++];
+    *g = (Grow){fi, at + off, (uint32_t)n, len, 0, d, ""};
+    snprintf(g->what, sizeof g->what, "%s/%s", mod, rel);
+    nused++;
+    return 1;
+}
+
+/* NOISE/012/03.wav: waveform 3 of NOISE.BIN's block 12 (done once every mod is in). */
+static int sfx_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    if (strncmp(up, "NOISE/", 6)) return 0;
+    unsigned blk, vag;
+    char rest[8] = "";
+    long n = 0;
+    if (sscanf(up + 6, "%u/MUSIC%u%7s", &blk, &vag, rest) == 3 && !strcmp(rest, ".SEQ")) return seq_apply(mod, rel, blk, vag, path);
+    if (sscanf(up + 6, "%u/MUSIC%u%7s", &blk, &vag, rest) == 3 && !strcmp(rest, ".WAV")) return music_apply(mod, rel, blk, vag, path);
+    if (sscanf(up + 6, "%u/%u%7s", &blk, &vag, rest) != 3 || strcmp(rest, ".WAV")) {
+        note("mods: %s/%s: name it by the bank's block and the sound's number (NOISE/012/03.wav), or a room's music (NOISE/240/music1.seq or .wav): not used", mod, rel);
+        return 1;
+    }
+    uint8_t *d = load(path, &n);
+    Sfx *s = d ? realloc(sfxs, (size_t)(nsfx + 1) * sizeof *sfxs) : NULL;
+    if (!s) { free(d); note("mods: %s/%s: couldn't read it", mod, rel); return 1; }
+    sfxs = s;
+    s = &sfxs[nsfx++];
+    memset(s, 0, sizeof *s);
+    s->block = blk;
+    s->vag = vag;
+    s->wav = d;
+    s->n = n;
+    snprintf(s->what, sizeof s->what, "%s/%s", mod, rel);
+    nused++;
+    return 1;
+}
+
+/* A waveform anew from sound s (mono, at its rate), in at most room
+ * bytes, shaped as the original (onb blocks); the bytes written. */
+static uint32_t sfx_encode(Sfx *s, const int16_t *pcm, uint32_t frames, uint32_t rate, const uint8_t *orig, uint32_t onb, uint32_t room, uint8_t *out) {
+    Shape sh = vag_shape(orig, onb);
+    uint32_t want = frames ? (frames + 27) / 28 : 1, cap = room / 16 > sh.lead + sh.tail ? room / 16 - sh.lead - sh.tail : 1;
+    if (want > cap) { want = cap; s->cut++; }
+    uint32_t rs;
+    int64_t from = wav_loop(s->wav, s->n, &rs);
+    uint32_t lf = from >= 0 && rs ? (uint32_t)((uint64_t)from * rate / rs / 28) : sh.from;
+    if (lf >= want) lf = 0;
+    uint8_t *o = out;
+    if (sh.lead) { memset(o, 0, 16); o += 16; }
+    int32_t h[2] = {0, 0};
+    int16_t x[28];
+    for (uint32_t k = 0; k < want; k++, o += 16) {
+        for (uint32_t i = 0; i < 28; i++) x[i] = 28 * k + i < frames ? pcm[28 * k + i] : 0;
+        adpcm_block(x, h, o);
+        o[1] = sh.loop ? 2 : 0;
+        if (k == (sh.loop ? lf : 0)) o[1] |= 4;
+        if (k == want - 1) o[1] |= 1;
+    }
+    memcpy(o, orig + 16 * (onb - sh.tail), 16 * sh.tail);
+    o += 16 * sh.tail;
+    double secs = (double)(want * 28 < frames ? want * 28 : frames) / rate;
+    if (secs > s->secs) s->secs = secs;
+    if (!s->rate) s->rate = rate;
+    return (uint32_t)(o - out);
+}
+
+/* NOISE.BIN's table of blocks (KERNEL.BIN's), and its banks: the number of blocks, 0 if not found. */
+static uint32_t noise_banks(Touched *t, uint32_t *v, Bank **bk) {
+    Touched *kern = touch(disc_index("KERNEL.BIN"));
+    uint32_t nb = 0, ko = kern ? NOISE_TABLE - rd32(kern->data + 0x18) + 0x800 : 0;
+    for (; t && kern && nb < 1023 && ko + 4 * nb + 4 <= kern->nsec * 2048; nb++) {
+        v[nb] = rd32(kern->data + ko + 4 * nb);
+        if (nb && v[nb] < v[nb - 1]) break;
+        if (nb && v[nb] == t->nsec) break;
+    }
+    if (!t || !kern || !nb || v[0] || v[nb] != t->nsec || !(*bk = calloc(nb, sizeof **bk))) return 0;
+    for (uint32_t b = 0; b < nb; b++)
+        if (v[b + 1] == v[b] || !bank_at(t->data, v[b] * 2048, (v[b + 1] - v[b]) * 2048, &(*bk)[b])) (*bk)[b].vs = 0;
+    return nb;
+}
+
+/* The sounds into their banks. */
+static void sfx_done(void) {
+    if (!nsfx) return;
+    Touched *t = touch(disc_index("NOISE.BIN"));
+    static uint32_t v[1024];
+    Bank *bk = NULL;
+    uint32_t nb = noise_banks(t, v, &bk);
+    uint32_t *base = nb ? calloc(nb + 1, sizeof *base) : NULL;
+    for (uint32_t b = 0; base && b < nb; b++) base[b + 1] = base[b] + bk[b].vs + 1;
+    int *who = base ? malloc(sizeof *who * (base[nb] + 1)) : NULL;
+    if (!who) {
+        for (int i = 0; i < nsfx; i++) { note("mods: %s: NOISE.BIN's table of banks wasn't found: not used", sfxs[i].what); nused--; }
+        nb = 0;
+    }
+    uint8_t *d = t ? t->data : NULL;
+    for (uint32_t k = 0; who && k <= base[nb]; k++) who[k] = -1;
+    /* which sound each waveform gets: the copies of the one a mod names, then the one it names (a later mod wins) */
+    for (int pass = 0; who && pass < 2; pass++)
+        for (int i = 0; i < nsfx; i++) {
+            Sfx *s = &sfxs[i];
+            if (s->block >= nb || !bk[s->block].vs || s->vag < 1 || s->vag > bk[s->block].vs) {
+                if (pass) { note("mods: %s: NOISE.BIN has no bank in block %u with a sound %u: not used", s->what, s->block, s->vag); nused--; }
+                continue;
+            }
+            const uint8_t *was = d + vag_off(d, &bk[s->block], s->vag);
+            uint32_t sz = vag_size(d, &bk[s->block], s->vag);
+            if (pass) {
+                if (s->places >= 0) who[base[s->block] + s->vag] = i;
+                continue;
+            }
+            /* the very sound that's there (the originals written out, given back): nothing to do */
+            uint32_t rate = vag_rate(d, &bk[s->block], s->vag), rs, frames = 0;
+            wav_loop(s->wav, s->n, &rs);
+            Shape sh = vag_shape(was, sz / 16);
+            const char *why = "";
+            int16_t *pcm = rs == rate ? wav_load(s->wav, s->n, rate, &frames, &why) : NULL, *dec = pcm ? vag_decode(was, sz / 16) : NULL;
+            int same = dec && frames == sh.data * 28;
+            for (uint32_t k = 0; same && k < frames; k++) same = pcm[2 * k] == dec[28 * sh.lead + k];
+            free(pcm);
+            free(dec);
+            if (same) { s->places = -1; continue; }
+            for (uint32_t b = 0; b < nb; b++)
+                for (uint32_t j = 1; j <= bk[b].vs; j++)
+                    if (vag_size(d, &bk[b], j) == sz && !memcmp(d + vag_off(d, &bk[b], j), was, sz)) who[base[b] + j] = i;
+        }
+    /* each bank with sounds to change: its waveforms again, in what its body was */
+    for (uint32_t b = 0; who && b < nb; b++) {
+        Bank *B = &bk[b];
+        int any = 0;
+        for (uint32_t j = 1; j <= B->vs; j++) any |= who[base[b] + j] >= 0;
+        if (!any) continue;
+        uint32_t total = 0, keep = 0, give[256] = {0}, want[256] = {0}, frames[256] = {0}, rate[256] = {0};
+        int16_t *mono[256] = {0};
+        for (uint32_t j = 1; j <= B->vs; j++) {
+            uint32_t sz = vag_size(d, B, j);
+            total += sz;
+            int i = who[base[b] + j];
+            if (i < 0) { keep += sz; continue; }
+            Sfx *s = &sfxs[i];
+            const char *why = "couldn't read it";
+            rate[j] = vag_rate(d, B, j);
+            int16_t *lr = wav_load(s->wav, s->n, rate[j], &frames[j], &why);
+            if (!lr) {
+                if (!s->bad) { note("mods: %s: %s: not used", s->what, why); nused--; }
+                s->bad = 1;
+                keep += sz;
+                continue;
+            }
+            mono[j] = malloc((size_t)frames[j] * 2 + 2);
+            for (uint32_t k = 0; mono[j] && k < frames[j]; k++) mono[j][k] = (int16_t)((lr[2 * k] + lr[2 * k + 1]) / 2);
+            free(lr);
+            if (!mono[j]) { keep += sz; continue; }
+            Shape sh = vag_shape(d + vag_off(d, B, j), sz / 16);
+            want[j] = 16 * (sh.lead + sh.tail + (frames[j] ? (frames[j] + 27) / 28 : 1));
+            give[j] = want[j] < sz ? want[j] : sz;
+        }
+        /* what the shorter ones leave, to the longer ones, in order */
+        uint32_t left = total - keep;
+        for (uint32_t j = 1; j <= B->vs; j++) if (mono[j]) left -= give[j];
+        for (uint32_t j = 1; j <= B->vs; j++)
+            if (mono[j] && want[j] > give[j]) {
+                uint32_t more = want[j] - give[j] < left ? want[j] - give[j] : left;
+                give[j] += more;
+                left -= more;
+            }
+        uint8_t *body = calloc(1, total + 16), *o = body;
+        uint32_t at = B->at + B->body, now[256] = {0};
+        for (uint32_t j = 1; body && j <= B->vs; j++) {
+            uint32_t sz = vag_size(d, B, j);
+            now[j] = sz;
+            if (mono[j]) {
+                Sfx *s = &sfxs[who[base[b] + j]];
+                now[j] = sfx_encode(s, mono[j], frames[j], rate[j], d + at, sz / 16, give[j], o);
+                s->places++;
+            } else
+                memcpy(o, d + at, sz);
+            o += now[j];
+            at += sz;
+        }
+        if (body) {
+            memcpy(d + B->at + B->body, body, total);   /* (zeros after, if it's shorter) */
+            for (uint32_t j = 1; j <= B->vs; j++) wr16(d + B->at + B->tab + 2 * j, (uint16_t)(now[j] / 8));
+        }
+        free(body);
+        for (uint32_t j = 1; j <= B->vs; j++) free(mono[j]);
+    }
+    for (int i = 0; i < nsfx; i++) {
+        Sfx *s = &sfxs[i];
+        if (s->places > 0) {
+            char cut[64] = "";
+            if (s->cut) snprintf(cut, sizeof cut, "; cut to fit in %d of them", s->cut);
+            note("mods: %s: in place of NOISE.BIN's sound %u of block %u%s (%d bank%s; %.2f s at %u Hz%s)", s->what, s->vag, s->block,
+                 s->places > 1 ? " and its copies" : "", s->places, s->places > 1 ? "s" : "", s->secs, s->rate, cut);
+        }
+        free(s->wav);
+    }
+    free(sfxs);
+    sfxs = NULL;
+    nsfx = 0;
+    free(who);
+    free(bk);
+    free(base);
+}
+
+/* ------------------------------------------------------------ music */
+
+/* A room's music is a sequence (NOISE/240/music1.seq, played with the
+ * room's sound bank) that the game starts, stops and fades (kernel_sound.c,
+ * room_sound.c), and whose place in it times the music's events. With
+ * NOISE/240/music1.wav a mod gives it as a recording instead, as the PC
+ * version has its music: the sequence still plays, every note at velocity
+ * 0 (silent: what the game times by is the same), and spu.c mixes the WAV
+ * in while it plays, at its volume (fades, the options' music volume),
+ * from the start when it starts again, repeating from the WAV's loop
+ * start (a smpl chunk) or else from the beginning. Sound sets: block 230
+ * is set 0 (room_sound.c: 0xE6 + the room's set); sequences 0 and 1 of the
+ * set are music1 and music2. */
+#define SND_SET_NOW   0x80062E7Cu                /* s16: the sound set loaded, -1 none */
+#define SND_SEQ_IDS   0x80062E70u                /* s16 x 2: its sequences' ids */
+#define SS_SCORE      0x80064678u                /* libsnd: per id, its sequence's state */
+
+typedef struct { uint32_t block, part, frames, loop; int16_t *pcm; uint8_t *wav; long n; char what[600]; } Music;
+static Music musics[64];
+static int nmusics;
+
+/* Every note-on of a sequence (after its 15-byte header) at velocity 0; 0 if it isn't one this reads to its end. */
+static int seq_mute(uint8_t *d, uint32_t n) {
+    uint32_t o = 15;
+    uint8_t st = 0;
+    if (n < 16 || memcmp(d, "pQES", 4)) return 0;
+    while (o < n) {
+        while (o < n && d[o] & 0x80) o++;    /* the time before it */
+        if (++o >= n) return 0;
+        if (d[o] & 0x80) st = d[o++];
+        if (!st || o >= n) return 0;
+        if (st == 0xFF) {
+            uint8_t t = d[o++];
+            if (t == 0x2F) return 1;
+            if (t != 0x51) return 0;
+            o += 3;                              /* the tempo */
+            continue;
+        }
+        uint32_t k = (st & 0xF0) == 0xC0 || (st & 0xF0) == 0xD0 ? 1 : 2;
+        if (o + k > n) return 0;
+        if ((st & 0xF0) == 0x90) d[o + 1] = 0;
+        o += k;
+    }
+    return 0;
+}
+
+static int music_apply(const char *mod, const char *rel, unsigned blk, unsigned part, const char *path) {
+    long n = 0;
+    uint8_t *d = load(path, &n);
+    if (!d) { note("mods: %s/%s: couldn't read it", mod, rel); return 1; }
+    for (int i = 0; i < nmusics; i++)            /* a later mod wins */
+        if (musics[i].block == blk && musics[i].part == part) { free(musics[i].wav); musics[i] = musics[--nmusics]; nused--; break; }
+    if (nmusics == (int)(sizeof musics / sizeof musics[0])) { free(d); note("mods: %s/%s: too many: not used", mod, rel); return 1; }
+    Music *m = &musics[nmusics++];
+    memset(m, 0, sizeof *m);
+    m->block = blk;
+    m->part = part;
+    m->wav = d;
+    m->n = n;
+    snprintf(m->what, sizeof m->what, "%s/%s", mod, rel);
+    nused++;
+    return 1;
+}
+
+/* The music WAVs: their sequences silenced, the WAVs read. */
+static void music_done(void) {
+    if (!nmusics) return;
+    int fi = disc_index("NOISE.BIN");
+    Touched *t = touch(fi);
+    static uint32_t v[1024];
+    Bank *bk = NULL;
+    uint32_t nb = noise_banks(t, v, &bk);
+    for (int i = 0; i < nmusics; i++) {
+        Music *m = &musics[i];
+        uint32_t at = m->block < nb && bk[m->block].vs ? v[m->block] * 2048 : 0, c = at ? rd32(t->data + at) : 0;
+        const char *why = "couldn't read it";
+        if (m->part < 1 || m->part + 2 > c) why = "NOISE.BIN has no such music (a room's sound set: blocks 230 and up)";
+        else {
+            uint32_t off = at + rd32(t->data + at + 4 + 4 * m->part), len = rd32(t->data + at + 8 + 4 * m->part) - (off - at);
+            uint8_t *seq = t->data + off;
+            for (int g = 0; g < ngrows; g++)     /* (a mod's own sequence there) */
+                if (grows[g].fi == fi && grows[g].offset == off) { seq = grows[g].data; len = grows[g].size; }
+            uint32_t rs;
+            int64_t from = wav_loop(m->wav, m->n, &rs);
+            if (!seq_mute(seq, len)) why = "its sequence isn't one this can silence";
+            else if ((m->pcm = wav_load(m->wav, m->n, 44100, &m->frames, &why)) && m->frames) {
+                m->loop = from >= 0 && rs ? (uint32_t)((uint64_t)from * 44100 / rs) : 0;
+                if (m->loop >= m->frames) m->loop = 0;
+                note("mods: %s: in place of NOISE.BIN block %u's music %u (%.1f s%s)", m->what, m->block, m->part, m->frames / 44100.0,
+                     from >= 0 ? ", repeating from its loop start" : "");
+                free(m->wav);
+                m->wav = NULL;
+                continue;
+            }
+        }
+        note("mods: %s: %s: not used", m->what, why);
+        nused--;
+        free(m->wav);
+        free(m->pcm);
+        musics[i--] = musics[--nmusics];
+    }
+    free(bk);
+}
+
+/* spu.c, every sample (44.1 kHz): the music WAVs playing, stereo, at full
+ * scale; what the game's sequences do is looked at every 512 samples. */
+void modfs_music(int32_t *l, int32_t *r) {
+    static struct { int m, playing; uint32_t pos; int32_t vl, vr; } st[2] = {{-1, 0, 0, 0, 0}, {-1, 0, 0, 0, 0}};
+    static int poll;
+    *l = *r = 0;
+    if (!g_mods_dir[0]) return;
+    if (--poll <= 0) {
+        poll = 512;
+        int16_t set = (int16_t)rd16(ram_ptr(SND_SET_NOW));
+        for (int k = 0; k < 2; k++) {
+            int16_t id = (int16_t)rd16(ram_ptr(SND_SEQ_IDS + 2 * (uint32_t)k));
+            uint32_t p = id >= 0 && id < 32 ? rd32(ram_ptr(SS_SCORE + 4 * (uint32_t)id)) : 0;
+            int m = -1;
+            if ((p >> 21) != 0x80000000u >> 21) p = 0;
+            for (int i = 0; p && set >= 0 && i < nmusics; i++)
+                if (musics[i].block == 0xE6u + (uint32_t)set && musics[i].part == (uint32_t)k + 1) m = i;
+            if (m != st[k].m) { st[k].m = m; st[k].playing = 0; st[k].pos = 0; }
+            if (!p) continue;
+            uint32_t rd = rd32(ram_ptr(p)), start = rd32(ram_ptr(p + 4));
+            int playing = rd32(ram_ptr(p + 0x98)) & 1;
+            if (playing && !st[k].playing && rd - start < 64) {   /* (started, not resumed) */
+                st[k].pos = 0;
+                rt_log("music: NOISE/%03d/music%d%s", 0xE6 + set, k + 1, m >= 0 ? ".wav (a mod's)" : ".seq");
+            }
+            st[k].playing = playing;
+            st[k].vl = (int16_t)rd16(ram_ptr(p + 0x58));
+            st[k].vr = (int16_t)rd16(ram_ptr(p + 0x5A));
+        }
+    }
+    for (int k = 0; k < 2; k++) {
+        if (st[k].m < 0 || !st[k].playing) continue;
+        const Music *m = &musics[st[k].m];
+        if (st[k].pos >= m->frames) st[k].pos = m->loop;
+        *l += m->pcm[2 * st[k].pos] * st[k].vl / 127;
+        *r += m->pcm[2 * st[k].pos + 1] * st[k].vr / 127;
+        st[k].pos++;
+    }
 }
 
 /* ------------------------------------------------------------ pictures */
@@ -753,6 +1325,17 @@ static int median_cut(uint16_t *c, size_t count, uint16_t *pal, int n) {
 }
 
 static int nearest(const uint16_t *pal, int n, uint16_t v) {
+    /* remembered for the palette last asked about (a picture asks for each of its pixels) */
+    static uint16_t last[256];
+    static int lastn = -1;
+    static int16_t memo[32768];
+    if (n > 256) n = 256;
+    if (n != lastn || memcmp(last, pal, (size_t)n * 2)) {
+        memcpy(last, pal, (size_t)n * 2);
+        lastn = n;
+        memset(memo, 0xFF, sizeof memo);
+    }
+    if (memo[v & 0x7FFF] >= 0) return memo[v & 0x7FFF];
     int best = 0, bd = 1 << 30;
     for (int i = 0; i < n; i++) {
         int dr = (int)(pal[i] & 31) - (v & 31), dg = (int)((pal[i] >> 5) & 31) - ((v >> 5) & 31);
@@ -760,6 +1343,7 @@ static int nearest(const uint16_t *pal, int n, uint16_t v) {
         int d = dr * dr * 3 + dg * dg * 4 + db * db * 2;
         if (pal[i] && d < bd) { bd = d; best = i; }
     }
+    memo[v & 0x7FFF] = (int16_t)best;
     return best;
 }
 
@@ -795,7 +1379,7 @@ static const char *tim_from_picture(uint8_t *tim, const uint8_t *img, uint32_t w
             rgba[y * tw + x] = (s[0] / m) | (s[1] / m) << 8 | (s[2] / m) << 16 | (s[3] / m) << 24;
         }
     /* what the original shows at each pixel (its 15-bit colour; 0: see-through) */
-    const uint8_t *row0 = clut ? clut + 12 : NULL;
+    uint8_t *row0 = clut ? clut + 12 : NULL;
     uint16_t *was = malloc((size_t)tw * th * 2);
     for (uint32_t k = 0; k < tw * th; k++) {
         uint32_t v;
@@ -806,13 +1390,21 @@ static const char *tim_from_picture(uint8_t *tim, const uint8_t *img, uint32_t w
     }
     uint16_t *col = malloc((size_t)tw * th * 2);  /* the new picture, 15-bit; 0 see-through */
     size_t opaque = 0;
+    int same = 1;
     for (uint32_t k = 0; k < tw * th; k++) {
         uint32_t p = rgba[k];
         int clear = (p >> 24) < 128 || ((p & 0xFFFFFF) == 0 && was[k] == 0);
         col[k] = clear ? 0 : to15(p);
         opaque += !clear;
+        if (same && !(col[k] == (was[k] & 0x7FFF) || (col[k] == 0x0400 && was[k] && !(was[k] & 0x7FFF)))) same = 0;
     }
     free(rgba);
+    if (same) {                                  /* the picture as the disc has it: left as it is */
+        free(col);
+        free(was);
+        *how = "as on the disc";
+        return NULL;
+    }
     uint16_t stp = 0;                            /* the original palette's semi-transparency bit, if all its colours have it */
     if (clut) {
         int with = 0, without = 0;
@@ -3363,6 +3955,39 @@ static int wav_write(const char *rel, const int16_t *lr, size_t frames, uint32_t
     return ok;
 }
 
+/* A sound of the banks as a WAV, mono, with its loop (a smpl chunk) if it repeats. */
+static int sfx_write(const char *rel, const int16_t *pcm, uint32_t frames, uint32_t rate, int64_t from) {
+    uint32_t n = frames * 2, extra = from >= 0 ? 8 + 60 : 0;
+    uint8_t *d = calloc(1, 44 + n + extra);
+    if (!d) return 0;
+    memcpy(d, "RIFF", 4);
+    wr32(d + 4, 36 + n + extra);
+    memcpy(d + 8, "WAVEfmt ", 8);
+    wr32(d + 16, 16);
+    wr16(d + 20, 1);
+    wr16(d + 22, 1);
+    wr32(d + 24, rate);
+    wr32(d + 28, rate * 2);
+    wr16(d + 32, 2);
+    wr16(d + 34, 16);
+    memcpy(d + 36, "data", 4);
+    wr32(d + 40, n);
+    for (uint32_t k = 0; k < frames; k++) wr16(d + 44 + 2 * k, (uint16_t)pcm[k]);
+    if (extra) {
+        uint8_t *m = d + 44 + n;
+        memcpy(m, "smpl", 4);
+        wr32(m + 4, 60);
+        wr32(m + 8 + 12, (uint32_t)(1000000000ull / rate));   /* sample period, ns */
+        wr32(m + 8 + 16, 60);                                /* MIDI unity note */
+        wr32(m + 8 + 28, 1);                                 /* one loop: */
+        wr32(m + 8 + 44, (uint32_t)from);                    /* from, */
+        wr32(m + 8 + 48, frames - 1);                        /* to the end */
+    }
+    int ok = write_out(rel, d, 44 + n + extra);
+    free(d);
+    return ok;
+}
+
 static int nextracted;
 int modfs_extracted(void) { return nextracted; }
 
@@ -3400,6 +4025,42 @@ int modfs_extract(void) {
             files += wav_write(rel, ch[c].pcm, ch[c].n, ch[c].rate);
             free(ch[c].pcm);
         }
+    }
+    /* the sound banks' sounds, each once (the same one in other banks is changed with it) */
+    {
+        Touched *t = touch(disc_index("NOISE.BIN"));
+        static uint32_t v[1024];
+        Bank *bk = NULL;
+        uint32_t nb = noise_banks(t, v, &bk);
+        uint32_t *seen = calloc(65536, sizeof *seen);   /* by crc: the first place it was, block << 8 | sound, +1 */
+        for (uint32_t b = 0; seen && b < nb; b++)
+            for (uint32_t j = 1; j <= bk[b].vs; j++) {
+                const uint8_t *w = t->data + vag_off(t->data, &bk[b], j);
+                uint32_t sz = vag_size(t->data, &bk[b], j), crc = (uint32_t)mz_crc32(0, w, sz), h = crc & 0xFFFF, dup = 0;
+                for (uint32_t k = h; seen[k] && !dup; k = (k + 1) & 0xFFFF) {
+                    const Bank *o = &bk[(seen[k] - 1) >> 8];
+                    uint32_t oj = (seen[k] - 1) & 0xFF;
+                    dup = vag_size(t->data, o, oj) == sz && !memcmp(t->data + vag_off(t->data, o, oj), w, sz);
+                    h = (k + 1) & 0xFFFF;
+                }
+                if (dup || sz < 16) continue;
+                seen[h] = (b << 8 | j) + 1;
+                Shape sh = vag_shape(w, sz / 16);
+                int16_t *pcm = vag_decode(w, sz / 16);
+                snprintf(rel, sizeof rel, "NOISE/%03u/%02u.wav", b, j);
+                if (pcm) files += sfx_write(rel, pcm + 28 * sh.lead, sh.data * 28, vag_rate(t->data, &bk[b], j), sh.loop ? (int64_t)sh.from * 28 : -1);
+                free(pcm);
+            }
+        for (uint32_t b = 0; b < nb; b++) {     /* the rooms' music */
+            uint32_t at = v[b] * 2048, c = bk[b].vs ? rd32(t->data + at) : 0;
+            for (uint32_t k = 1; k + 2 <= c; k++) {
+                uint32_t off = rd32(t->data + at + 4 + 4 * k), end = rd32(t->data + at + 8 + 4 * k);
+                snprintf(rel, sizeof rel, "NOISE/%03u/music%u.seq", b, k);
+                if (end > off && !memcmp(t->data + at + off, "pQES", 4)) files += write_out(rel, t->data + at + off, end - off);
+            }
+        }
+        free(seen);
+        free(bk);
     }
     /* the PC version's names: loose files, ones in packed blocks, 2D pictures, enemies' textures */
     for (size_t i = 0; i < sizeof modfs_pc / sizeof modfs_pc[0]; i++) {
@@ -3510,6 +4171,8 @@ void modfs_open(void) {
     }
     enemies_done();
     packs_done();
+    sfx_done();
+    music_done();
     grow_all();
     movie_done();
     if (nused || nskipped) note("mods: %d files from %d mods, %d not used", nused, nmods, nskipped);

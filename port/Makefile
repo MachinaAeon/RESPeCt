@@ -20,7 +20,7 @@ $(BUILD)/gen/%.o: gen/%.c include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(GEN_CFLAGS) -c $< -o $@
 
-$(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h include/recomp.h
+$(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -c $< -o $@
 
@@ -53,7 +53,7 @@ $(WBUILD)/gen/%.o: gen/%.c include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(GEN_CFLAGS) -c $< -o $@
 
-$(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h include/recomp.h
+$(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -c $< -o $@
 
@@ -80,7 +80,7 @@ DMETA_O = $(META:meta/%.c=$(DBUILD)/meta/%.o)
 
 dist: $(DBUILD)/resurv_headless
 
-$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h include/recomp.h
+$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -DRT_DIST -c $< -o $@
 
@@ -106,7 +106,7 @@ WDMETA_O = $(META:meta/%.c=$(WDBUILD)/meta/%.o)
 
 windist: $(WDBUILD)/RESPeCt.exe
 
-$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h include/recomp.h
+$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -DRT_DIST -c $< -o $@
 

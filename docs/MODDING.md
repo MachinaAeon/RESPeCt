@@ -27,6 +27,9 @@ mods/
     map/MAP00_1.png                    a map screen
     nab/ENEM11.png                     a zombie's skin
     X/BGM_32.STR/05.wav                a piece of music
+    wav/Scene05_1.wav                  a voice (the PC's name)
+    NOISE/001/02.wav                   a sound effect
+    NOISE/236/music1.wav               a room's music, recorded
     stage/STAGE07/0700/0700_A.hmd      a room's model
 ```
 
@@ -42,7 +45,9 @@ mods/
 | 2D screens: maps, results, title and menus, fonts | `map/MAP00_1.png`, `RESULT/RANK_A.png`, `RESOURCE/TITLE10.png`... (BMP works too) | `extract`, `PSX_DATA`, `Resource` |
 | An enemy's skin | `nab/ENEMnn.png`, nn its type (00 to 30) | `extract` |
 | An enemy's shape, textures and animations, the PC's way | `nab/ENEMnn.NAB`, `nab/ENEMnn.NAC` | the PC's `nab` |
-| Music, voices, a movie's sound | `X/BGM_32.STR/05.wav`: a channel of a stream | `extract` |
+| Streamed music, voices, a movie's sound | `X/BGM_32.STR/05.wav`: a channel of a stream; or the PC's name, `wav/Scene05_1.wav` | `extract`, the PC's `PSX_DATA/wav` |
+| Sound effects (and the instruments of the rooms' music) | `NOISE/012/03.wav`: sound 3 of the bank in block 12 | `extract` |
+| A room's music | `NOISE/236/music1.seq` (the PS1's sequence), or `NOISE/236/music1.wav` (a recording, as the PC has its music) | `extract` |
 | A movie's pictures | `M/OPENING.STR/0042.png`: frame 42 | `movie_dump` (below) |
 | Any texture in HD | a texture pack (see the README) | |
 
@@ -73,6 +78,9 @@ changes those tables when a file grows, as far as the game's memory goes:
   69632, an effect set up to 20480.
 - An enemy's block can take up to 93 sectors (190464 bytes, packed), the
   biggest the game loads.
+- A room's sound set (its bank and music, `NOISE.BIN`) can grow to 290816
+  bytes, so a sequence can be bigger. A sound bank can't: it goes whole into
+  the sound chip's 512 KB, shared with the other banks open (see below).
 - A file inside one of the packed archives (items, enemy textures in
   `Resource`) keeps its size: smaller is fine, bigger isn't.
 - Pictures are written at the size the PS1 has for them; another size is
@@ -143,18 +151,65 @@ take all of it too, with these differences:
   gets a palette made for it (type 33's share one, made for all of
   them), and the copies of them elsewhere on the disc change too.
 
-## Music, voices and movies' sound
+## Streamed sound: voices, music, movies' sound
 
 The disc's streamed sound (XA: the music in `X/BGM_32.STR`, the voices in
 `X/VC/*.STR`, the movies' sound in `M/*.STR`) is in channels, and a mod
 replaces one channel at a time with a WAV file (16-bit PCM, mono or
 stereo, any rate): `X/BGM_32.STR/00.wav` is channel 0 of `X/BGM_32.STR`.
+The PC version has the same sound as WAVs in `PSX_DATA/wav`, one per
+channel (`Scene05_1.wav` is channel 0 of `X/VC/SCENE05.STR`); those names
+work too, so the PC's voice mods work as they are.
 
 The game still plays the stream from the disc, so it starts, loops and
 stops where it always did; RESPeCt plays the WAV's samples in place of
 the channel's, at the same point. A WAV shorter than the channel ends in
 silence, a longer one is cut (both in the log). `extract` has every
 channel with the right name and length.
+
+## Sound effects
+
+The sound effects, and the instruments the rooms' music plays, are the
+sounds of the PS1's sound banks, in `NOISE.BIN`: `NOISE/012/03.wav` is
+sound 3 of the bank in block 12. Many banks share sounds (a gunshot is in
+every weapon's bank), so a WAV given for one sound changes it in every
+bank that has it. `extract` has each sound once, as a WAV at the rate the
+game plays it (the pitch is right as you hear it).
+
+The WAV (16-bit PCM, mono or stereo, any rate) is turned into the PS1's
+own sound format at that rate. A sound that plays once still plays once; one
+that repeats (an engine, a fire) repeats from the WAV's loop start if it
+has one (a `smpl` chunk, which `extract` writes and sound editors keep),
+else from where the original did.
+
+A bank goes whole into the sound chip's memory (512 KB, shared with the
+other banks open at the time), so a bank can't be bigger than the
+original: a sound can be longer than its original only by what the mod's
+other sounds for the same bank leave free (shorter ones, or silence cut).
+A longer one is cut to fit (the log says so, and in how many banks).
+
+The PC version's sound effects (`wav/door`, `wav/enemy`...) are other
+recordings, not the PS1's sounds: they aren't used.
+
+## A room's music
+
+Each room has a sound set: a bank and one or two sequences, its music
+(`NOISE/230` and on: block 230 is set 0). The game starts, stops and fades
+them, and times events by where the music is. Two ways to change it:
+
+- `NOISE/236/music1.seq`: a sequence, the PS1's own (`pQES`; `extract`
+  has them all; tools that turn MIDI into SEQ and back are common). It
+  plays with the room's bank, so its instruments are that bank's sounds,
+  which can be changed too (above). It can be bigger than the original.
+- `NOISE/236/music1.wav`: a recording, as the PC version has its music.
+  The sequence still plays, silent (every note at velocity 0), so
+  everything timed by it stays as it was, and RESPeCt plays the WAV while
+  it plays: from the start when it starts, paused when it's paused,
+  faded when it fades, at the options' music volume. It repeats from the
+  WAV's loop start (a `smpl` chunk), else from the beginning.
+
+Which set a room uses: `resurv.log` has a line each time a room's music
+starts (`music: NOISE/236/music1.seq`).
 
 ## Movies
 
@@ -166,6 +221,11 @@ fill it: keep the original's shape (4:3) and draw it as large as you like,
 say 1280x960. RESPeCt follows which of the stream's frames the game is
 showing, so the pictures keep the game's own timing, in step with the
 sound; a frame with no picture shows the disc's.
+
+A video (the PC's `.avi` or `.mpg`, or your own) becomes frames with any
+video tool, for example `ffmpeg -i movie.avi -vf fps=15 %04d.png`: as many
+as the stream has frames (`movie_dump`, below, shows how many), so its
+timing is the stream's.
 
 To get the original frames, make a folder `movie_dump` next to
 `RESPeCt.exe` and play the movies: every frame shown is written there as
@@ -188,8 +248,8 @@ leave that save reading the wrong places: load a memory card save then.
 - **Texts.** The PC version's messages are pictures of text (BMPs); the PS1
   builds them from font sheets and message data, which are disc files
   (they can be replaced whole, but there's no tool for the text yet).
-- **Sound effects**: they are in the PS1's sound banks; the PC's `wav`
-  folder isn't used.
+- **The PC's sound effects** (`wav/door`, `wav/enemy`...): other
+  recordings than the PS1's; give the PS1's sounds instead (above).
 - **The PC's movies and animations** (`.avi`, `.mpg`, `.FLC`): give frames
   instead (above).
 - Everything else the PC version has in its own forms; the log says so
@@ -208,6 +268,8 @@ disc image:
   the disc's pictures (needs numpy);
 - `tools/mod_bossnames.py` (`port/src/modfs_boss.h`): where the
   bosses' textures are on the disc (needs numpy and the PC's `nab`);
+- `tools/mod_wavnames.py` (`port/src/modfs_wav.h`): which stream channel
+  each of the PC's `wav` files is (needs numpy);
 - `tools/xa_dump.py`: every sound channel as WAV (as `extract` does).
 
 The headless runner (`port/build/.../resurv_headless`) takes `RT_MODS=dir`
