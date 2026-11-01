@@ -9,6 +9,7 @@
 
 Cpu g_cpu;
 uint8_t g_ram[RAM_SIZE];
+int g_ram_ext_used;                              /* modfs.c put something past the game's 2 MB */
 uint8_t g_scratch[SCRATCH_SIZE];
 int32_t g_rt_budget = POLL_SLICE;
 uint32_t g_poll_pc;
@@ -27,7 +28,7 @@ static uint64_t fnv64(const uint8_t *p, uint32_t n) {
 }
 
 static int module_loaded(const RtModule *m) {
-    const uint8_t *ram = g_ram + (m->vram & 0x1FFFFF);
+    const uint8_t *ram = g_ram + (m->vram & 0x7FFFFF);
     if (m->sig) return memcmp(ram, m->sig, m->sig_len) == 0;
     return fnv64(ram, m->sig_len) == m->sig_hash;
 }
@@ -306,7 +307,8 @@ int rt_in_interrupt(void) { return irq_depth != 0; }
 void rt_state(StateIO *io) {
     ss_module(io, "rt");
     SS(io, g_cpu);
-    SS(io, g_ram);
+    ss_field(io, "g_ram", g_ram, RAM_GAME);          /* (a save keeps the 2 MB the game has as before) */
+    if (!ss_saving(io) || g_ram_ext_used) ss_field(io, "g_ram_ext", g_ram + RAM_GAME, RAM_SIZE - RAM_GAME);
     SS(io, g_scratch);
     SS(io, g_rt_budget);
     SS(io, g_poll_pc);

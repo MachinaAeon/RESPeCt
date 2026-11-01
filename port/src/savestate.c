@@ -64,6 +64,8 @@ static void write_chunk(StateIO *io, const char *full, const void *p, uint32_t n
     if (n) fwrite(p, 1, n, io->f);
 }
 
+int ss_saving(const StateIO *io) { return io->mode == SS_SAVE; }
+
 void ss_field(StateIO *io, const char *name, void *p, size_t n) {
     char full[96];
     snprintf(full, sizeof full, "%s.%s", io->prefix, name);

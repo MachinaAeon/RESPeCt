@@ -32,16 +32,16 @@ typedef int64_t s64;
 #define V0 R[2]
 
 /* The game variable of this type at this address (an lvalue). */
-#define GV(type, addr) (*(type *)(g_ram + ((addr) & 0x1FFFFF)))
+#define GV(type, addr) (*(type *)(g_ram + ((addr) & 0x7FFFFF)))
 /* An array in game RAM. */
-#define GA(type, addr) ((type *)(g_ram + ((addr) & 0x1FFFFF)))
+#define GA(type, addr) ((type *)(g_ram + ((addr) & 0x7FFFFF)))
 
 /* Game address -> host pointer: main RAM, or the scratchpad (1 KB of fast
  * RAM at 0x1F800000, where the game sometimes keeps its stack). */
 static inline void *gp(u32 addr) {
     u32 p = addr & 0x1FFFFFFF;
     if (p >= 0x1F800000 && p < 0x1F800400) return g_scratch + (p & 0x3FF);
-    return g_ram + (addr & 0x1FFFFF);
+    return g_ram + (addr & 0x7FFFFF);
 }
 static inline u32 ga(const void *p) {
     const u8 *b = p;

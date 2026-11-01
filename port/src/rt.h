@@ -26,7 +26,8 @@ void irq_check(void);
 void rt_return_from_exception(void) __attribute__((noreturn));
 
 /* Pointer into RAM for a game address (RAM only). */
-static inline uint8_t *ram_ptr(uint32_t a) { return g_ram + (a & 0x1FFFFF); }
+extern int g_ram_ext_used;
+static inline uint8_t *ram_ptr(uint32_t a) { return g_ram + (a & 0x7FFFFF); }
 void ram_read(uint32_t a, void *dst, uint32_t n);
 void ram_write(uint32_t a, const void *src, uint32_t n);
 const char *ram_str(uint32_t a);

@@ -79,7 +79,7 @@ static uint32_t patched(const RtModule *m, uint32_t pc) {
 /* Code is always in main RAM. */
 static inline uint32_t ram_word(uint32_t pc) {
     uint32_t v;
-    memcpy(&v, g_ram + (pc & 0x1FFFFC), 4);
+    memcpy(&v, g_ram + (pc & 0x7FFFFC), 4);
     return v;
 }
 

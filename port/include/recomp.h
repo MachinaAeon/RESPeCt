@@ -20,7 +20,10 @@ extern Cpu g_cpu;
 #define HI g_cpu.hi
 #define LO g_cpu.lo
 
-#define RAM_SIZE     0x200000
+/* 8 MB, as the development consoles had: the game uses the first 2 MB, the
+ * rest is for mods (modfs.c) and is never mirrored. */
+#define RAM_SIZE     0x800000
+#define RAM_GAME     0x200000
 #define SCRATCH_SIZE 0x400
 extern uint8_t g_ram[RAM_SIZE];
 extern uint8_t g_scratch[SCRATCH_SIZE];
@@ -33,14 +36,14 @@ void mem_slow_w32(uint32_t a, uint32_t v);
 void mem_slow_w16(uint32_t a, uint32_t v);
 void mem_slow_w8(uint32_t a, uint32_t v);
 
-/* Main RAM is mirrored through the first 8 MB of KUSEG/KSEG0/KSEG1. */
+/* Main RAM: the first 8 MB of KUSEG/KSEG0/KSEG1. */
 #define RAM_PHYS(a) ((a) & 0x1FFFFFFFu)
 #define IS_RAM(p)   ((p) < 0x800000u)
 
 /* Projected points copied by the game's code (gte.c, "precision"): a RAM
  * word holding one has its mark set; a load of it and a store of the same
  * value carry the point's exact position along. */
-extern uint8_t g_sxy_mark[RAM_SIZE / 4];
+extern uint8_t g_sxy_mark[RAM_GAME / 4];
 extern uint32_t g_sxy_filter[8];          /* hashes of the points just read */
 static inline int sxy_maybe(uint32_t v) { uint32_t h = (v * 0x9E3779B1u) >> 24; return (g_sxy_filter[h >> 5] >> (h & 31)) & 1; }
 void sxy_load(uint32_t p, uint32_t v);
@@ -52,20 +55,20 @@ static inline uint32_t MEM_R32(uint32_t a) {
     uint32_t p = RAM_PHYS(a);
     if (IS_RAM(p)) {
         uint32_t v;
-        memcpy(&v, g_ram + (p & 0x1FFFFC), 4);
-        if (g_sxy_mark[(p & 0x1FFFFC) >> 2]) sxy_load(p & 0x1FFFFC, v);
+        memcpy(&v, g_ram + (p & 0x7FFFFC), 4);
+        if (p < RAM_GAME && g_sxy_mark[(p & 0x1FFFFC) >> 2]) sxy_load(p & 0x1FFFFC, v);
         return v;
     }
     return mem_slow_r32(a);
 }
 static inline uint32_t MEM_R16(uint32_t a) {
     uint32_t p = RAM_PHYS(a);
-    if (IS_RAM(p)) { uint16_t v; memcpy(&v, g_ram + (p & 0x1FFFFE), 2); return v; }
+    if (IS_RAM(p)) { uint16_t v; memcpy(&v, g_ram + (p & 0x7FFFFE), 2); return v; }
     return mem_slow_r16(a);
 }
 static inline uint32_t MEM_R8(uint32_t a) {
     uint32_t p = RAM_PHYS(a);
-    if (IS_RAM(p)) return g_ram[p & 0x1FFFFF];
+    if (IS_RAM(p)) return g_ram[p & 0x7FFFFF];
     return mem_slow_r8(a);
 }
 #ifdef RT_WATCH_WRITES
@@ -79,8 +82,8 @@ static inline void MEM_W32(uint32_t a, uint32_t v) {
     WATCH(a, v, 4);
     uint32_t p = RAM_PHYS(a);
     if (IS_RAM(p)) {
-        if (g_sxy_mark[(p & 0x1FFFFC) >> 2] || sxy_maybe(v)) sxy_store(p & 0x1FFFFC, v);
-        memcpy(g_ram + (p & 0x1FFFFC), &v, 4);
+        if (p < RAM_GAME && (g_sxy_mark[(p & 0x1FFFFC) >> 2] || sxy_maybe(v))) sxy_store(p & 0x1FFFFC, v);
+        memcpy(g_ram + (p & 0x7FFFFC), &v, 4);
         return;
     }
     mem_slow_w32(a, v);
@@ -88,13 +91,13 @@ static inline void MEM_W32(uint32_t a, uint32_t v) {
 static inline void MEM_W16(uint32_t a, uint32_t v) {
     WATCH(a, v, 2);
     uint32_t p = RAM_PHYS(a);
-    if (IS_RAM(p)) { uint16_t h = (uint16_t)v; memcpy(g_ram + (p & 0x1FFFFE), &h, 2); return; }
+    if (IS_RAM(p)) { uint16_t h = (uint16_t)v; memcpy(g_ram + (p & 0x7FFFFE), &h, 2); return; }
     mem_slow_w16(a, v);
 }
 static inline void MEM_W8(uint32_t a, uint32_t v) {
     WATCH(a, v, 1);
     uint32_t p = RAM_PHYS(a);
-    if (IS_RAM(p)) { g_ram[p & 0x1FFFFF] = (uint8_t)v; return; }
+    if (IS_RAM(p)) { g_ram[p & 0x7FFFFF] = (uint8_t)v; return; }
     mem_slow_w8(a, v);
 }
 
