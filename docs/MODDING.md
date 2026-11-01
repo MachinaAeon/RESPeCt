@@ -107,14 +107,30 @@ into another form, so RESPeCt converts them back:
 - from a NAB, its textures (edit them with a NAB tool, or give the skin
   as a picture: `nab/ENEMnn.png`, which `extract` has for every type);
 - from a NAC, its animations: every key (each bone's rotation and
-  position over time) and the animation script.
+  position over time) and the animation script;
+- from a NAB, its animation tables: where each of a bone's animations
+  starts in the script.
 
-Vertices can be moved as far as you like, but polygons can't be added or
-taken away, nor animations or keys (a NAB has to have as many polygons
-as the PS1's model, a NAC as many keys); the log says when one doesn't
-match. Type 30's model on the PS1 isn't the one in the PC's NAB, so only
-its textures and animations are taken from it; types 31 to 37 the PS1
-keeps in other forms.
+**Shapes.** Vertices can be moved as far as you like, and polygons added,
+taken away or moved to another body part: the model is then built again
+(its skeleton, animation and the rest kept), with new polygons on the
+texture page their UVs need. Each enemy in a room has its own copy of the
+model, so a model can grow by up to 48 KB (about 1800 more triangles);
+the game's memory for a room's enemies ends at 0x801F0000, and if a room
+comes near it the log says so.
+
+**Animations.** Keys and commands can be changed, added or taken away
+(up to 13107 keys, and 64 KB more than the PS1's): a command takes its
+key by the NAC's index, and the NAB's animation tables say where each
+animation starts, so a NAC with another number of commands or keys needs
+its NAB in the mod too. The enemies' code picks which animation plays, so
+new animations aren't used unless they take an existing one's place.
+
+**Types.** 0 to 30 take all of the above. The PC's 34 to 37 are types 16
+and 17 on the PS1 and go there. 31 to 33, the bosses loaded in one piece,
+take their animations and tables in place (as many commands and keys as
+the PS1's); their models are in another form (shared vertices) and their
+textures are the room's (change those through the room's files).
 
 ## Music, voices and movies' sound
 

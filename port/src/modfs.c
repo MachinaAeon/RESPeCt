@@ -1090,10 +1090,28 @@ static void png_write(const char *path, const uint8_t *rgb, int w, int h) {
     free(z);
 }
 
+/* Once a frame: with enemy models a mod made bigger, a line in the log if
+ * a room's enemies fill the memory they're loaded into (0x80150000 up,
+ * below the stacks from 0x801F0000) nearly to its end. */
+static int models_grown;
+static void memory_watch(void) {
+    static int told;
+    if (!models_grown || told) return;
+    uint32_t top = rd32(ram_ptr(0x800B4D78));
+    if (top > 0x801E8000u && top < 0x801F0000u) {
+        told = 1;
+        note("mods: this room's enemies take the memory they load into nearly to its end (up to %08X): bigger models than these are not safe", top);
+    } else if (top >= 0x801F0000u && top < 0x80200000u) {
+        told = 1;
+        note("mods: this room's enemies don't fit the memory they load into (up to %08X): the game may break; make the bigger models lighter", top);
+    }
+}
+
 /* display.c, once a frame: which frame the screen shows; written out
  * when dumping (g_movie_dump/M/OPENING.STR/0042.png, the picture as the
  * PS1 shows it). */
 void modfs_movie_vblank(void) {
+    memory_watch();
     now.fi = -1;
     if (g_frame - g_mdec_frame >= 8) return;     /* no movie playing */
     GpuDisplay d;
@@ -1446,29 +1464,160 @@ static int enemy_apply(const char *mod, const char *rel, const char *up, const c
 }
 
 /* The NAC's animations into the PS1's (A: 2, script, keys). */
-static const char *nac_into(const uint8_t *nac, long n, uint8_t *A, uint32_t na) {
+/* How much bigger an enemy type's animations (loaded once for all of its
+ * kind, in the same memory as the models) can get. */
+#define ANIM_GROWTH (64u * 1024)
+
+/* The NAC's animations into the PS1's (A: 2, script, keys; *A replaced
+ * when the NAC has another number of commands or keys). A command that
+ * takes a key has the key's word offset (index x 5) in its low 16 bits:
+ * from the NAC's own key index, so commands and keys can be added (up to
+ * 13107 keys). NULL, or why not. */
+static const char *nac_into(const uint8_t *nac, long n, uint8_t **Ap, uint32_t *nap, int *rebuilt) {
+    uint8_t *A = *Ap;
+    uint32_t na = *nap;
+    *rebuilt = 0;
     if (n < 8 || na < 12 || rd32(A) != 2) return "the disc's animations aren't laid out as expected";
     uint32_t a0 = rd32(A + 4), a1 = rd32(A + 8);
     if (a0 > a1 || a1 > na) return "the disc's animations aren't laid out as expected";
     uint32_t ncmd = (a1 - a0) / 4, nkey = (na - a1) / 20, nk = rd32(nac);
-    if ((uint64_t)nk * 112 + 8 > (uint64_t)n) return "it's cut short";
+    if (!nk || (uint64_t)nk * 112 + 8 > (uint64_t)n) return "it's cut short";
     uint32_t nc = rd32(nac + 4 + (size_t)nk * 112);
     if (4 + (uint64_t)nk * 112 + 4 + (uint64_t)nc * 8 != (uint64_t)n) return "it's cut short or has more after it";
-    if (nc != ncmd || nk < nkey)
-        return "its animations aren't as many as the PS1's (new animations or keys can't be added; change the existing ones)";
-    const uint8_t *cmd = nac + 4 + (size_t)nk * 112 + 4;
-    for (uint32_t i = 0; i < ncmd; i++) wr32(A + a0 + 4 * i, rd32(cmd + 8 * i));
-    for (uint32_t k = 0; k < nkey; k++) {
-        const uint8_t *f = nac + 4 + (size_t)k * 112;
-        uint8_t *p = A + a1 + 20 * k;
-        float v[12];
-        memcpy(v, f, sizeof v);
-        for (int c = 0; c < 3; c++) {
-            int32_t t = (int32_t)lrintf(v[9 + c]);
-            if (!(rd32(p + 4 * c) == 0x7FFFFFFFu && t == 0)) wr32(p + 4 * c, (uint32_t)t);
-            wr16(p + 12 + 2 * c, (uint16_t)(int16_t)lrintf(v[5 + c]));
+    uint32_t keys = nk - 1;                      /* (the PC's NAC has a key more than the PS1's, at its end) */
+    if (keys > 13107) return "it has more than 13107 keys, more than the PS1's commands can point at";
+    uint8_t *old = A;
+    uint32_t oa0 = a0, oa1 = a1;
+    if (nc != ncmd || keys != nkey) {            /* laid out again: 2, 12, the script's end, then the script and the keys */
+        uint32_t nn = 12 + 4 * nc + 20 * keys;
+        if (nn > na + ANIM_GROWTH) {
+            static char b[160];
+            snprintf(b, sizeof b, "its animations would grow by %u bytes, more than the %u the game's memory has room for", nn - na, ANIM_GROWTH);
+            return b;
+        }
+        A = calloc(nn, 1);
+        if (!A) return "out of memory";
+        wr32(A, 2);
+        wr32(A + 4, 12);
+        wr32(A + 8, 12 + 4 * nc);
+        a0 = 12;
+        a1 = 12 + 4 * nc;
+        *rebuilt = 1;
+        *nap = nn;
+    }
+    /* laid out again, keys may have moved: each found by what it holds among the disc's (as the PC
+     * shows them), to know which of its channels were "unchanged" there */
+    uint32_t *find = NULL;
+    if (*rebuilt && (find = malloc(32768 * 4))) {
+        memset(find, 0xFF, 32768 * 4);
+        for (uint32_t k = 0; k < nkey; k++) {
+            const uint8_t *q = old + oa1 + 20 * k;
+            uint32_t hsh = 0;
+            for (int c = 0; c < 3; c++) hsh = hsh * 31 + (rd32(q + 4 * c) == 0x7FFFFFFFu ? 0 : rd32(q + 4 * c));
+            for (int c = 0; c < 3; c++) hsh = hsh * 31 + rd16(q + 12 + 2 * c);
+            hsh &= 32767;
+            while (find[hsh] != 0xFFFFFFFFu) hsh = (hsh + 1) & 32767;
+            find[hsh] = k;
         }
     }
+    const uint8_t *cmd = nac + 4 + (size_t)nk * 112 + 4;
+    for (uint32_t i = 0; i < nc; i++) {
+        uint32_t w = rd32(cmd + 8 * i), key = rd32(cmd + 8 * i + 4);
+        if (i && key != 0xFFFFFFFFu) {
+            if (key >= keys) { if (*rebuilt) free(A); free(find); return "a command takes a key it doesn't have"; }
+            w = (w & 0xFFFF0000u) | (key * 5);
+        }
+        wr32(A + a0 + 4 * i, w);
+    }
+    for (uint32_t k = 0; k < keys; k++) {
+        const uint8_t *f = nac + 4 + (size_t)k * 112;
+        uint8_t *p = A + a1 + 20 * k;
+        const uint8_t *was = !*rebuilt && k < nkey ? old + oa1 + 20 * k : NULL;
+        float v[12];
+        memcpy(v, f, sizeof v);
+        if (find) {                              /* the disc's key with the same values, if there is one */
+            int32_t t3[3];
+            uint16_t r3[3];
+            uint32_t hsh = 0;
+            for (int c = 0; c < 3; c++) { t3[c] = (int32_t)lrintf(v[9 + c]); hsh = hsh * 31 + (uint32_t)t3[c]; }
+            for (int c = 0; c < 3; c++) { r3[c] = (uint16_t)(int16_t)lrintf(v[5 + c]); hsh = hsh * 31 + r3[c]; }
+            for (hsh &= 32767; find[hsh] != 0xFFFFFFFFu; hsh = (hsh + 1) & 32767) {
+                const uint8_t *q = old + oa1 + 20 * find[hsh];
+                int same = 1;
+                for (int c = 0; c < 3 && same; c++)
+                    same = (rd32(q + 4 * c) == 0x7FFFFFFFu ? 0 : (int32_t)rd32(q + 4 * c)) == t3[c] && rd16(q + 12 + 2 * c) == r3[c];
+                if (same) { was = q; break; }
+            }
+        }
+        for (int c = 0; c < 3; c++) {
+            int32_t t = (int32_t)lrintf(v[9 + c]);
+            if (was && rd32(was + 4 * c) == 0x7FFFFFFFu && t == 0) t = 0x7FFFFFFF;   /* "unchanged", which the PC turns into 0 */
+            wr32(p + 4 * c, (uint32_t)t);
+            wr16(p + 12 + 2 * c, (uint16_t)(int16_t)lrintf(v[5 + c]));
+        }
+        wr16(p + 18, 0);
+    }
+    (void)oa0;
+    free(find);
+    if (*rebuilt) *Ap = A;
+    return NULL;
+}
+
+/* The NAB's animation tables (for each bone, where each of its animations
+ * starts in the script: control << 16 | command) into the HMD's
+ * animation unit (B). NULL, or why not. */
+static const char *nab_seqs(const uint8_t *nab, long n, uint8_t *B, uint32_t nb) {
+    uint64_t at = 8 + (uint64_t)rd32(nab) * 36;  /* past the vertices, materials and groups */
+    if (n < 8 || at + 4 > (uint64_t)n) return "it's cut short";
+    uint32_t nm = rd32(nab + at);
+    at += 4;
+    for (uint32_t m = 0; m < nm && m < 64; m++) {
+        if (at + 352 > (uint64_t)n) return "it's cut short";
+        uint32_t ntx = rd32(nab + at + 8);
+        at += 352;
+        for (uint32_t t = 0; t < ntx && at + 16 <= (uint64_t)n; t++) at += 16 + (uint64_t)rd32(nab + at);
+    }
+    if (at + 4 > (uint64_t)n) return "it's cut short";
+    uint32_t ng = rd32(nab + at);
+    at += 4;
+    for (uint32_t g = 0; g < ng && g < 4096; g++) {
+        if (at + 24 > (uint64_t)n) return "it's cut short";
+        at += 24 + (rd32(nab + at) ? 4 : 0) + 4;
+    }
+    at += (uint64_t)rd32(nab) * 60 + (uint64_t)rd32(nab + 4) * 20;   /* per-vertex and per-face data */
+    if (at + 4 > (uint64_t)n) return "it's cut short";
+    uint32_t nq = rd32(nab + at);
+    at += 4;
+    /* the HMD's animation unit (B: the model, 2 parts; or nb's top bit set: B is the HMD itself) */
+    uint32_t o1 = 0;
+    if (nb & 0x80000000u) nb &= 0x7FFFFFFF;
+    else {
+        if (nb < 12 || rd32(B) != 2) return "the disc's model isn't laid out as expected";
+        o1 = rd32(B + 8);
+        if (o1 > nb) return "the disc's model isn't laid out as expected";
+    }
+    uint32_t hw = (nb - o1) / 4, unit = 0;
+    const uint8_t *h = B + o1;
+#define HW(i) ((uint32_t)(i) < hw ? rd32(h + 4 * (uint32_t)(i)) : 0xFFFFFFFFu)
+    for (uint32_t bi = 0; bi < HW(3) && bi < 64 && !unit; bi++)   /* (following each block's chain of units) */
+        for (uint32_t p = HW(4 + bi), guard = 0; p && p != 0xFFFFFFFFu && guard < 64 && !unit; p = HW(p), guard++)
+            if (HW(p + 3) == 0x3800000u) unit = p;
+    if (!unit) return "the disc's model has no animation table";
+    uint32_t pos = unit + 5;
+    for (uint32_t q = 0; q < nq; q++) {
+        if (at + 96 > (uint64_t)n) return "it's cut short";
+        uint32_t cnt = rd32(nab + at + 12), w1 = HW(pos + 1);
+        if (w1 == 0xFFFFFFFFu || (w1 >> 16) != cnt) return "its animation tables aren't the size of the PS1's (as many animations for each bone)";
+        if (at + 96 + (uint64_t)cnt * 8 > (uint64_t)n) return "it's cut short";
+        for (uint32_t k = 0; k < cnt; k++) {
+            uint32_t ctl = rd32(nab + at + 96 + 8 * k), start = rd32(nab + at + 100 + 8 * k);
+            if (start > 0xFFFF || ctl > 0xFFFF) return "an animation starts past what the PS1 can point at";
+            wr32((uint8_t *)h + 4 * (size_t)(pos + 6 + k), ctl << 16 | start);
+        }
+        at += 96 + (uint64_t)cnt * 8;
+        pos += w1 & 0xFFFF;
+    }
+#undef HW
     return NULL;
 }
 
@@ -1576,6 +1725,326 @@ static const char *nab_shape(const uint8_t *nab, long n, uint8_t *B, uint32_t nb
     return NULL;
 }
 
+/* A NAB whose polygons aren't the PS1 model's (some added or taken away,
+ * or moved to other body parts): the model built again from it. The
+ * HMD stays as it is (its skeleton, animation, coordinates and untextured
+ * polygons), and gets after its end a new unit for every block (body
+ * part) with its textured polygons, the NAB's triangles (GT3, each on the
+ * texture page its UVs need), the block pointing to it; the vertices and
+ * normals they need are added after the disc's (shared ones once). The
+ * model, the HMD part copied for each enemy, grows by the new triangles'
+ * size: up to MODEL_GROWTH, so a room full of them still fits the
+ * memory the game loads enemies into (0x80150000 up; the fullest room
+ * measured leaves 213 KB). */
+#define MODEL_GROWTH (48u * 1024)
+
+typedef struct { uint32_t page, w, h; } NabMat;
+typedef struct { uint32_t start, count, node, mat; } NabGroup;   /* mat ~0u: untextured */
+
+/* The NAB's materials and groups; NULL, or why not. */
+static const char *nab_layout(const uint8_t *nab, long n, NabMat *mat, uint32_t *nm, NabGroup *grp, uint32_t *ng) {
+    uint64_t at = 8 + (uint64_t)rd32(nab) * 36;
+    if (n < 8 || at + 4 > (uint64_t)n) return "it's cut short";
+    *nm = rd32(nab + at);
+    at += 4;
+    if (*nm > 8) return "it has more materials than this reads";
+    for (uint32_t m = 0; m < *nm; m++) {
+        if (at + 352 > (uint64_t)n) return "it's cut short";
+        uint32_t ntx = rd32(nab + at + 8);
+        mat[m].page = rd32(nab + at + 4) & 0x1F;
+        mat[m].w = mat[m].h = 0;
+        at += 352;
+        for (uint32_t t = 0; t < ntx; t++) {
+            if (at + 16 > (uint64_t)n) return "it's cut short";
+            if (!mat[m].w) { mat[m].w = rd32(nab + at + 8); mat[m].h = rd32(nab + at + 12); }
+            at += 16 + (uint64_t)rd32(nab + at);
+        }
+    }
+    if (at + 4 > (uint64_t)n) return "it's cut short";
+    *ng = rd32(nab + at);
+    at += 4;
+    if (*ng > 256) return "it has more groups than this reads";
+    for (uint32_t g = 0; g < *ng; g++) {
+        if (at + 24 > (uint64_t)n) return "it's cut short";
+        uint32_t has = rd32(nab + at);
+        grp[g].start = rd32(nab + at + 8);
+        grp[g].count = rd32(nab + at + 12);
+        at += 24;
+        grp[g].mat = ~0u;
+        if (has) { grp[g].mat = rd32(nab + at); at += 4; }
+        grp[g].node = rd32(nab + at);
+        at += 4;
+        if ((uint64_t)grp[g].start + grp[g].count > rd32(nab) / 3) return "a group has triangles past its end";
+        if (grp[g].mat != ~0u && grp[g].mat >= *nm) return "a group's material isn't one of its own";
+    }
+    return NULL;
+}
+
+/* The model built again from the NAB; the new model (malloc'd) and its
+ * size, or NULL and why. */
+static uint8_t *nab_rebuild(const uint8_t *nab, long n, const uint8_t *B, uint32_t nb, uint32_t timw, uint32_t *outn, int *ntri,
+                            const char **why) {
+    static NabMat mat[8];
+    static NabGroup grp[256];
+    uint32_t nm = 0, ng = 0;
+    if ((*why = nab_layout(nab, n, mat, &nm, grp, &ng))) return NULL;
+    *why = "the disc's model isn't laid out as expected";
+    if (nb < 12 || rd32(B) != 2) return NULL;
+    uint32_t o0 = rd32(B + 4), o1 = rd32(B + 8);
+    if (o0 + 8 > o1 || o1 + 16 > nb) return NULL;
+    uint32_t vb = o0 + rd32(B + o0) * 4, nbase = o0 + rd32(B + o0 + 4) * 4;
+    if (vb > nbase || nbase > o1) return NULL;
+    uint32_t nS = (nbase - vb) / 8, nN = (o1 - nbase) / 8, hw = (nb - o1) / 4;
+    const uint8_t *h = B + o1;
+#define HW(i) ((uint32_t)(i) < hw ? rd32(h + 4 * (uint32_t)(i)) : 0xFFFFFFFFu)
+    uint32_t nblk = HW(3), hdr = 0, base = 0;
+    if (nblk > 64) return NULL;
+    /* each material's texture window bits (from a polygon of the disc's that uses it) */
+    uint32_t tsb[8] = {0}, cba[8] = {0};
+    int seen[8] = {0};
+    for (uint32_t bi = 0; bi < nblk; bi++) {
+        uint32_t p = HW(4 + bi);
+        if (!p || p == 0xFFFFFFFFu) continue;
+        uint32_t nt = HW(p + 2) & 0xFFFF, b0 = HW(HW(p + 1) + 1) & 0x7FFFFFFF;
+        for (uint32_t t = 0; t < nt && t < 4096; t++) {
+            uint32_t ty = HW(p + 3 + 3 * t), idx = HW(p + 5 + 3 * t);
+            if (ty & 0xFF000000u) break;
+            if ((ty & 0xFF) != 0x0D && (ty & 0xFF) != 0x15) continue;
+            hdr = HW(p + 1);
+            base = b0;
+            uint32_t w1 = HW(b0 + idx + 1), pg = (w1 >> 16) & 0x1F;
+            for (uint32_t q = 0; q < nm; q++)
+                if (!seen[q] && (mat[q].page & 0x10) == (pg & 0x10) && (mat[q].page & 0xF) <= (pg & 0xF)) {
+                    seen[q] = 1;
+                    tsb[q] = w1 >> 16;
+                    cba[q] = HW(b0 + idx) >> 16;
+                }
+        }
+    }
+    if (!hdr) return NULL;
+    for (uint32_t q = 0; q < nm; q++)
+        if (!seen[q]) tsb[q] = (tsb[0] & ~0x1Fu) | mat[q].page;   /* (a material none of the disc's polygons used) */
+    /* the new vertices and normals after the disc's, and the new HMD after the disc's */
+    uint32_t total = 0;
+    for (uint32_t g = 0; g < ng; g++) if (grp[g].mat != ~0u) total += grp[g].count;
+    size_t cap = (size_t)nb + (size_t)total * 32 + (size_t)nblk * 12 + (size_t)total * 12 + 4096;
+    uint8_t *S = malloc(((size_t)nS + total * 3) * 8), *N = malloc(((size_t)nN + total * 3) * 8), *H = malloc(cap);
+    uint32_t *hash = malloc(2 * 65536 * 4);
+    if (!S || !N || !H || !hash) { free(S); free(N); free(H); free(hash); *why = "out of memory"; return NULL; }
+    memcpy(S, B + vb, (size_t)nS * 8);
+    memcpy(N, B + nbase, (size_t)nN * 8);
+    uint32_t cs = nS, cn = nN;
+    memset(hash, 0xFF, 2 * 65536 * 4);
+    /* hash[0..65535]: vertices, [65536..]: normals; slot = 1 + index, linear probing */
+    for (int pass = 0; pass < 2; pass++)
+        for (uint32_t i = 0; i < (pass ? nN : nS); i++) {
+            const uint8_t *s = (pass ? N : S) + 8 * i;
+            uint32_t k = (rd16(s) * 73856093u ^ rd16(s + 2) * 19349663u ^ rd16(s + 4) * 83492791u) & 65535;
+            while (hash[pass * 65536 + k] != 0xFFFFFFFFu) k = (k + 1) & 65535;
+            hash[pass * 65536 + k] = i;
+        }
+    memcpy(H, h, (size_t)hw * 4);
+    uint32_t hn = hw;                            /* words in the new HMD */
+    /* the words the disc's textured polygons take are free to use again (not their units' words: a
+     * unit put there isn't drawn) */
+    uint8_t *fw = calloc(hw + 1, 1);
+    uint32_t (*ent)[3] = malloc(sizeof *ent * 8192);
+    if (!fw || !ent) { free(S); free(N); free(H); free(hash); free(fw); free(ent); *why = "out of memory"; return NULL; }
+    for (uint32_t bi = 0; bi < nblk; bi++) {
+        uint32_t p = HW(4 + bi);
+        if (!p || p == 0xFFFFFFFFu || HW(p) != 0xFFFFFFFFu) continue;   /* (one unit to a block, as the disc's are) */
+        uint32_t nt = HW(p + 2) & 0xFFFF, b0 = HW(HW(p + 1) + 1) & 0x7FFFFFFF, other = 0;
+        for (uint32_t t = 0; t < nt && t < 4096; t++) {
+            uint32_t ty = HW(p + 3 + 3 * t), sz = HW(p + 4 + 3 * t), idx = HW(p + 5 + 3 * t);
+            if (ty & 0xFF000000u) { other = 1; break; }
+            if ((ty & 0xFF) != 0x0D && (ty & 0xFF) != 0x15) continue;
+            uint32_t pw = ty & 0x10 ? 7 : 6;
+            for (uint32_t k = 0; k < ((sz >> 16) & 0x7FFF) * pw; k++)
+                if (b0 + idx + k < hw) fw[b0 + idx + k] = 1;
+        }
+        (void)other;
+    }
+    *ntri = 0;
+    for (uint32_t bi = 0; bi < nblk; bi++) {
+        uint32_t p = HW(4 + bi), keep[64][3], nk = 0, flag = 0;
+        int had = 0;
+        if (p && p != 0xFFFFFFFFu) {
+            uint32_t nt = HW(p + 2) & 0xFFFF;
+            for (uint32_t t = 0; t < nt && t < 4096; t++) {
+                uint32_t ty = HW(p + 3 + 3 * t);
+                if (ty & 0xFF000000u) { nk = 99; break; }    /* not a unit of polygons: left as it is */
+                if ((ty & 0xFF) == 0x0D || (ty & 0xFF) == 0x15) { had = 1; flag |= ty & 0x800000; continue; }
+                if (nk < 64) { keep[nk][0] = ty; keep[nk][1] = HW(p + 4 + 3 * t); keep[nk][2] = HW(p + 5 + 3 * t); nk++; }
+            }
+        }
+        if (nk == 99) continue;
+        uint32_t count = 0, ne = 0;
+        for (uint32_t g = 0; g < ng; g++) if (grp[g].mat != ~0u && grp[g].node == bi) count += grp[g].count;
+        if (!count && !had) continue;
+        /* the polygons: two triangles that were a quad (corners a,b,c and d,c,b) a GT4 again, the rest GT3 */
+        for (uint32_t g = 0; g < ng; g++) {
+            if (grp[g].mat == ~0u || grp[g].node != bi) continue;
+            const NabMat *mm = &mat[grp[g].mat];
+            uint32_t wm = !grp[g].mat && timw ? timw : mm->w, hm2 = mm->h ? mm->h : 256;
+            for (uint32_t t = grp[g].start; t < grp[g].start + grp[g].count;) {
+                const uint8_t *ta = nab + 8 + (size_t)3 * t * 36, *tb = ta + 3 * 36;
+                int quad = t + 1 < grp[g].start + grp[g].count && !memcmp(tb + 36, ta + 72, 36) && !memcmp(tb + 72, ta + 36, 36);
+                int nc = quad ? 4 : 3;
+                const uint8_t *cor[4] = {ta, ta + 36, ta + 72, tb};
+                long u[4], v[4], lo = 1 << 30;
+                uint32_t vi[4], ni[4];
+                for (int c = 0; c < nc; c++) {
+                    float f[9];
+                    memcpy(f, cor[c], sizeof f);
+                    int16_t pos[3] = {sat16(f[0]), sat16(f[1]), sat16(-f[2])}, nor[3] = {sat16(f[3]), sat16(f[4]), sat16(-f[5])};
+                    for (int pass = 0; pass < 2; pass++) {
+                        const int16_t *x = pass ? nor : pos;
+                        uint8_t *arr = pass ? N : S;
+                        uint32_t *cnt = pass ? &cn : &cs;
+                        uint32_t k = ((uint16_t)x[0] * 73856093u ^ (uint16_t)x[1] * 19349663u ^ (uint16_t)x[2] * 83492791u) & 65535, found = ~0u;
+                        while (hash[pass * 65536 + k] != 0xFFFFFFFFu) {
+                            const uint8_t *q = arr + 8 * hash[pass * 65536 + k];
+                            if ((int16_t)rd16(q) == x[0] && (int16_t)rd16(q + 2) == x[1] && (int16_t)rd16(q + 4) == x[2]) { found = hash[pass * 65536 + k]; break; }
+                            k = (k + 1) & 65535;
+                        }
+                        if (found == ~0u) {
+                            if (*cnt >= 65535) { free(S); free(N); free(hash); free(H); free(fw); free(ent); *why = "too many vertices"; return NULL; }
+                            found = (*cnt)++;
+                            uint8_t *q = arr + 8 * found;
+                            wr16(q, (uint16_t)x[0]); wr16(q + 2, (uint16_t)x[1]); wr16(q + 4, (uint16_t)x[2]); wr16(q + 6, 0);
+                            hash[pass * 65536 + k] = found;
+                        }
+                        (pass ? ni : vi)[c] = found;
+                    }
+                    u[c] = lrintf(f[7] * (float)wm);
+                    v[c] = lrintf(f[8] * (float)hm2);
+                    if (u[c] < lo) lo = u[c];
+                }
+                long off = lo < 0 ? 0 : lo / 64;     /* the texture page from where its UVs start */
+                if ((mm->page & 0xF) + off > 15) off = 15 - (mm->page & 0xF);
+                /* its place: the first free run it fits in, else after the end */
+                uint32_t pw = quad ? 7 : 6, at = 0, run = 0;
+                for (uint32_t w = base; w < hw && run < pw; w++) {   /* (after the polygons' start: their index is counted from it) */
+                    if (!fw[w]) { run = 0; continue; }
+                    if (!run) at = w;
+                    run++;
+                }
+                if (run < pw) { at = hn; hn += pw; }
+                else memset(fw + at, 0, pw);
+                uint8_t *pk = H + 4 * (size_t)at;
+                memset(pk, 0, 4 * pw);
+                for (int c = 0; c < nc; c++) {
+                    long uu = u[c] - 64 * off, vv = v[c];
+                    pk[4 * c] = (uint8_t)(uu < 0 ? 0 : uu > 255 ? 255 : uu);
+                    pk[4 * c + 1] = (uint8_t)(vv < 0 ? 0 : vv > 255 ? 255 : vv);
+                }
+                wr16(pk + 2, (uint16_t)cba[grp[g].mat]);
+                wr16(pk + 6, (uint16_t)((tsb[grp[g].mat] & ~0x1Fu) | (mm->page & 0x10) | ((mm->page & 0xF) + (uint32_t)off)));
+                if (quad) {
+                    wr16(pk + 10, (uint16_t)ni[0]);
+                    wr16(pk + 14, (uint16_t)vi[0]);
+                    for (int c = 1; c < 4; c++) { wr16(pk + 16 + 4 * (c - 1), (uint16_t)ni[c]); wr16(pk + 18 + 4 * (c - 1), (uint16_t)vi[c]); }
+                } else
+                    for (int c = 0; c < 3; c++) { wr16(pk + 12 + 4 * c, (uint16_t)ni[c]); wr16(pk + 14 + 4 * c, (uint16_t)vi[c]); }
+                uint32_t ty = quad ? 0x15 : 0x0D;     /* the type's entry: a run of packets one after the other */
+                if (ne && ent[ne - 1][0] == ty && ent[ne - 1][1] + ent[ne - 1][2] * pw == at) ent[ne - 1][2]++;
+                else if (ne < 8192) { ent[ne][0] = ty; ent[ne][1] = at; ent[ne][2] = 1; ne++; }
+                *ntri += quad ? 2 : 1;
+                t += quad ? 2 : 1;
+            }
+        }
+        /* the block's new unit, after the end */
+        uint32_t nt = nk + ne;
+        if (!nt) { wr32(H + 4 * (4 + bi), 0); continue; }
+        uint32_t uw = 3 + 3 * nt, unit = hn;
+        hn += uw;
+        uint8_t *u8 = H + 4 * (size_t)unit;
+        wr32(u8, 0xFFFFFFFFu);
+        wr32(u8 + 4, p && p != 0xFFFFFFFFu ? HW(p + 1) : hdr);
+        wr32(u8 + 8, 0x80000000u | nt);
+        uint32_t e = 12;
+        for (uint32_t k = 0; k < ne; k++, e += 12) {
+            wr32(u8 + e, ent[k][0] | (k ? 0 : flag));
+            wr32(u8 + e + 4, 0x80000002u | ent[k][2] << 16);
+            wr32(u8 + e + 8, ent[k][1] - base);
+        }
+        for (uint32_t k = 0; k < nk; k++, e += 12) { wr32(u8 + e, keep[k][0]); wr32(u8 + e + 4, keep[k][1]); wr32(u8 + e + 8, keep[k][2]); }
+        wr32(H + 4 * (4 + bi), unit);
+    }
+    free(fw);
+    free(ent);
+#undef HW
+    free(hash);
+    if ((hn - hw) * 4 > MODEL_GROWTH) {
+        free(S); free(N); free(H);
+        static char b[160];
+        snprintf(b, sizeof b, "the model would grow by %u bytes, more than the %u each enemy of it can take in memory", (hn - hw) * 4, MODEL_GROWTH);
+        *why = b;
+        return NULL;
+    }
+    /* B: 2, then the vertices and normals (their header: where each starts), then the HMD */
+    uint32_t b0n = 8 + cs * 8 + cn * 8;
+    size_t total_n = 12 + (size_t)b0n + (size_t)hn * 4;
+    uint8_t *o = malloc(total_n);
+    if (!o) { free(S); free(N); free(H); *why = "out of memory"; return NULL; }
+    wr32(o, 2);
+    wr32(o + 4, 12);
+    wr32(o + 8, 12 + b0n);
+    wr32(o + 12, 2);
+    wr32(o + 16, 2 + cs * 2);
+    memcpy(o + 20, S, (size_t)cs * 8);
+    memcpy(o + 20 + (size_t)cs * 8, N, (size_t)cn * 8);
+    memcpy(o + 12 + b0n, H, (size_t)hn * 4);
+    free(S); free(N); free(H);
+    *outn = (uint32_t)total_n;
+    *why = NULL;
+    return o;
+}
+
+/* Whether the NAB has the PS1 model's textured polygons, block by block
+ * and material by material (then it goes in place, nab_shape). */
+static int nab_same_layout(const uint8_t *nab, long n, const uint8_t *B, uint32_t nb) {
+    static NabMat mat[8];
+    static NabGroup grp[256];
+    uint32_t nm = 0, ng = 0;
+    if (nab_layout(nab, n, mat, &nm, grp, &ng) || nb < 12 || rd32(B) != 2) return 0;
+    uint32_t o1 = rd32(B + 8);
+    if (o1 + 16 > nb) return 0;
+    const uint8_t *h = B + o1;
+    uint32_t hw = (nb - o1) / 4;
+#define HW(i) ((uint32_t)(i) < hw ? rd32(h + 4 * (uint32_t)(i)) : 0xFFFFFFFFu)
+    static uint32_t ps1[64][8], pc[64][8];
+    memset(ps1, 0, sizeof ps1);
+    memset(pc, 0, sizeof pc);
+    uint32_t nblk = HW(3);
+    if (nblk > 64) return 0;
+    for (uint32_t bi = 0; bi < nblk; bi++)
+        for (uint32_t p = HW(4 + bi), guard = 0; p && p != 0xFFFFFFFFu && guard < 4096; p = HW(p), guard++) {
+            uint32_t nt = HW(p + 2) & 0xFFFF, base = HW(HW(p + 1) + 1) & 0x7FFFFFFF;
+            for (uint32_t t = 0; t < nt && t < 4096; t++) {
+                uint32_t ty = HW(p + 3 + 3 * t), sz = HW(p + 4 + 3 * t), idx = HW(p + 5 + 3 * t);
+                if (ty & 0xFF000000u) break;
+                if ((ty & 0xFF) != 0x0D && (ty & 0xFF) != 0x15) continue;
+                int quad = (ty & 0x10) != 0;
+                for (uint32_t k = 0; k < ((sz >> 16) & 0x7FFF); k++) {
+                    uint32_t pg = (HW(base + idx + k * (quad ? 7 : 6) + 1) >> 16) & 0x1F, best = nm;
+                    for (uint32_t q = 0; q < nm; q++)
+                        if ((mat[q].page & 0x10) == (pg & 0x10) && (mat[q].page & 0xF) <= (pg & 0xF) &&
+                            (best == nm || (mat[q].page & 0xF) > (mat[best].page & 0xF)))
+                            best = q;
+                    if (best < nm) ps1[bi][best] += quad ? 2 : 1;
+                }
+            }
+        }
+#undef HW
+    for (uint32_t g = 0; g < ng; g++)
+        if (grp[g].mat != ~0u) {
+            if (grp[g].node >= 64) return 0;
+            pc[grp[g].node][grp[g].mat] += grp[g].count;
+        }
+    return !memcmp(ps1, pc, sizeof ps1);
+}
+
 /* The NAB's textures into the PS1's 16-bit TIMs (in order, same height). */
 static const char *nab_into(const uint8_t *nab, long n, uint8_t *tex, uint32_t nt, int *ntex) {
     if (n < 8) return "it's cut short";
@@ -1638,6 +2107,91 @@ static uint8_t *enemy_skin(uint8_t *tex, uint32_t nt) {
     return NULL;
 }
 
+/* Types 31 to 33 (the bosses loaded whole: EV_OBJ.DAT 0x190 to 0x192)
+ * are one HMD, not packed, with their animation inside: its script and
+ * keys where the animation unit's header says (its 4th and 5th words).
+ * The NAC's go in place (as many commands and keys as the PS1's), each
+ * key where the disc's commands that take it point, 5 words (T, R) or 6
+ * (T, R, then a scale of which the PC keeps the 2nd and 3rd, swapped).
+ * Their shape is in another form (shared vertices) and their textures
+ * are the room's, so from the NAB only its animation tables go in. */
+static void enemy_whole(Enemy *e) {
+    int fi = disc_index("EV_OBJ.DAT");
+    Touched *test = touch(disc_index("TEST.BIN")), *t = touch(fi);
+    uint32_t blk = 0x190 + (uint32_t)(e->type - 31);
+    uint32_t start = test && t ? rd32(test->data + 0x800A195Cu - TEST_BASE + 4 * blk) * 2048 : 0;
+    uint32_t end = test && t ? rd32(test->data + 0x800A195Cu - TEST_BASE + 4 * blk + 4) * 2048 : 0;
+    uint8_t *h = t ? t->data + start : NULL;
+    uint32_t hw = end > start ? (end - start) / 4 : 0;
+#define HW(i) ((uint32_t)(i) < hw ? rd32(h + 4 * (uint32_t)(i)) : 0xFFFFFFFFu)
+    uint32_t unit = 0;
+    for (uint32_t bi = 0; h && bi < HW(3) && bi < 64 && !unit; bi++)
+        for (uint32_t p = HW(4 + bi), guard = 0; p && p != 0xFFFFFFFFu && guard < 64 && !unit; p = HW(p), guard++)
+            if (HW(p + 3) == 0x3800000u) unit = p;
+    if (!h || (HW(0) & ~0x100u) != 0x50 || !unit) {
+        if (e->data[1]) { note("mods: %s: the disc's enemy type %d isn't laid out as expected: not used", e->what[1], e->type); nused--; }
+        if (e->data[0]) { note("mods: %s: the disc's enemy type %d isn't laid out as expected: not used", e->what[0], e->type); nused--; }
+        if (e->data[2]) { note("mods: %s: enemy type %d's textures are the room's: change those: not used", e->what[2], e->type); nused--; }
+        return;
+    }
+    uint32_t hdr = HW(unit + 1), sc = HW(hdr + 3) & 0x7FFFFFFF, ky = HW(hdr + 4) & 0x7FFFFFFF;
+    if (e->data[1]) {
+        const uint8_t *nac = e->data[1];
+        long n = e->n[1];
+        uint32_t nk = n >= 8 ? rd32(nac) : 0, nc = 0;
+        const char *why = NULL;
+        if (!nk || (uint64_t)nk * 112 + 8 > (uint64_t)n) why = "it's cut short";
+        else {
+            nc = rd32(nac + 4 + (size_t)nk * 112);
+            if (4 + (uint64_t)nk * 112 + 4 + (uint64_t)nc * 8 != (uint64_t)n) why = "it's cut short or has more after it";
+            else if (sc + nc > ky || ky >= hw) why = "it has other commands than the PS1's (for this type they can only be changed)";
+        }
+        /* where each key is: from the disc's commands that take it, the key's size from their steps */
+        uint32_t *at = why ? NULL : malloc(nk * 4), size = 5;
+        if (!why && !at) why = "out of memory";
+        if (!why) {
+            memset(at, 0xFF, nk * 4);
+            uint32_t prev = ~0u;
+            for (uint32_t i = 1; i < nc; i++) {
+                uint32_t key = rd32(nac + 4 + (size_t)nk * 112 + 4 + 8 * i + 4), w = HW(sc + i);
+                if (key == 0xFFFFFFFFu || key >= nk) continue;
+                at[key] = w & 0xFFFF;
+                if (prev != ~0u && (w & 0xFFFF) == prev + 6) size = 6;
+                prev = w & 0xFFFF;
+            }
+            for (uint32_t i = 0; i < nc; i++) wr32(h + 4 * (sc + i), rd32(nac + 4 + (size_t)nk * 112 + 4 + 8 * i));
+            for (uint32_t k = 0; k < nk; k++) {
+                if (at[k] == 0xFFFFFFFFu || ky + at[k] + size > hw) continue;
+                uint8_t *q = h + 4 * (ky + at[k]);
+                float v[12];
+                memcpy(v, nac + 4 + (size_t)k * 112, sizeof v);
+                for (int c = 0; c < 3; c++) {
+                    int32_t tv = (int32_t)lrintf(v[9 + c]);
+                    if (!(rd32(q + 4 * c) == 0x7FFFFFFFu && tv == 0)) wr32(q + 4 * c, (uint32_t)tv);
+                    wr16(q + 12 + 2 * c, (uint16_t)(int16_t)lrintf(v[5 + c]));
+                }
+                if (size == 6) {                 /* the scale: the PC's 1st is the PS1's 3rd, its 2nd the 2nd */
+                    wr16(q + 22, (uint16_t)(int16_t)lrintf(v[1]));
+                    wr16(q + 20, (uint16_t)(int16_t)lrintf(v[2]));
+                }
+            }
+            free(at);
+            note("mods: %s: its animations in place of enemy type %d's", e->what[1], e->type);
+        } else {
+            note("mods: %s: %s: not used", e->what[1], why);
+            nused--;
+        }
+    }
+    if (e->data[0]) {
+        const char *why = nab_seqs(e->data[0], e->n[0], h, (hw * 4) | 0x80000000u);
+        if (why) { note("mods: %s: its animation tables: %s: not used", e->what[0], why); nused--; }
+        else note("mods: %s: its animation tables in place of enemy type %d's (its shape and textures aren't taken: "
+                  "type %d's model is in another form, its textures are the room's)", e->what[0], e->type, e->type);
+    }
+    if (e->data[2]) { note("mods: %s: enemy type %d's textures are the room's: change those: not used", e->what[2], e->type); nused--; }
+#undef HW
+}
+
 /* Each enemy a mod changes, converted into its block (packed again in
  * packs_done). */
 static void enemies_done(void) {
@@ -1645,10 +2199,19 @@ static void enemies_done(void) {
         Enemy *e = &enemies[i];
         int nk = !!e->data[0] + !!e->data[1] + !!e->data[2];
         const char *what = e->data[0] ? e->what[0] : e->data[1] ? e->what[1] : e->what[2];
+        if (e->type >= 31 && e->type <= 33) {
+            enemy_whole(e);
+            goto next;
+        }
+        if (e->type >= 34 && e->type <= 37) {    /* the PC's types 34-37 are 16's and 17's data on the PS1 */
+            int to = e->type < 36 ? 16 : 17;
+            note("mods: %s: enemy type %d is type %d's data on the PS1: it goes there", what, e->type, to);
+            e->type = to;
+        }
         int fi = disc_index(e->type == 30 ? "EV_OBJ.DAT" : "OBJ.DAT");
         Packed *p = e->type >= 0 && e->type <= 30 ? packed_get(fi, e->type == 30 ? 0x196 : (uint32_t)e->type) : NULL;
         if (!p || !p->split) {
-            note("mods: %s: enemy type %d isn't one the PS1 keeps in this form (types 0-30 are): not used", what, e->type);
+            note("mods: %s: the PS1 has no enemy type %d: not used", what, e->type);
             nused -= nk;
             goto next;
         }
@@ -1665,20 +2228,34 @@ static void enemies_done(void) {
                 note("mods: %s: its textures (%d) in place of enemy type %d's", e->what[0], ntex, e->type);
             }
         }
-        if (e->data[0] && e->type != 30) {      /* the NAB's shape (type 30's model on the disc isn't the NAB's) */
+        if (e->data[0]) {                        /* the NAB's shape */
             uint32_t nt = 0, n2 = 0, tw = 0, th = 0;
             uint8_t *tex = packed_part(p, 0, &nt), *skin = tex ? enemy_skin(tex, nt) : NULL;
             if (skin) tim_size(skin, &tw, &th);
             u = packed_part(p, 2, &n2);
             int ntri = 0, moved = 0;
-            why = u ? nab_shape(e->data[0], e->n[0], u, n2, tw, &ntri, &moved) : "the disc's model couldn't be unpacked";
-            if (why) note("mods: %s: its shape: %s: not used (its textures are)", e->what[0], why);
-            else if (p->was[2] && memcmp(p->was[2], u, n2)) {
-                packed_note(p, 2, e->what[0]);
-                note("mods: %s: its shape in place of enemy type %d's (%d polygons; %d vertex coordinates moved)", e->what[0], e->type, ntri, moved);
+            if (u && (!nab_same_layout(e->data[0], e->n[0], u, n2) || getenv("RT_MOD_REBUILD"))) {   /* (RT_MOD_REBUILD: always, to test it) */
+                uint32_t nn = 0;                 /* polygons added, taken away or moved between body parts */
+                uint8_t *nu = nab_rebuild(e->data[0], e->n[0], u, n2, tw, &nn, &ntri, &why);
+                if (!nu) note("mods: %s: its shape: %s: not used (its textures are)", e->what[0], why);
+                else {
+                    note("mods: %s: its shape, built again, in place of enemy type %d's (%d triangles; the model %u -> %u bytes)", e->what[0],
+                         e->type, ntri, n2, nn);
+                    free(p->part[2]);
+                    p->part[2] = nu;
+                    p->plen[2] = nn;
+                    if (nn > n2) models_grown = 1;
+                    packed_note(p, 2, e->what[0]);
+                }
+            } else {
+                why = u ? nab_shape(e->data[0], e->n[0], u, n2, tw, &ntri, &moved) : "the disc's model couldn't be unpacked";
+                if (why) note("mods: %s: its shape: %s: not used (its textures are)", e->what[0], why);
+                else if (p->was[2] && memcmp(p->was[2], u, n2)) {
+                    packed_note(p, 2, e->what[0]);
+                    note("mods: %s: its shape in place of enemy type %d's (%d polygons; %d vertex coordinates moved)", e->what[0], e->type, ntri, moved);
+                }
             }
-        } else if (e->data[0])
-            note("mods: %s: type 30's model on the disc isn't the one in the NAB: its shape isn't taken", e->what[0]);
+        }
         if (e->data[2]) {                        /* a picture of the skin: after the NAB's, so it wins */
             u = packed_part(p, 0, &n);
             uint8_t *tim = u ? enemy_skin(u, n) : NULL;
@@ -1699,12 +2276,36 @@ static void enemies_done(void) {
         }
         if (e->data[1]) {
             u = packed_part(p, 1, &n);
-            why = u ? nac_into(e->data[1], e->n[1], u, n) : "the disc's animations couldn't be unpacked";
+            int rebuilt = 0;
+            uint32_t was_n = n;
+            why = u ? nac_into(e->data[1], e->n[1], &u, &n, &rebuilt) : "the disc's animations couldn't be unpacked";
+            if (!why && rebuilt && !e->data[0]) {
+                free(u);
+                why = "it has other commands or keys than the PS1's, and the NAB that says where each animation starts isn't in the mod";
+            }
             if (why) { note("mods: %s: %s: not used", e->what[1], why); nused--; }
             else {
+                if (rebuilt) {
+                    free(p->part[1]);
+                    p->part[1] = u;
+                    p->plen[1] = n;
+                }
                 packed_note(p, 1, e->what[1]);
-                note("mods: %s: its animations in place of enemy type %d's", e->what[1], e->type);
+                note("mods: %s: its animations in place of enemy type %d's%s", e->what[1], e->type, rebuilt ? " (laid out again)" : "");
+                if (rebuilt) note("mods: %s: the animations %u -> %u bytes", e->what[1], was_n, n);
             }
+        }
+        if (e->data[0]) {                        /* the NAB's animation tables: where each animation starts */
+            uint32_t n2 = 0;
+            uint8_t *b2 = packed_part(p, 2, &n2), *before = b2 ? malloc(n2) : NULL;
+            if (before) memcpy(before, b2, n2);
+            why = b2 ? nab_seqs(e->data[0], e->n[0], b2, n2) : "the disc's model couldn't be unpacked";
+            if (why) note("mods: %s: its animation tables: %s: not used", e->what[0], why);
+            else if (before && memcmp(before, b2, n2)) {
+                packed_note(p, 2, e->what[0]);
+                note("mods: %s: its animation tables in place of enemy type %d's", e->what[0], e->type);
+            }
+            free(before);
         }
     next:
         for (int k = 0; k < 3; k++) free(e->data[k]);
