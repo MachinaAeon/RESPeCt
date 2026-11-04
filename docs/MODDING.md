@@ -344,6 +344,15 @@ with comments, and given back unchanged they leave the disc as it is.
   small enemies (types 0 to 10) by their placement's value, and `chance`
   the odds for a value of 15 or more, which picks one at random. A quick
   save made before the mod gets these numbers when it's loaded.
+  The bigger enemies and the final boss (ENEMPROG.BIN, each enemy
+  program's own table): `enemy <type> <h0> <h1> <h2> <h3>` the four hit
+  points of types 11 to 33 (the placement's value 0-3 picks one, 4 and up
+  one at random: Cerberus 11, Tyrant 22, Hunter 28, the final boss 32 and
+  33...), and `part <type> <shot kind> <ten percents>` the body-part
+  factors of every program, zombies (type 0) included: a row per shot
+  kind, a column per body part. They apply from the next time the
+  program is loaded (the next room with that enemy). Bosses of types 50
+  and up keep the hit points their own code gives them.
 - `data/ROOMS.txt` (ROOMENV.DAT; `port/decomp/room_loader.c`): for each
   room (`@block`, block = stage x 30 + room) its `enemy` lines (type, the
   game flag that stops it from being placed, position, yaw, pose, the

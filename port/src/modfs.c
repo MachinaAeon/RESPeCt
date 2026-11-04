@@ -2642,6 +2642,14 @@ static int texts_extract(void) {
  *                     their placement's hit points value, "hp <n> <points>"
  *                     (n 0-14), and, for a value of 15 and up, the
  *                     cumulative chances (percent) of each, "chance <n> <p>";
+ *                     the bigger enemies' (11-33) four hit points (their
+ *                     placement's value 0-3; 4 and up one of them at
+ *                     random), "enemy <type> <h0> <h1> <h2> <h3>", and every
+ *                     enemy program's body-part factors, a row per shot
+ *                     kind, "part <type> <kind> <p0> ... <p9>": in the
+ *                     program's own table (+0x840, enemy.c and combat.c)
+ *                     in ENEMPROG.BIN, both of its copies (the two
+ *                     program slots), from the next time it's loaded;
  *   data/ROOMS.txt    a room's enemies and pickups (ROOMENV.DAT: block =
  *                     stage * 30 + room, room_loader.c), "@<block>" then
  *                     "enemy <type> <flag> <x> <y> <z> <yaw> <pose>
@@ -2659,6 +2667,41 @@ static int texts_extract(void) {
 #define W_HP      0x800A23ACu                    /* s16 x 15: small enemies' hit points (enemy.c) */
 #define W_CHANCE  0x800A23CCu                    /* s32 x 15: cumulative chances, percent */
 #define ITEM_NAMES 0x800A6D5Cu                   /* the items' names (pointers) */
+
+#define EN_PROGS  0x800A31C4u                    /* ENEMPROG.BIN's block table: type, type + 0x28 (enemy_spawn.c) */
+/* Each enemy program's table (+0x840): s16 x 12 (2-5 the hit points of
+ * types 11 and up, n_enemy_AttackInfo), then s16 x 10 body parts per
+ * shot kind, 11 kinds (n_enemy_HitFactor). Where it is in the program's
+ * block (the same in both slots); the block is the type's, or the one
+ * whose program it shares. */
+#define EN_TABLE_N (12 + 110)
+static const struct { uint8_t type, block; uint16_t off; const char *name; } enemy_tables[] = {
+    {0, 0, 0x5728, "zombies (types 0-10)"}, {11, 11, 0x3FA4, "Cerberus"}, {12, 12, 0x4208, "crows"},
+    {13, 13, 0x7368, "licker"}, {14, 13, 0x745C, "licker (type 14)"}, {15, 15, 0x2CCC, "giant cockroach"},
+    {16, 16, 0x5938, "giant spider (16 and 17)"}, {18, 18, 0x1E00, "alligator"}, {19, 19, 0x27A8, ""},
+    {20, 20, 0x27A8, ""}, {22, 22, 0x58F8, "Tyrant (22 and 23)"}, {26, 26, 0x251C, "giant moth"},
+    {28, 28, 0x58DC, "Hunter"}, {30, 30, 0x61AC, "Lott and Lily"}, {31, 31, 0x3154, ""},
+    {32, 32, 0x31DC, "final boss"}, {33, 33, 0x4620, "final boss, second form"},
+};
+/* The table's two copies in ENEMPROG.BIN (byte offsets), if they look like one. */
+static int enemy_table_at(const Touched *test, const Touched *ep, int k, uint32_t at[2]) {
+    if (!test || !ep) return 0;
+    for (int slot = 0; slot < 2; slot++) {
+        uint32_t b = enemy_tables[k].block + (slot ? 0x28u : 0), t = EN_PROGS - TEST_BASE + 4 * b;
+        if (t + 8 > test->nsec * 2048) return 0;
+        uint32_t s0 = rd32(test->data + t), s1 = rd32(test->data + t + 4);
+        uint64_t o = (uint64_t)s0 * 2048 + enemy_tables[k].off;
+        if (s1 <= s0 || s1 > ep->nsec || o + 2 * EN_TABLE_N > (uint64_t)s1 * 2048) return 0;
+        for (int i = 2; i < 6; i++) if ((int16_t)rd16(ep->data + o + 2 * i) <= 0) return 0;
+        for (int i = 12; i < EN_TABLE_N; i++) if ((int16_t)rd16(ep->data + o + 2 * i) < 0) return 0;
+        at[slot] = (uint32_t)o;
+    }
+    return 1;
+}
+static int enemy_table(long type) {
+    for (int k = 0; k < (int)(sizeof enemy_tables / sizeof enemy_tables[0]); k++) if (enemy_tables[k].type == type) return k;
+    return -1;
+}
 
 typedef struct { int kind; uint8_t *d; long n; char what[600]; } DataFile;   /* kind: 0 combat, 1 rooms */
 static DataFile *datafiles;
@@ -2725,15 +2768,38 @@ static void data_done(void) {
             memcpy(was, test->data + W_RATE - TEST_BASE, sizeof was);
             memcpy(washp, test->data + W_HP - TEST_BASE, sizeof washp);
             int lines = 0, bad = 0, ln = 0;
+            Touched *ep = NULL;
             for (char *line = strtok(s, "\n"); line; line = strtok(NULL, "\n")) {
                 ln++;
                 char *h = strchr(line, '#');
                 if (h) *h = 0;
                 char word[16];
-                long a[7];
-                int got = sscanf(line, "%15s %ld %ld %ld %ld %ld %ld", word, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5]);
-                if (got <= 0) continue;
+                long a[14];
+                int n = 0, used = 0;
+                if (sscanf(line, "%15s%n", word, &used) != 1) continue;
+                for (char *q = line + used, *e; n < 14; q = e) {
+                    long v = strtol(q, &e, 10);
+                    if (e == q) break;
+                    a[n++] = v;
+                }
+                int got = n + 1;                 /* (the word and its numbers) */
                 uint8_t *at = NULL;
+                int pt = !strcmp(word, "part");
+                if ((!strcmp(word, "enemy") && got == 6) || (pt && got == 13)) {   /* an enemy program's table */
+                    int k = enemy_table(a[0]), ok = k >= 0 && (pt || a[0] >= 11);
+                    uint32_t where[2];
+                    if (ok && !ep) ep = touch(disc_index("ENEMPROG.BIN"));
+                    if (ok && pt) ok = a[1] >= 0 && a[1] < 11;
+                    for (int i = pt ? 2 : 1; ok && i < n; i++) ok = a[i] >= (pt ? 0 : 1) && a[i] < 32768;
+                    if (ok && enemy_table_at(test, ep, k, where)) {
+                        for (int slot = 0; slot < 2; slot++) {
+                            uint8_t *t = ep->data + where[slot];
+                            if (!pt) for (int i = 0; i < 4; i++) wr16(t + 4 + 2 * i, (uint16_t)a[1 + i]);
+                            else for (int i = 0; i < 10; i++) wr16(t + 0x18 + 20 * a[1] + 2 * i, (uint16_t)a[2 + i]);
+                        }
+                        at = ep->data;
+                    }
+                }
                 if (!strcmp(word, "rate") && got == 3 && a[0] >= 0 && a[0] < 11 && a[1] >= 0 && a[1] < 1000) {
                     at = test->data + W_RATE - TEST_BASE + 4 * a[0];
                     wr32(at, (uint32_t)a[1]);
@@ -2752,7 +2818,7 @@ static void data_done(void) {
                     wr32(at, (uint32_t)a[1]);
                 }
                 if (at) lines++;
-                else { note("mods: %s: line %d isn't one of rate/shot/factor/hp/chance with its numbers: not used", f->what, ln); bad++; }
+                else { note("mods: %s: line %d isn't one of rate/shot/factor/hp/chance/enemy/part with its numbers: not used", f->what, ln); bad++; }
             }
             ram_fix(W_RATE, was, test->data + W_RATE - TEST_BASE, sizeof was);
             ram_fix(W_HP, washp, test->data + W_HP - TEST_BASE, sizeof washp);
@@ -2877,6 +2943,29 @@ static int data_extract(void) {
         "# (data/ROOMS.txt); 15 and up picks one at random, by the cumulative chances in percent:\n");
     for (uint32_t k = 0; k < 15; k++) ADD("hp %u %d\n", k, (int16_t)rd16(T + W_HP + 2 * k));
     for (uint32_t k = 0; k < 15; k++) ADD("chance %u %d\n", k, (int32_t)rd32(T + W_CHANCE + 4 * k));
+    Touched *ep = touch(disc_index("ENEMPROG.BIN"));
+    ADD("# enemy <type> <hit points 0> <1> <2> <3>: a bigger enemy's (types 11-33), by its placement's last\n"
+        "# number (0-3; 4 and up: one of the four at random). In its program (ENEMPROG.BIN), from the next room.\n");
+    for (int k = 0; k < (int)(sizeof enemy_tables / sizeof enemy_tables[0]); k++) {
+        uint32_t at[2];
+        if (!enemy_tables[k].type || !enemy_table_at(test, ep, k, at)) continue;
+        ADD("enemy %u", enemy_tables[k].type);
+        for (int i = 0; i < 4; i++) ADD(" %d", (int16_t)rd16(ep->data + at[0] + 4 + 2 * i));
+        if (enemy_tables[k].name[0]) ADD("    # %s", enemy_tables[k].name);
+        ADD("\n");
+    }
+    ADD("# part <type> <shot kind 0-10> <percent for body part 0> <1> ... <9>: the body-part factor of a hit,\n"
+        "# by the shot's kind (as in shot above: the weapon, the grenade gun's 8-10 by its grenades).\n");
+    for (int k = 0; k < (int)(sizeof enemy_tables / sizeof enemy_tables[0]); k++) {
+        uint32_t at[2];
+        if (!enemy_table_at(test, ep, k, at)) continue;
+        ADD("# type %u%s%s\n", enemy_tables[k].type, enemy_tables[k].name[0] ? ": " : "", enemy_tables[k].name);
+        for (int r = 0; r < 11; r++) {
+            ADD("part %u %d", enemy_tables[k].type, r);
+            for (int i = 0; i < 10; i++) ADD(" %d", (int16_t)rd16(ep->data + at[0] + 0x18 + 20 * r + 2 * i));
+            ADD("\n");
+        }
+    }
     files += write_out("data/COMBAT.txt", (const uint8_t *)out, o);
     o = 0;
     ADD("# The rooms' enemies and pickups (ROOMENV.DAT: @block, block = stage * 30 + room; see room_loader.c).\n"
