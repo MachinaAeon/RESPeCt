@@ -960,7 +960,8 @@ int modfs_xa(uint32_t lba, const uint8_t *s) {
  * chunk; else from the original's). */
 #define NOISE_TABLE 0x80058D2Cu
 
-typedef struct { uint32_t block, vag; uint8_t *wav; long n; int places, cut, bad; double secs; uint32_t rate; char what[600]; } Sfx;   /* cut: in how many banks */
+typedef struct { uint32_t block, vag; uint8_t *wav; long n; int places, cut, bad; double secs; uint32_t rate; char what[600];
+                 int16_t *whole; uint32_t whole_frames, whole_rate; } Sfx;   /* whole: the WAV, mono at its own rate (spu.c plays it) */   /* cut: in how many banks */
 static Sfx *sfxs;
 static int nsfx;
 
@@ -1204,6 +1205,33 @@ static uint32_t sfx_encode(Sfx *s, const int16_t *pcm, uint32_t frames, uint32_t
     return (uint32_t)(o - out);
 }
 
+/* The SPU plays sound s whole, at the WAV's own rate and length, where the
+ * game starts the waveform just written (out, n bytes; its original's
+ * shape orig, onb blocks, at rate): spu.c finds it by the CRC of its blocks
+ * up to the end flag. */
+static void sfx_whole(Sfx *s, const uint8_t *out, uint32_t n, const uint8_t *orig, uint32_t onb, uint32_t rate) {
+    void spu_hd_add(uint32_t crc, uint32_t len, const int16_t *pcm, uint32_t frames, uint32_t wav_rate, uint32_t rate, int64_t loop, uint32_t lead);
+    uint32_t rs;
+    int64_t from = wav_loop(s->wav, s->n, &rs);
+    if (!s->whole && rs) {
+        const char *why = "";
+        uint32_t fr = 0;
+        int16_t *lr = wav_load(s->wav, s->n, rs, &fr, &why);
+        if ((s->whole = lr ? malloc((size_t)fr * 2 + 2) : NULL)) {
+            for (uint32_t k = 0; k < fr; k++) s->whole[k] = (int16_t)((lr[2 * k] + lr[2 * k + 1]) / 2);
+            s->whole_frames = fr;
+            s->whole_rate = rs;
+        }
+        free(lr);
+    }
+    if (!s->whole || !s->whole_frames) return;
+    uint32_t len = 16;
+    while (len < n && !(out[len - 16 + 1] & 1)) len += 16;
+    Shape sh = vag_shape(orig, onb);
+    int64_t loop = !sh.loop ? -1 : from >= 0 ? from : (int64_t)((uint64_t)sh.from * 28 * s->whole_rate / rate);
+    spu_hd_add((uint32_t)mz_crc32(0, out, len), len, s->whole, s->whole_frames, s->whole_rate, rate, loop, 28 * sh.lead);
+}
+
 /* NOISE.BIN's table of blocks (KERNEL.BIN's), and its banks: the number of blocks, 0 if not found. */
 static uint32_t noise_banks(Touched *t, uint32_t *v, Bank **bk) {
     Touched *kern = touch(disc_index("KERNEL.BIN"));
@@ -1314,6 +1342,7 @@ static void sfx_done(void) {
             if (mono[j]) {
                 Sfx *s = &sfxs[who[base[b] + j]];
                 now[j] = sfx_encode(s, mono[j], frames[j], rate[j], d + at, sz / 16, give[j], o);
+                sfx_whole(s, o, now[j], d + at, sz / 16, rate[j]);
                 s->places++;
             } else
                 memcpy(o, d + at, sz);
@@ -1331,7 +1360,7 @@ static void sfx_done(void) {
         Sfx *s = &sfxs[i];
         if (s->places > 0) {
             char cut[64] = "";
-            if (s->cut) snprintf(cut, sizeof cut, "; cut to fit in %d of them", s->cut);
+            if (s->cut) snprintf(cut, sizeof cut, "; %d of its banks keep less of it, RESPeCt plays it whole", s->cut);
             note("mods: %s: in place of NOISE.BIN's sound %u of block %u%s (%d bank%s; %.2f s at %u Hz%s)", s->what, s->vag, s->block,
                  s->places > 1 ? " and its copies" : "", s->places, s->places > 1 ? "s" : "", s->secs, s->rate, cut);
         }

@@ -40,6 +40,45 @@ typedef struct {
 
 static Voice voices[24];
 static uint32_t endx;
+
+/* Mods' sound effects whole (modfs.c): a sample a mod replaced is still in
+ * SPU RAM, as long as its bank has room for, but when a voice starts it
+ * (found by the CRC of its blocks up to the end flag) the voice plays the
+ * mod's WAV instead, at the game's pitch, envelope and volume, for as long
+ * as the WAV is, repeating from its loop start if the original repeats.
+ * (Port-side, not in save states: a loaded state plays the SPU's own.) */
+typedef struct { uint32_t crc, len; const int16_t *pcm; uint32_t frames; uint64_t k; int64_t loop, lead; } HdSfx;
+static HdSfx *hds;
+static int nhds;
+static const HdSfx *hd_of[24];
+static int64_t hd_pos[24];                         /* 32.32, in the WAV's samples */
+
+unsigned long mz_crc32(unsigned long crc, const unsigned char *ptr, size_t buf_len);   /* miniz */
+
+/* modfs.c: the blocks a replaced sample has (crc, len: up to its end flag), the WAV (mono, its
+ * frames at wav_rate), the sample's rate, its loop start in the WAV's samples (-1: it doesn't repeat),
+ * the sample's own samples before the sound starts (a silent block). */
+void spu_hd_add(uint32_t crc, uint32_t len, const int16_t *pcm, uint32_t frames, uint32_t wav_rate, uint32_t rate, int64_t loop, uint32_t lead) {
+    for (int i = 0; i < nhds; i++)
+        if (hds[i].crc == crc && hds[i].len == len) return;
+    HdSfx *h = realloc(hds, (size_t)(nhds + 1) * sizeof *hds);
+    if (!h || !rate) return;
+    hds = h;
+    uint64_t k = ((uint64_t)wav_rate << 32) / ((uint64_t)rate * 4096);   /* the WAV's samples per pitch unit, 32.32 */
+    hds[nhds++] = (HdSfx){crc, len, pcm, frames, k, loop, -(int64_t)(((uint64_t)lead * wav_rate << 32) / rate)};
+}
+
+/* The mod's WAV for the sample at addr, if any. */
+static const HdSfx *hd_find(uint32_t addr) {
+    if (!nhds) return NULL;
+    uint32_t len = 16;
+    while (len < 0x80000 && !(ram[(addr + len - 16 + 1) & 0x7FFFF] & 1)) len += 16;
+    if (addr + len > 0x80000) return NULL;
+    uint32_t crc = (uint32_t)mz_crc32(0, ram + addr, len);
+    for (int i = 0; i < nhds; i++)
+        if (hds[i].crc == crc && hds[i].len == len) return &hds[i];
+    return NULL;
+}
 static int32_t noise_level = 1, noise_timer;
 
 /* The SPU's 4-point Gaussian interpolation table (psx-spx "SPU
@@ -193,6 +232,9 @@ static void key_on(int n) {
     endx &= ~(1u << n);
     decode_block(v);
     if (v->flags & 4) v->repeat = v->addr;
+    hd_of[n] = hd_find(v->addr);
+    if (hd_of[n]) hd_pos[n] = hd_of[n]->lead;      /* (after the silent block the sample starts with) */
+    if (trace && hd_of[n]) rt_log("SPU   a mod's sound, whole: %u frames", hd_of[n]->frames);
 }
 
 static void key_off(int n) {
@@ -211,8 +253,38 @@ static int irq_check_addr(uint32_t addr, uint32_t len) {
     return 0;
 }
 
+/* A mod's WAV playing on voice n: its next sample, the end handled as the SPU's own. */
+static int32_t hd_sample(Voice *v, int n, uint32_t pitch) {
+    const HdSfx *h = hd_of[n];
+    int64_t p = hd_pos[n];
+    int32_t s = 0;
+    if (p >= 0) {
+        uint32_t i = (uint32_t)(p >> 32), f = (uint32_t)(p >> 16) & 0xFFFF;
+        int32_t a = i < h->frames ? h->pcm[i] : 0, b = i + 1 < h->frames ? h->pcm[i + 1] : a;
+        s = a + (int32_t)(((int64_t)(b - a) * f) >> 16);
+    }
+    hd_pos[n] = p + (int64_t)(pitch * h->k);
+    if (hd_pos[n] >= (int64_t)h->frames << 32) {
+        endx |= 1u << n;
+        if (h->loop >= 0 && (uint64_t)h->loop < h->frames) hd_pos[n] = h->loop << 32;
+        else { v->env_phase = ENV_OFF; v->env = 0; hd_of[n] = NULL; }
+    }
+    return s;
+}
+
 /* Next sample of a voice at the current pitch position. */
 static int32_t voice_sample(Voice *v, int n, int32_t pitch_mod) {
+    if (hd_of[n]) {
+        uint32_t pitch = REG(n * 16 + 4);
+        if (n > 0 && ((REG(0x190) | (uint32_t)REG(0x192) << 16) & (1u << n))) {
+            int32_t f = (int16_t)pitch_mod + 0x8000;
+            pitch = (uint32_t)((int32_t)pitch * f >> 15) & 0xFFFF;
+        }
+        if (pitch > 0x3FFF) pitch = 0x4000;
+        int32_t s = hd_sample(v, n, pitch);
+        if ((REG(0x194) | (uint32_t)REG(0x196) << 16) & (1u << n)) s = noise_level;
+        return s;
+    }
     int i = (int)(v->counter >> 12);
     int g = (int)(v->counter >> 4) & 0xFF;
     int32_t s4[4];                                   /* oldest, older, old, new */
@@ -681,6 +753,7 @@ void spu_state(StateIO *io) {
 /* After loading: drop sound mixed before it. */
 void spu_reset_output(void) {
     out_rd = out_wr;
+    memset(hd_of, 0, sizeof hd_of);
     /* saves from before fixed_vol was kept: take it from the registers */
     for (uint32_t off = 0; off < 0x184; off += 2) {
         int is_vol = (off < 0x180 && (off & 0xF) < 4) || off == 0x180 || off == 0x182;

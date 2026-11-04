@@ -387,10 +387,13 @@ has one (a `smpl` chunk, which `extract` writes and sound editors keep),
 else from where the original did.
 
 A bank goes whole into the sound chip's memory (512 KB, shared with the
-other banks open at the time), so a bank can't be bigger than the
-original: a sound can be longer than its original only by what the mod's
-other sounds for the same bank leave free (shorter ones, or silence cut).
-A longer one is cut to fit (the log says so, and in how many banks).
+other banks open at the time), so the bank keeps as much of a longer
+sound as it has room for. RESPeCt plays the WAV itself, though: when the
+game starts that sound, the sound chip plays the mod's WAV, whole and at
+its own quality (16 bits, its own rate), with the game's pitch, envelope
+and volume, repeating from the loop start if the original repeats. So a
+sound can be as long as you like; only a quick save loaded in the middle
+of one goes on with the bank's version.
 
 The PC version's sound effects (`wav/door`, `wav/enemy`...) are other
 recordings, not the PS1's sounds: they aren't used.
