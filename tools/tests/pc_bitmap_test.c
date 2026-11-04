@@ -19,6 +19,10 @@ int modplug_add(const char *mod, const char *mod_dir, const char *up, const char
 int modplug_enabled(void) { return 0; }
 /* spu.c: mods' sounds played whole (not in these tests) */
 void spu_hd_add(uint32_t crc, uint32_t len, const int16_t *pcm, uint32_t frames, uint32_t wav_rate, uint32_t rate, int64_t loop, uint32_t lead) { (void)crc; (void)len; (void)pcm; (void)frames; (void)wav_rate; (void)rate; (void)loop; (void)lead; }
+/* modvideo.c: no videos in these tests */
+struct Video *modvideo_open(const char *path, const char **why) { (void)path; *why = "no videos in tests"; return NULL; }
+int modvideo_frames(struct Video *v) { (void)v; return 0; }
+const uint32_t *modvideo_frame(struct Video *v, int n, int *w, int *h) { (void)v; (void)n; (void)w; (void)h; return NULL; }
 uint32_t disc_image_sectors(void){return DISC_SECTORS;}
 int cd_read_sector_raw(uint32_t lba,uint8_t out[2352]){memset(out,0,2352);return 0;}
 void texpack_add_image(uint32_t h,uint32_t p,int w,int z,uint32_t *d){free(d);}
