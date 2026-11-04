@@ -351,8 +351,12 @@ with comments, and given back unchanged they leave the disc as it is.
   33...), and `part <type> <shot kind> <ten percents>` the body-part
   factors of every program, zombies (type 0) included: a row per shot
   kind, a column per body part. They apply from the next time the
-  program is loaded (the next room with that enemy). Bosses of types 50
-  and up keep the hit points their own code gives them.
+  program is loaded (the next room with that enemy). Every fight is one
+  of these types, bosses included (checked: the Tyrant spawns with the
+  numbers given). Types 50 and up aren't enemies with hit points: they're
+  the stages' things and people (breakables, actors in scenes, mostly
+  placed hidden), only alive or not. The zombies of stage 8 room 0's
+  ambush get 200 from that stage's own code.
 - `data/ROOMS.txt` (ROOMENV.DAT; `port/decomp/room_loader.c`): for each
   room (`@block`, block = stage x 30 + room) its `enemy` lines (type, the
   game flag that stops it from being placed, position, yaw, pose, the
