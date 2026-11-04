@@ -493,14 +493,77 @@ static uint32_t room_cap(const Touched *test) {
     return cap > OBJ_ROOM ? (uint32_t)cap : OBJ_ROOM;
 }
 
+/* The scenery of stages 1, 5 and 6: their blocks go in slots from the
+ * rooms' window, one after the other (TEST 80090DC4 for the ones kept,
+ * 80091554/80091938/80091E10 for the ones read as the player moves), as
+ * many as the stage's area record says (byte 6, plus two) and as big as
+ * it says (byte 7, sectors). The record is in the stage's program
+ * (STAGPROG.BIN, loaded at 0x800F2C50), the pointer to it at 0x800A89B0.
+ * A mod's block bigger than its slot makes the slots of that stage bigger
+ * (byte 7) and moves the rooms' window, bigger by as much. */
+static struct { const char *file; uint32_t first, last, sector, addr; uint8_t count, stride, want; } scenery[] = {
+    {"B/STGBG1.BIN", 0, 11, 5, 0x800F3060u, 3, 20, 0},   /* (stage 1 has two areas) */
+    {"B/STGBG1.BIN", 12, 16, 5, 0x800F3068u, 3, 20, 0},
+    {"B/STGBG5.BIN", 2, 55, 19, 0x800F3668u, 5, 12, 0},
+    {"B/STGBG6.BIN", 0, 13, 22, 0x800F328Cu, 3, 23, 0},
+};
+static uint32_t scenery_extra;                   /* what the bigger slots take more (room_window_place) */
+/* The area record in STAGPROG.BIN, if it's the one expected. */
+static uint8_t *scenery_record(int k) {
+    Touched *sp = touch(disc_index("STAGPROG.BIN"));
+    uint64_t o = (uint64_t)scenery[k].sector * 2048 + (scenery[k].addr - 0x800F2C50u);
+    if (!sp || o + 8 > (uint64_t)sp->nsec * 2048) return NULL;
+    uint8_t *r = sp->data + o;
+    uint32_t ptr = rd32(r);
+    if (ptr < 0x800F2C50u || ptr >= 0x800F8000u || r[6] != scenery[k].count || r[7] != scenery[k].stride) return NULL;
+    return r;
+}
+static int scenery_of(int fi, uint32_t block) {
+    for (int k = 0; k < (int)(sizeof scenery / sizeof scenery[0]); k++)
+        if (!strcmp(disc_files[fi].name, scenery[k].file) && block >= scenery[k].first && block <= scenery[k].last) return k;
+    return -1;
+}
+/* The original slot's size, 0 for a block not in one. */
+static uint32_t scenery_resident_cap(int fi, uint32_t block) {
+    int k = scenery_of(fi, block);
+    return k < 0 ? 0 : scenery[k].stride * 2048u;
+}
+/* How big a scenery block can be: its slot, or with the slots made bigger,
+ * as much as extended RAM leaves for all of them (up to 255 sectors). */
+static uint32_t scenery_cap(int fi, uint32_t block, const Touched *test) {
+    int k = scenery_of(fi, block);
+    if (k < 0) return 0;
+    uint32_t slot = scenery[k].stride * 2048u, n = scenery[k].count + 2u;
+    uint32_t most = room_cap(test);              /* (what the window can grow by) */
+    if (!scenery_record(k) || most <= OBJ_ROOM) return slot;
+    uint64_t cap = ((uint64_t)most - OBJ_ROOM + (uint64_t)n * slot) / n;
+    if (cap > 255u * 2048) cap = 255u * 2048;
+    cap &= ~UINT64_C(2047);
+    return cap > slot ? (uint32_t)cap : slot;
+}
 /* Every mod in: a room bigger than the PS1's moves the window (modfs_open). */
 static void room_window_place(void) {
     const char *force = getenv("RT_ROOM_WINDOW");    /* (tests: moved with no room needing it) */
     if (!room_need && force && atoi(force)) room_need = OBJ_ROOM;
-    if (!room_need) return;
+    const char *more_slots = getenv("RT_SCENERY_SLOTS");   /* (tests: every stage's slots this many sectors bigger) */
+    for (int k = 0; k < (int)(sizeof scenery / sizeof scenery[0]); k++) {
+        if (more_slots && atoi(more_slots) > 0 && scenery[k].want < scenery[k].stride + atoi(more_slots))
+            scenery[k].want = (uint8_t)(scenery[k].stride + atoi(more_slots));
+        if (scenery[k].want <= scenery[k].stride) continue;
+        uint8_t *r = scenery_record(k), was[8], now[8];
+        if (!r) rt_fatal("mods: %s's scenery slots can't be made bigger after all (STAGPROG.BIN changed)", scenery[k].file);
+        memcpy(was, r, 8);
+        r[7] = scenery[k].want;                  /* the stage's slots, bigger */
+        memcpy(now, r, 8);
+        ram_fix(scenery[k].addr, was, now, 8);
+        uint32_t more = (scenery[k].count + 2u) * (uint32_t)(scenery[k].want - scenery[k].stride) * 2048u;
+        if (more > scenery_extra) scenery_extra = more;
+        note("mods: %s's scenery slots %u -> %u sectors (the stage's program, STAGPROG.BIN)", scenery[k].file, scenery[k].stride, scenery[k].want);
+    }
+    if (!room_need && !scenery_extra) return;
     Touched *test = touch(disc_index("TEST.BIN"));
     uint32_t base = (0x80200000u + ext_used + 0xFFFFu) & ~0xFFFFu;
-    uint32_t bytes = (room_need + 0x48000u + 0xFFFFu) & ~0xFFFFu;
+    uint32_t bytes = ((room_need > scenery_extra ? room_need : scenery_extra) + 0x48000u + 0xFFFFu) & ~0xFFFFu;
     if (!room_code_found(test) || (uint64_t)base + bytes > 0x80000000u + RAM_SIZE)
         rt_fatal("mods: the rooms' memory can't be moved after all (TEST.BIN changed, or no extended RAM left)");
     for (size_t i = 0; i < sizeof room_code / sizeof room_code[0]; i++) {
@@ -515,8 +578,8 @@ static void room_window_place(void) {
     g_room_win_end = base + bytes;
     room_bytes = bytes;
     g_ram_ext_used = 1;
-    note("mods: the rooms' memory moved to %08X-%08X (the biggest room %u bytes, the PS1 has room for %u)",
-         base, base + bytes, room_need, OBJ_ROOM);
+    note("mods: the rooms' memory moved to %08X-%08X (the biggest room %u bytes, the PS1 has room for %u; scenery slots %u bytes more)",
+         base, base + bytes, room_need, OBJ_ROOM, scenery_extra);
 }
 
 /* savestate.c: a quick save made with the rooms' memory where it isn't
@@ -633,17 +696,6 @@ static uint32_t split_model_cap(int fi,uint32_t block,const uint8_t *b,uint32_t 
             !rd32(b+off[k]) || rd32(b+off[k])>RAM_SIZE-RAM_GAME) return 0;
     return RAM_SIZE-RAM_GAME;
 }
-/* USA STAGPROG area headers: 800F3060/68 (overlay16), 800F3668
- * (overlay20), 800F328C (overlay21). TEST 80090DC4 advances each resident
- * slot by header[7] << 11; 80091E10 reuses those same slots. A rebuilt
- * sector table cannot enlarge them. Zero means no bound verified here. */
-static uint32_t scenery_resident_cap(int fi, uint32_t block) {
-    const char *name = disc_files[fi].name;
-    if (!strcmp(name, "B/STGBG1.BIN") && block <= 16) return 20u * 2048;
-    if (!strcmp(name, "B/STGBG5.BIN") && block >= 2 && block <= 55) return 12u * 2048;
-    if (!strcmp(name, "B/STGBG6.BIN") && block <= 13) return 23u * 2048;
-    return 0;
-}
 static void grow_all(void) {
     if (!ngrows) return;
     Touched *test = touch(disc_index("TEST.BIN"));
@@ -743,8 +795,8 @@ static void grow_all(void) {
         nv[0] = 0;
         for (uint32_t b = 0; b < nb; b++) {
             uint32_t start = v[b] * 2048, len = (v[b + 1] - v[b]) * 2048, room = cap[b % kinds];
-            uint32_t resident = scenery_resident_cap(fi, b);
-            if (resident && room > resident) room = resident;
+            uint32_t resident = scenery_resident_cap(fi, b), slot_cap = resident ? scenery_cap(fi, b, test) : 0;
+            if (resident && room > slot_cap) room = slot_cap;
             uint32_t sync_original=modio_original_size(sync_file_table(fi),(int)b);
             if(sync_original && room>sync_original)room=sync_original;
             const uint8_t *blk = t->data + start;
@@ -768,7 +820,7 @@ static void grow_all(void) {
                     if (dynamic_cap) room=dynamic_cap;
                 }
                 /* An authored whole-block capacity cannot override a live slot. */
-                if (resident && room > resident) room = resident;
+                if (resident && room > slot_cap) room = slot_cap;
                 if(sync_original) {
                     uint32_t expanded=sync_growth_cap(fi,b,whole->data,whole->size);
                     room=expanded?expanded:sync_original;
@@ -820,6 +872,10 @@ static void grow_all(void) {
                 note("mods: %s block %u: its layout isn't one this knows: not used", disc_files[fi].name, b);
             if (!ok) memcpy(out + cur, blk, len);
             if (ok && rooms && !resident && newlen > OBJ_ROOM && newlen > room_need) room_need = newlen;
+            if (ok && resident && newlen > resident) {           /* the stage's slots must grow */
+                int k = scenery_of(fi, b);
+                if (k >= 0 && newlen / 2048 > scenery[k].want) scenery[k].want = (uint8_t)(newlen / 2048);
+            }
             for (int g = gi; g < ngrows; g++)
                 if (grows[g].fi == fi && grows[g].offset - start < len) {
                     if (ok) {

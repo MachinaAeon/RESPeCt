@@ -103,8 +103,9 @@ changes those tables when a file grows, as far as the game's memory goes:
   changed to match. A room's block can take up to 1 MB (1048576 bytes,
   less if the mods' pictures already fill much of the extra memory); the
   PS1 has room for 290816 (the biggest the game loads). A bigger one moves
-  the rooms' memory, see below. The scenery slots of stages 1, 5 and 6 keep
-  their own sizes (20, 12 and 23 sectors). A door's model can take up to
+  the rooms' memory, see below. The scenery of stages 1, 5 and 6 goes in
+  slots of 20, 12 and 23 sectors; a bigger block makes all the slots of
+  its area that big (up to 255 sectors), see below. A door's model can take up to
   71680 bytes and its data up to 69632, an effect set up to 20480.
 - An enemy's block can take up to 93 sectors (190464 bytes, packed), the
   biggest the game loads.
@@ -137,6 +138,14 @@ builds those addresses is changed with it; what only borrows the old place
 for a moment (enemy files, sound banks, a door's model, the title's and
 the typewriter's pictures) stays there, out of the room's way now. Without
 such a room nothing moves: the memory is the PS1's, byte for byte.
+
+Stages 1, 5 and 6 keep their scenery in slots one after the other (3, 5
+and 3 of them, plus two for what's read as you walk), as big as the
+stage's program says (`STAGPROG.BIN`). A mod's scenery block bigger than
+its slot makes every slot of that area as big as the biggest block
+(`mods: B/STGBG5.BIN's scenery slots 12 -> 18 sectors`), and the rooms'
+memory moves as above. Checked walking in all three stages: the same
+frames as with the PS1's slots.
 
 Rooms, doors, the scenery stages, game loads and quick saves were checked
 with a room 415744 bytes big: the same frames as without the mod. A quick
