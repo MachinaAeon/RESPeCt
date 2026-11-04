@@ -145,6 +145,11 @@ class Catalog:
         sound = re.fullmatch(r"NOISE/([0-9]+)/(?:([0-9]+)\.WAV|MUSIC([0-9]+)\.(WAV|SEQ))", name)
         if sound and all(int(x) <= 0xffffffff for x in [sound[1], sound[2] or sound[3]]):
             return {"kind": "sound", "targets": [f"sound:{int(sound[1])}:" + ("sfx:" + str(int(sound[2])) if sound[2] else "music:" + str(int(sound[3])))], "archives": ["NOISE.BIN"]}
+        video = re.fullmatch(r"AVI/([^/]+)\.(AVI|MPG|MPEG|MP4|MKV|WEBM|MOV|WMV|M4V)", name) or             re.fullmatch(r"(M/[^/]+\.STR)/VIDEO\.(AVI|MPG|MPEG|MP4|MKV|WEBM|MOV|WMV|M4V)", name)
+        if video:
+            target = video[1] if video[1].startswith("M/") else "M/" + video[1] + ".STR"
+            if target in self.disc:
+                return {"kind": "movie-video", "targets": ["movie-video:" + target], "archives": [target]}
         stream = name.rsplit("/", 1)
         if len(stream) == 2 and stream[0] in self.disc and stream[0].endswith(".STR"):
             frame = re.fullmatch(r"([0-9]+)\.(WAV|BMP|PNG|JPG|JPEG|TGA)", stream[1])

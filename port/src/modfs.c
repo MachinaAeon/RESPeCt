@@ -2894,8 +2894,95 @@ static int cmp_pic(const void *a, const void *b) {
     return x->seq < y->seq ? -1 : x->seq > y->seq;
 }
 
+/* A movie as a video file (modvideo.c, FFmpeg): M/OPENING.STR/video.mp4 (any
+ * format FFmpeg reads), or the PC version's avi/Opening.avi for the stream
+ * of the same name. Its frames go over the stream's in proportion (the
+ * first to the first, the last to the last), so the game's own timing
+ * stays; a frame given as a picture wins over the video's. */
+typedef struct Video Video;
+Video *modvideo_open(const char *path, const char **why);
+int modvideo_frames(Video *v);
+const uint32_t *modvideo_frame(Video *v, int n, int *w, int *h);
+typedef struct { int fi; char *path; char what[600]; Video *v; int bad, frames, str_frames; } Vid;
+static Vid vids[32];
+static int nvids;
+
+static int is_video(const char *ext) {
+    static const char *const e[] = {".AVI", ".MPG", ".MPEG", ".MP4", ".MKV", ".WEBM", ".MOV", ".WMV", ".M4V"};
+    for (size_t i = 0; i < sizeof e / sizeof e[0]; i++)
+        if (!strcasecmp(ext, e[i])) return 1;
+    return 0;
+}
+
+static int video_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    const char *sl = strrchr(up, '/'), *dot = strrchr(up, '.');
+    if (!sl || !dot || dot < sl || !is_video(dot)) return 0;
+    char stream[512];
+    if (!strncmp(up, "AVI/", 4) && !strchr(up + 4, '/'))           /* the PC's: avi/Opening.avi */
+        snprintf(stream, sizeof stream, "M/%.*s.STR", (int)(dot - up - 4), up + 4);
+    else if (!strncmp(sl, "/VIDEO.", 7))
+        snprintf(stream, sizeof stream, "%.*s", (int)(sl - up), up);
+    else
+        return 0;
+    int fi = disc_index(stream);
+    if (fi < 0 || !strstr(stream, ".STR")) {
+        note("mods: %s/%s: a video, but the disc has no movie %s: not used", mod, rel, stream);
+        return 1;
+    }
+    int k = 0;
+    while (k < nvids && vids[k].fi != fi) k++;   /* a later mod wins */
+    if (k == nvids) {
+        if (nvids == (int)(sizeof vids / sizeof vids[0])) { note("mods: %s/%s: too many videos: not used", mod, rel); return 1; }
+        nvids++;
+    } else {
+        free(vids[k].path);
+        nused--;
+    }
+    vids[k] = (Vid){fi, strdup(path), "", NULL, 0, 0, 0};
+    snprintf(vids[k].what, sizeof vids[k].what, "%s/%s", mod, rel);
+    note("mods: %s/%s: the video for %s (read when it plays)", mod, rel, stream);
+    nused++;
+    return 1;
+}
+
+/* How many frames a stream has (its last frame's number in the sectors' headers). */
+static int str_frames(int fi) {
+    uint8_t s[2352];
+    uint32_t n = (disc_files[fi].size + 2047) / 2048, most = 0;
+    disc_only = 1;
+    for (uint32_t k = 0; k < n; k++) {
+        if (!cd_read_sector_raw(disc_files[fi].lba + k, s)) continue;
+        if (rd32(s + 24) == 0x80010160u && rd32(s + 32) > most) most = rd32(s + 32);
+    }
+    disc_only = 0;
+    return (int)most;
+}
+
+/* The video's picture for frame (from 1) of stream fi, or NULL. */
+static const uint32_t *video_picture(int fi, uint32_t frame, int *w, int *h) {
+    Vid *v = NULL;
+    for (int i = 0; i < nvids; i++)
+        if (vids[i].fi == fi) v = &vids[i];
+    if (!v || v->bad) return NULL;
+    if (!v->v) {
+        const char *why = "";
+        if (!(v->v = modvideo_open(v->path, &why))) {
+            note("mods: %s: %s: not shown", v->what, why);
+            v->bad = 1;
+            return NULL;
+        }
+        v->frames = modvideo_frames(v->v);
+        v->str_frames = str_frames(fi);
+        note("mods: %s: %d frames over the movie's %d", v->what, v->frames, v->str_frames);
+        if (v->frames < 1 || v->str_frames < 1) { v->bad = 1; return NULL; }
+    }
+    int n = v->str_frames > 1 ? (int)(((int64_t)(frame - 1) * (v->frames - 1) + (v->str_frames - 1) / 2) / (v->str_frames - 1)) : 0;
+    return modvideo_frame(v->v, n < v->frames ? n : v->frames - 1, w, h);
+}
+
 /* M/OPENING.STR/0042.png: frame 42 of that stream. */
 static int movie_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    if (video_apply(mod, rel, up, path)) return 1;
     const char *sl = strrchr(up, '/'), *dot = strrchr(up, '.');
     if (!sl || !dot || dot < sl) return 0;
     if (strcasecmp(dot, ".PNG") && strcasecmp(dot, ".JPG") && strcasecmp(dot, ".JPEG") && strcasecmp(dot, ".BMP") &&
@@ -3115,7 +3202,7 @@ void modfs_movie_vblank(void) {
 const uint32_t *modfs_movie_picture(int *w, int *h) {
     if (now.fi < 0 || g_frame - g_mdec_frame >= 8) return NULL;
     const Pic *p = pic_find(now.fi, now.frame);
-    if (!p) return NULL;
+    if (!p) return video_picture(now.fi, now.frame, w, h);
     static const Pic *have;
     static uint32_t *px;
     static int pw, ph;

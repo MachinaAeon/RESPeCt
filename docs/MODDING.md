@@ -435,10 +435,17 @@ say 1280x960. RESPeCt follows which of the stream's frames the game is
 showing, so the pictures keep the game's own timing, in step with the
 sound; a frame with no picture shows the disc's.
 
-A video (the PC's `.avi` or `.mpg`, or your own) becomes frames with any
-video tool, for example `ffmpeg -i movie.avi -vf fps=15 %04d.png`: as many
-as the stream has frames (`movie_dump`, below, shows how many), so its
-timing is the stream's.
+A whole movie can also be a video file, read as it plays: the PC
+version's own (`avi/Opening.avi`, by its PC name, for the stream of the
+same name) or any video as `M/OPENING.STR/video.mp4` (AVI, MPG, MP4, MKV,
+WEBM, MOV, WMV: whatever FFmpeg reads, at any size up to 4096x4096). Its
+frames are spread over the stream's (the first on the first, the last on
+the last), so the timing stays the game's; a frame given as a picture wins
+over the video. The stream's sound stays the PS1's (give a WAV per channel
+to change it). RESPeCt uses FFmpeg for this: put its 64-bit DLLs (version
+6 or 7: avformat, avcodec, avutil, swscale and what they need) next to
+RESPeCt.exe. Classic Rebirth's are 32-bit and don't fit. Without them the
+log says so and the disc's movie shows.
 
 To get the original frames, make a folder `movie_dump` next to
 `RESPeCt.exe` and play the movies: every frame shown is written there as
