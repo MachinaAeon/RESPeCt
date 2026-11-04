@@ -55,6 +55,9 @@ int modmem_enabled(void) { return dynamic_buffers; }
 size_t g_hd_budget=(size_t)1536<<20;
 void rt_log(const char *fmt,...) {va_list a;va_start(a,fmt);vfprintf(stderr,fmt,a);fputc('\n',stderr);va_end(a);}
 void rt_fatal(const char *fmt,...){(void)fmt;abort();}
+/* modplug.c: no plugins in these tests */
+int modplug_add(const char *mod, const char *mod_dir, const char *up, const char *path) { (void)mod; (void)mod_dir; (void)up; (void)path; return 0; }
+int modplug_enabled(void) { return 0; }
 uint32_t disc_image_sectors(void){return DISC_SECTORS;}
 static int fixture_iso;
 static const char *fixture_iso_name="OBJ.DAT";

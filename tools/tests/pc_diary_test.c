@@ -18,6 +18,9 @@ int modmem_enabled(void) { return 0; }
 uint32_t g_frame,g_mdec_frame; size_t g_hd_budget=(size_t)1536<<20;
 void rt_log(const char *fmt,...){va_list a;va_start(a,fmt);vfprintf(stderr,fmt,a);fputc('\n',stderr);va_end(a);}
 void rt_fatal(const char *fmt,...){va_list a;va_start(a,fmt);vfprintf(stderr,fmt,a);fputc('\n',stderr);va_end(a);abort();}
+/* modplug.c: no plugins in these tests */
+int modplug_add(const char *mod, const char *mod_dir, const char *up, const char *path) { (void)mod; (void)mod_dir; (void)up; (void)path; return 0; }
+int modplug_enabled(void) { return 0; }
 uint32_t disc_image_sectors(void){return DISC_SECTORS;}
 int cd_read_sector_raw(uint32_t lba,uint8_t out[2352]){memset(out,0,2352);return 0;}
 void texpack_add_image(uint32_t h,uint32_t p,int w,int z,uint32_t *d){free(d);}
