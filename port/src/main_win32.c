@@ -438,12 +438,12 @@ static void paint(HDC dc) {
         HFONT f = CreateFontA(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, "Segoe UI");
         HGDIOBJ of = SelectObject(dc, f);
         SetBkMode(dc, TRANSPARENT);
-        RECT r = {dx + fh, dy + fh, dx + dw - fh, dy + fh * 3};
+        RECT r = {dx + fh, dy + fh, dx + dw - fh, dy + fh * 5};   /* (a long one goes on over more lines) */
         RECT sh = {r.left + 2, r.top + 2, r.right + 2, r.bottom + 2};
         SetTextColor(dc, RGB(0, 0, 0));
-        DrawTextA(dc, toast, -1, &sh, DT_LEFT | DT_TOP | DT_SINGLELINE);
+        DrawTextA(dc, toast, -1, &sh, DT_LEFT | DT_TOP | DT_WORDBREAK | DT_NOPREFIX);
         SetTextColor(dc, RGB(235, 235, 235));
-        DrawTextA(dc, toast, -1, &r, DT_LEFT | DT_TOP | DT_SINGLELINE);
+        DrawTextA(dc, toast, -1, &r, DT_LEFT | DT_TOP | DT_WORDBREAK | DT_NOPREFIX);
         SelectObject(dc, of);
         DeleteObject(f);
     }
@@ -1314,13 +1314,21 @@ static void menu_draw(HDC dc) {
 
     /* tabs */
     SelectObject(dc, font);
-    int tw = (pw - 2 * pad) / NPAGES;
+    int tws[NPAGES], need = 0, tx = px + pad;   /* each tab as wide as its name, sharing the row */
     for (int p = 0; p < NPAGES; p++) {
-        RECT r = {px + pad + p * tw, y, px + pad + (p + 1) * tw - 4, y + row};
+        SIZE s;
+        GetTextExtentPoint32A(dc, page_names[p], (int)strlen(page_names[p]), &s);
+        tws[p] = s.cx + row;
+        need += tws[p];
+    }
+    for (int p = 0; p < NPAGES; p++) {
+        int tw = need ? (int)((long long)tws[p] * (pw - 2 * pad) / need) : (pw - 2 * pad) / NPAGES;
+        RECT r = {tx, y, tx + tw - 4, y + row};
+        tx += tw;
         tab_rect[p] = r;
         FillRect(dc, &r, p == menu_page ? border : tabb);
         SetTextColor(dc, p == menu_page ? RGB(255, 255, 255) : RGB(170, 170, 170));
-        DrawTextA(dc, page_names[p], -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        DrawTextA(dc, page_names[p], -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     }
     y += row + pad / 2;
 

@@ -120,7 +120,7 @@ static void mods_state(StateIO *io) {
     uint64_t saved = 0;
     if (c->size == 8) for (int i = 0; i < 8; i++) saved |= (uint64_t)c->data[i] << (i * 8);
     if (c->size != 8 || (saved && saved != current)) {
-        if (!io->bad) snprintf(io->err, sizeof io->err, "different mods: restore the saved mod files and order, or load a memory card save");
+        if (!io->bad) snprintf(io->err, sizeof io->err, "made with other mods: restore them or load a card save");
         io->bad = 1;
     }
 }
@@ -423,7 +423,7 @@ static void room_window_state(StateIO *io) {
     for (int i = 0; i < rt_module_count; i++)
         if (!strcmp(rt_modules[i].name, "test") && saved_module_matches(ram, &rt_modules[i])) in_game = 1;
     if (in_game && !modfs_room_window_state_ok(saved_word(ram, 0x800B3D54u))) {
-        if (!io->bad) snprintf(io->err, sizeof io->err, "made with the rooms' memory elsewhere (a mod with bigger rooms added or removed): load a memory card save");
+        if (!io->bad) snprintf(io->err, sizeof io->err, "made before or after a big-room mod: load a memory card save");
         io->bad = 1;
     }
 }
@@ -538,7 +538,10 @@ static void load_now(const char *path, char *msg, size_t msgn) {
     visit_all(&io);
     if (io.bad) {
         rt_log("savestate: can't load %s: %s", path, io.err);
-        snprintf(msg, msgn, "This save doesn't fit this version of the game");
+        if (io.err[0] && !strstr(io.err, " in this build")) {   /* a reason the player can act on (mods) */
+            snprintf(msg, msgn, "%s", io.err);
+            if (msg[0] >= 'a' && msg[0] <= 'z') msg[0] = (char)(msg[0] - 'a' + 'A');
+        } else snprintf(msg, msgn, "This save doesn't fit this version of the game");
         for (int i = 0; i < io.nchunks; i++) free((void *)io.chunks[i].name);
         free(io.chunks);
         free(b);
