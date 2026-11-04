@@ -20,6 +20,8 @@
  * with tools/eq). */
 #include "game_vars.h"
 #include "poll.h"
+#include "modio.h"
+#include "rt.h"
 
 void n_op_CutsceneStart(void);
 void n_op_ThreadEnd(void);
@@ -757,9 +759,13 @@ void n_op_CameraWalk(void) {
 void n_op_LoadImage(void) {
     FRAME(0x28);
     u32 th = A0;
-    GS(u32, sp + 0x10) = g_imageBuf;
-    GCALL4(F_FILE_LOAD, 0x8006C664u, 0x80058538u, 0x800A2B3Cu, (s32)ARG(PC(th), 1));
-    GCALL1(F_TEXTURE_UPLOAD, g_imageBuf);
+    u32 file=(u32)(s32)ARG(PC(th),1),dest=g_imageBuf;
+    int lease=modio_acquire(0x800A2B3Cu,file,dest,&dest);
+    if(!lease)rt_fatal("mods: grown image staging is already in use");
+    GS(u32, sp + 0x10) = dest;
+    GCALL4(F_FILE_LOAD, 0x8006C664u, 0x80058538u, 0x800A2B3Cu, file);
+    GCALL1(F_TEXTURE_UPLOAD, dest);
+    if(lease==2 && !modio_release(0x800A2B3Cu,file))rt_fatal("mods: image staging ownership changed during upload");
     PC(th) += 4;
     V0 = 0;
 }

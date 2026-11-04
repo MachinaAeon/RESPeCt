@@ -5,6 +5,7 @@
 #include "render.h"
 #include "render_gpu.h"
 #include "rt.h"
+#include "modfs_pc_text.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -327,7 +328,7 @@ static void picture_scale(const uint32_t *in, int iw, int ih, uint32_t *out, int
     }
 }
 
-void display_grab_bgrx(uint32_t *out, int *w, int *h) {
+static void display_grab_bgrx_base(uint32_t *out, int *w, int *h) {
     build_luts();
     GpuDisplay d;
     gpu_display(&d);
@@ -414,4 +415,13 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
     const float *depth = render_depth();
     if (depth && display_holes()) close_holes(out, depth, stride, s, X, Y, W, H);
     if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);
+}
+
+/* The GUI and headless captures both use this final CPU/GPU presentation path. */
+void display_grab_bgrx(uint32_t *out, int *w, int *h) {
+    display_grab_bgrx_base(out, w, h);
+    if (modfs_pc_has_bitmaps()) {
+        GpuDisplay d; gpu_display(&d);
+        if (d.enabled && !d.rgb24) modfs_pc_composite(out, *w, *h, d.w, d.h);
+    }
 }

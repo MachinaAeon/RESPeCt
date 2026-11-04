@@ -22,6 +22,7 @@
  * with tools/eq). */
 #include "game_vars.h"
 #include "poll.h"
+#include "modfs_pc_text.h"
 
 void n_pickup_PlaceModel(void);
 void n_op_PickUp(void);
@@ -296,6 +297,7 @@ void n_pickup_Step(void) {
         GS(u32, sp + 0x10) = 2;
         GS(u32, sp + 0x14) = 0;
         GS(u32, sp + 0x18) = 0;
+        modfs_pc_pickup((u32)(s32)GV(s16, GV(u32, th) + 2));
         GCALL4(F_MSG_ADD_ENTRY, 0x800A88C8u, (u32)x, 0x30, 0x10);
         g_msgState = 1;
         u16 s = GV(u16, th + 0xA);

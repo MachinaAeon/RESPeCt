@@ -28,6 +28,8 @@
  * with tools/eq). */
 #include "game_vars.h"
 #include "poll.h"
+#include "modmem.h"
+#include "rt.h"
 
 /* ---- loader state ---- */
 #define g_loaderStep     GV(s32, 0x800A0CBC)   /* index into LOADER_STEPS */
@@ -134,6 +136,269 @@ static void vram_transfer(u32 sp, u32 func) {
 
 static s32 end_of_list(s16 type) { return (type & 0xF000) == 0xF000; }
 
+/* Boot-cached sizes only: preserve CD requests, sectors and timing.
+ * Shared payloads are counted once for identical consecutive types; work
+ * uses a conservative upper bound from its containing part/file. */
+static u32 model_sizes(u32 table, s32 file, u32 parts[3]) {
+    u32 packed;
+    if (!modfs_model_request_size(table, file, &packed, parts))
+        rt_fatal("mods: no model size metadata for table %08X file %d", table, file);
+    return packed;
+}
+static int needs_first_part(s32 t, s32 prev) {
+    switch(t) {
+    case 0: case 1: case 2: case 8: return prev == -1 || (u32)(prev-3)<5;
+    case 4: case 5: case 6: return !((u32)(prev-4)<3);
+    case 13: case 14: return !((u32)(prev-13)<2);
+    default: return t != prev;
+    }
+}
+static int sync_first_part(s32 type,s32 prev);
+static void room_budget(int synchronous) {
+    uint64_t bytes = 0, scratch = 0, work_bound = 0;
+    s32 prev = -1;
+    u32 models = 0,objects = 0;
+    u32 p = g_setupData + 4;
+    s32 cached=GV(s16,p);
+    for (u32 count = 0; !end_of_list(GV(s16,p)); count++, p += 0x18) {
+        if (count == 512 || p >= 0x80200000u - 0x18)
+            rt_fatal("mods: invalid room placement list before model preflight");
+        if (flag_set(FLAGS_ENEMY, GV(s16,p+2))) continue;
+        s32 t = synchronous ? cached : GV(s16,p);
+        if (synchronous && ++objects>7)
+            rt_fatal("mods: synchronous preflight exceeds original seven object slots");
+        u32 parts[3];
+        if ((t!=prev || (u32)(t-0x1F)<3 || (synchronous && t>=0x32)) && ++models>MODMEM_MODELS)
+            rt_fatal("mods: room exceeds original model-record table capacity");
+        if ((u32)(t-0x1F)<3) {
+            bytes += (uint64_t)model_sizes(ENEMY_FILE_TBL,t+0x171,parts) + 16;
+            work_bound = 4;
+        } else if (t==prev && !(synchronous && t>=0x32)) {
+            bytes += work_bound + 4;
+        } else if (t >= 0x32) {
+            bytes += (uint64_t)model_sizes(ENEMY_FILE_TBL,(t-0x32)*3,parts) + 16;
+            work_bound = t==0x9A ? 4 : model_sizes(ENEMY_FILE_TBL,(t-0x32)*3+2,parts);
+            if (t!=0x9A) bytes += work_bound + 16;
+        } else {
+            u32 packed=model_sizes(t==0x1E ? ENEMY_FILE_TBL : STAGE_FILE_TBL,t==0x1E ? 0x196 : t,parts);
+            u32 table=t==0x1E ? ENEMY_FILE_TBL : STAGE_FILE_TBL, file=t==0x1E ? 0x196 : (u32)t;
+            int staged=modmem_split_identity(table,file);
+            if ((!staged && packed > HEAP_START-(synchronous ? WORK_BUF : TEX_BUF)) || !parts[0] || !parts[1] || !parts[2])
+                rt_fatal("mods: invalid or oversized compressed room model before read");
+            uint64_t temp=(uint64_t)parts[0]+48+(staged ? (uint64_t)packed+32 : 0);
+            if (temp>scratch) scratch=temp;
+            bytes += (uint64_t)parts[2] + 40;
+            if (synchronous ? sync_first_part(t,prev) : needs_first_part(t,prev)) bytes += (uint64_t)parts[1] + 40;
+            work_bound=parts[2];
+        }
+        bytes += 0xDC;
+        if (synchronous && (t==0x22 || t==0x23)) t=0x10;
+        prev=t;
+        if (synchronous) {
+            cached=GV(s16,p+0x18);
+            if (cached==0x22 || cached==0x23) cached=0x10;
+        }
+    }
+    /* Pickups and script-created extras have data-dependent sizes and get
+     * their own capacity checks before reads, decode and final placement. */
+    modmem_budget(bytes, scratch);
+}
+static void model_slot_check(void) {
+    if (modmem_active() && (g_modelCount<0 || (u32)g_modelCount>=MODMEM_MODELS))
+        rt_fatal("mods: original model-record table is full before model loading");
+}
+static void model_decode_check(u32 src, u32 dest) {
+    modmem_require_fresh();
+    if (modmem_active()) modmem_require(dest, (uint64_t)GV(u32,src) + 34, "model/animation decompression");
+}
+
+/* Initial and event/reset loading has a separate, synchronous implementation
+ * at 8007428C. Keep the translated original byte-for-byte when the feature is
+ * inactive. Its seven object slots and sharing rules differ from Begin/Run. */
+void f_test_8007428C(void);
+static void sync_busy_leave(int *busy) { (void)busy; modmem_sync_end(); }
+static u32 sync_file(u32 sp,u32 name,u32 table,s32 index,u32 dest) {
+    u32 parts[3],bytes=model_sizes(table,index,parts);
+    if (dest>=0x80200000u) {
+        if (!modmem_stage_read(table,(u32)index,dest,bytes)) modmem_require(dest,bytes,"synchronous model file read");
+    } else if ((dest==WORK_BUF && bytes>HEAP_START-WORK_BUF) ||
+               (dest==0x800C3E50u && bytes>0x800F2C50u-0x800C3E50u))
+        rt_fatal("mods: synchronous resource exceeds its original fixed staging buffer");
+    GS(u32,sp+0x10)=dest;
+    u32 words=GCALL4(F_LOAD_FILE,table==STAGE_FILE_TBL ? 0x8006C230u : 0x8006C21Cu,name,table,index);
+    if ((uint64_t)words*4>bytes) rt_fatal("mods: synchronous model read returned an invalid size");
+    return words;
+}
+static int sync_first_part(s32 type,s32 prev) {
+    if (type<3 || type==8 || type==9)
+        return prev==-1 || (u32)(prev-3)<5 || prev>=10;
+    if ((u32)(type-4)<3) return !((u32)(prev-4)<3);
+    if ((u32)(type-13)<2) return !((u32)(prev-13)<2);
+    return 1;
+}
+static void sync_packed_record(u32 entry,u32 data) {
+    u32 rec=model_addr(g_modelCount);
+    GV(u32,rec+0x10)=data;
+    u32 hdr=GCALL2(F_MODEL_SECTION,data,3);
+    u32 sec=data+GV(u32,hdr+4)*4;
+    GV(s32,rec)=GV(s16,entry);
+    GV(u32,rec+8)=data+GV(u32,sec+0xC)*4;
+    GV(u32,rec+4)=0;
+    GV(u32,rec+0xC)=data+GV(u32,sec+0x10)*4;
+    GV(u32,rec+0x14)=GCALL2(F_MODEL_SECTION,data,2);
+    GV(u32,rec+0x18)=g_loadPtr-data;
+    g_modelCount++;
+}
+void n_loader_LoadSync(void) {
+    if (!modmem_enabled() || !modfs_dynamic_models()) { f_test_8007428C(); return; }
+    modmem_sync_begin();
+    __attribute__((cleanup(sync_busy_leave))) int busy=1;
+    FRAME(0x48);
+    u32 texture_buffer=A0,saved_s3=R[19];
+    R[19]=0x800B0000u;                         /* implicit odds input of roomscript_Branch */
+    GS(u32,sp+0x48)=texture_buffer;
+    g_objectWords=0xF57;                         /* original seven 0x8C4-byte slots */
+    u32 end=GV(u32,0x800BBCD0);
+    if (end<0x80000000u+0x3D5C || end>0x80200000u) rt_fatal("mods: invalid synchronous object pool");
+    g_objects=end-0x3D5C;
+    for (u32 i=0;i<0xF57;i++) {
+        GV(u32,g_objects+i*4)=0;
+        if (i+1<0xF57) LOOP_POLL(0x800742F4);
+    }
+    copy_record_polled(OBJ_TEMPLATE,g_objects,0x80074334);
+    for (s32 i=11;;) {
+        GV(u32,0x800A8850+(u32)i*4)=0;
+        if (--i<0) break;
+        LOOP_POLL(0x80074360);
+    }
+    GV(u32,0x800AB51C)=0;
+    for (s32 i=4;;) {
+        GV(s16,0x800B3EA8+(u32)i*12)=-1;
+        if (--i<0) break;
+        LOOP_POLL(0x8007438C);
+    }
+    GV(u32,0x800BB018)=0;
+    GV(s16,TYPE_SLOTS+6)=0; GV(s16,TYPE_SLOTS+2)=0;
+    GV(s32,0x800B6090)=-1;
+    g_objectCount=0; g_modelCount=0;
+    GV(u32,0x800BAA30)=0; g_texShareMode=0;
+    g_loadPtr=HEAP_START;
+    GCALL0(F_LOADER_RESET);                     /* selects the original script variant */
+    modmem_begin(g_setupData);
+    room_budget(1);
+    g_loadPtr=(modfs_static_end()+15u)&~15u;
+    u32 entry=g_setupData+4,part_a=0,instance=0;
+    s32 type=GV(s16,entry),prev=-1;
+    for (u32 visited=0;!end_of_list(GV(s16,entry));visited++) {
+        if (visited>=512 || entry>=0x80200000u-0x18) rt_fatal("mods: invalid synchronous placement list");
+        if (flag_set(FLAGS_ENEMY,GV(s16,entry+2))) {
+            /* The original skips this entry without replacing its cached type. */
+            entry+=0x18;
+            if (!end_of_list(GV(s16,entry))) LOOP_POLL(0x80074A98);
+            continue;
+        }
+        if (g_objectCount>=7) rt_fatal("mods: synchronous loader exceeds its original seven object slots");
+        model_slot_check();
+        if (type>=0x32) {
+            s32 file=(type-0x32)*3;
+            if (type==0x9A) {
+                u32 data=g_loadPtr;
+                g_loadPtr+=sync_file(sp,ENEMY_FILE_NAME,ENEMY_FILE_TBL,file,data)*4;
+                sync_packed_record(entry,data);
+            } else {
+                sync_file(sp,ENEMY_FILE_NAME,ENEMY_FILE_TBL,file+1,0x800C3E50u);
+                GCALL1(F_UPLOAD_TIMS,texture_buffer);
+                part_a=g_loadPtr;
+                g_loadPtr+=sync_file(sp,ENEMY_FILE_NAME,ENEMY_FILE_TBL,file,g_loadPtr)*4;
+                u32 part_b=g_loadPtr;
+                g_loadPtr+=sync_file(sp,ENEMY_FILE_NAME,ENEMY_FILE_TBL,file+2,g_loadPtr)*4;
+                u32 rec=model_addr(g_modelCount++);
+                GV(s32,rec)=GV(s16,entry);
+                GV(u32,rec+8)=part_a+(GV(u32,part_a+4)&~3u);
+                GV(u32,rec+0xC)=part_a+(GV(u32,part_a+8)&~3u);
+                GV(u32,rec+4)=part_b+(GV(u32,part_b+4)&~3u);
+                GV(u32,rec+0x14)=0;
+                u32 work=part_b+(GV(u32,part_b+8)&~3u);
+                GV(u32,rec+0x10)=work;
+                GV(u32,rec+0x18)=g_loadPtr-work;
+                instance=0;
+            }
+        } else if ((u32)(type-0x1F)<3) {
+            u32 data=g_loadPtr;
+            g_loadPtr+=sync_file(sp,ENEMY_FILE_NAME,ENEMY_FILE_TBL,type+0x171,data)*4;
+            sync_packed_record(entry,data);
+        } else if (type==prev) {
+            u32 rec=model_addr(g_modelCount-1),src=GV(u32,rec+0x10),stride=GV(u32,rec+0x18)&~3u;
+            if (stride && (uint64_t)src+(uint64_t)stride*(instance+1)!=g_loadPtr)
+                rt_fatal("mods: synchronous instance work would cease to be contiguous");
+            modmem_require(g_loadPtr,stride?stride:4,"synchronous contiguous model work");
+            u32 stop=src+stride;
+            do {
+                GV(u32,g_loadPtr)=GV(u32,src);src+=4;g_loadPtr+=4;
+                if (src<stop) LOOP_POLL(0x80074908);
+            } while (src<stop);
+            instance++;
+        } else {
+            u32 table=type==0x1E ? ENEMY_FILE_TBL : STAGE_FILE_TBL;
+            s32 file=type==0x1E ? 0x196 : type;
+            u32 parts[3],bytes=model_sizes(table,file,parts),source=WORK_BUF;
+            if (!parts[0] || !parts[1] || !parts[2]) rt_fatal("mods: missing synchronous split model metadata");
+            if (modmem_split_identity(table,(u32)file)) source=modmem_stage_acquire(table,(u32)file,bytes);
+            sync_file(sp,type==0x1E ? ENEMY_FILE_NAME : STAGE_FILE_NAME,table,file,source);
+            u32 src=source+GV(u32,source+8);
+            if (sync_first_part(type,prev)) {
+                if (type==0x22 || type==0x23) type=0x10;
+                part_a=g_loadPtr;model_decode_check(src,g_loadPtr);
+                g_loadPtr+=(GCALL2(F_DECOMPRESS,src,g_loadPtr)&~3u);
+            }
+            int shared_texture=(prev==0&&type==4)||(prev==1&&type==5)||(prev==2&&type==6)||
+                               (prev==4&&type==0)||(prev==5&&type==1)||(prev==6&&type==2);
+            if (!shared_texture) {
+                src=source+GV(u32,source+4);
+                u32 temp=modmem_scratch((uint64_t)GV(u32,src)+34,"synchronous room texture decode");
+                GCALL2(F_DECOMPRESS,src,temp);GCALL1(F_UPLOAD_TIMS,temp);
+            }
+            src=source+GV(u32,source+0xC);
+            u32 part_b=g_loadPtr;model_decode_check(src,part_b);
+            g_loadPtr+=(GCALL2(F_DECOMPRESS,src,part_b)&~3u);
+            modmem_stage_release();
+            u32 rec=model_addr(g_modelCount++);
+            GV(s32,rec)=GV(s16,entry);
+            GV(u32,rec+8)=part_a+(GV(u32,part_a+4)&~3u);
+            GV(u32,rec+0xC)=part_a+(GV(u32,part_a+8)&~3u);
+            GV(u32,rec+4)=part_b+(GV(u32,part_b+4)&~3u);
+            GV(u32,rec+0x14)=0;
+            u32 work=part_b+(GV(u32,part_b+8)&~3u);
+            GV(u32,rec+0x10)=work;GV(u32,rec+0x18)=g_loadPtr-work;
+            instance=0;
+        }
+        modmem_checkpoint((u32)g_modelCount,g_loadPtr);
+        u32 object=obj_addr(g_objectCount),rec=model_addr(g_modelCount-1);
+        copy_record_polled(object,OBJ_TEMPLATE,0x80074970);
+        GV(u8,object+0x314)=(u8)g_objectCount;
+        GV(u8,object+0x315)=GV(u8,entry);
+        GV(u32,object+0x88C)=rec;
+        GV(u32,object+0x848)=entry;
+        GV(u32,object+0x890)=GV(u32,rec+0x10)+((GV(u32,rec+0x18)*instance)&~3u);
+        if (GV(u8,object+0x315)<0x32) {
+            GS(s32,sp+0x18)=type;
+            s32 slot=(s32)GCALL3(F_TYPE_SLOT,object,sp+0x18,0);
+            if ((u32)slot>=2) rt_fatal("mods: invalid synchronous enemy program slot");
+            GV(s16,TYPE_SLOTS+(u32)slot*4+2)=1;
+            GV(u16,TYPE_SLOTS+(u32)slot*4)=GS(u16,sp+0x18);
+            GV(s16,object+0x84E)=(s16)slot;
+            GCALL2(0x80080A28u,(u32)slot,GS(u32,sp+0x18));
+            GCALL2(0x80098100u,GS(u32,sp+0x18),0x800C3E50u);
+        }
+        entry+=0x18;prev=type;g_objectCount++;
+        type=GV(s16,entry);
+        if (type==0x22 || type==0x23) type=0x10;
+        if (!end_of_list(GV(s16,entry))) LOOP_POLL(0x80074A98);
+    }
+    R[19]=saved_s3;
+    V0=(u32)GV(u16,entry)&0xF000u;             /* end marker bits, as left by the original */
+}
+
 /* 80074AD0 (step 0): idle. */
 void n_loader_Idle(void) { V0 = 0; }
 
@@ -142,6 +407,8 @@ void n_loader_Idle(void) { V0 = 0; }
  * the end of memory and fill them from the template. */
 void n_loader_Begin(void) {
     FRAME(0x28);
+    modmem_begin(g_setupData);
+    if (modmem_active()) room_budget(0);
     for (s32 i = 11;; ) {
         GV(u32, 0x800A8850 + (u32)i * 4) = 0;
         if (--i < 0) break;
@@ -195,7 +462,7 @@ void n_loader_Begin(void) {
     s32 n = enemies + items;
     s32 words = n * (s32)(OBJ_SIZE / 4);
     g_objectWords = words;
-    g_loadPtr = HEAP_START;
+    g_loadPtr = modmem_active() ? ((modfs_static_end() + 15u) & ~15u) : HEAP_START;
     g_objects = GV(u32, 0x800BBCD0) - (u32)words * 4;
     for (s32 i = 0; i < n - 1; ) {
         copy_record_polled(obj_addr(i), OBJ_TEMPLATE, 0x80074D54);
@@ -213,6 +480,7 @@ static void skip_loaded_trunc(void) { g_loadPtr += (u32)(g_cdSize / 4 * 4); }
  * types: textures to TEX_BUF), unless the previous entry had the same
  * type (its model data is copied instead). */
 void n_loader_RequestModel(void) {
+    modmem_require_fresh();
     FRAME(0x20);
     g_texEnd = TEX_BUF;
     if (flag_set(FLAGS_ENEMY, GV(s16, g_setupEntry + 2))) {
@@ -228,6 +496,7 @@ void n_loader_RequestModel(void) {
     if (type >= 0x32) {
         if ((u32)(type - 0x32) < 10 || type == 0x55) g_texShareMode = 1;
         if (g_setupPrevType == g_setupType) { g_loaderStep = 7; V0 = 0; return; }
+        model_slot_check();
         s32 file = (g_setupType - 0x32) * 3;
         u32 dest = g_loadPtr;
         g_enemyFile = file;
@@ -239,6 +508,7 @@ void n_loader_RequestModel(void) {
         return;
     }
     if ((u32)(type - 0x1F) < 3) {               /* types 0x1F-0x21: one packed file */
+        model_slot_check();
         cd_request(ENEMY_FILE_NAME, ENEMY_FILE_TBL, type + 0x171, g_loadPtr);
         u32 p = g_loadPtr;
         GV(u32, model_addr(g_modelCount) + 0x10) = p;
@@ -248,16 +518,30 @@ void n_loader_RequestModel(void) {
         return;
     }
     if (type == g_setupPrevType) { g_loaderStep = 7; V0 = 0; return; }
+    model_slot_check();
     vram_transfer(sp, F_LOAD_IMAGE);
     type = g_setupType;
     if (type == 0x12) g_texShareMode = 2;
-    if (type == 0x1E) cd_request(ENEMY_FILE_NAME, ENEMY_FILE_TBL, 0x196, TEX_BUF);
-    else cd_request(STAGE_FILE_NAME, STAGE_FILE_TBL, type, TEX_BUF);
-    u32 end = g_texEnd + (u32)(g_cdSize >> 2 << 2);
+    u32 table=type==0x1E ? ENEMY_FILE_TBL : STAGE_FILE_TBL;
+    s32 file=type==0x1E ? 0x196 : type;
+    u32 source=TEX_BUF;
+    if (modmem_active() && modmem_split_identity(table,(u32)file)) {
+        if (g_cdState) { V0=0; return; }
+        u32 parts[3], bytes=model_sizes(table,file,parts);
+        if (!parts[0] || !parts[1] || !parts[2]) rt_fatal("mods: missing split model metadata before staging read");
+        source=modmem_stage_acquire(table,(u32)file,bytes);
+    }
+    cd_request(type==0x1E ? ENEMY_FILE_NAME : STAGE_FILE_NAME,table,file,source);
+    u32 end = source + (u32)(g_cdSize >> 2 << 2);
     g_texEnd = end;
     GV(s32, end) = -1;
     g_loaderStep = 3;
     V0 = 0;
+}
+
+static u32 split_source(void) {
+    u32 source=modmem_stage_source();
+    return source ? source : TEX_BUF;
 }
 
 /* 80075050 (step 3): once the read is done, unpack the model's first part
@@ -268,7 +552,7 @@ void n_loader_UnpackModel(void) {
     s32 type = g_setupType;
     if (type < 0x32) {
         if ((u32)(type - 0x1F) < 3) { g_loaderStep = 6; V0 = 0; return; }
-        u32 src = GV(u32, TEX_BUF + 8) + TEX_BUF;
+        u32 src = GV(u32, split_source() + 8) + split_source();
         s32 prev = g_setupPrevType;
         s32 unpack;
         if ((u32)type < 0xF) LOOP_POLL(0x800750CC);   /* the jump table */
@@ -287,6 +571,7 @@ void n_loader_UnpackModel(void) {
             break;
         }
         if (unpack) {
+            model_decode_check(src, g_loadPtr);
             g_partA = g_loadPtr;
             u32 size = GCALL2(F_DECOMPRESS, src, g_loadPtr);
             g_loadPtr += size >> 2 << 2;
@@ -299,6 +584,7 @@ void n_loader_UnpackModel(void) {
 /* 800751CC (step 4): the textures: stage types unpack them (except for
  * pairs of types that share them), enemy types 0x3C+ request theirs. */
 void n_loader_Textures(void) {
+    modmem_require_fresh();
     FRAME(0x18);
     s32 t = g_setupType;
     if (t < 7) {
@@ -310,7 +596,9 @@ void n_loader_Textures(void) {
     }
     t = g_setupType;
     if (t < 0x32) {
-        GCALL2(F_DECOMPRESS, GV(u32, TEX_BUF + 4) + TEX_BUF, g_texEnd);
+        u32 src = GV(u32, split_source() + 4) + split_source();
+        if (modmem_active()) g_texEnd = modmem_scratch((uint64_t)GV(u32,src) + 34, "room textures");
+        GCALL2(F_DECOMPRESS, src, g_texEnd);
     } else if (t >= 0x3C) {
         cd_request(ENEMY_FILE_NAME, ENEMY_FILE_TBL, (t - 0x32) * 3 + 1, WORK_BUF);
     }
@@ -369,6 +657,7 @@ static void packed_model_record(void) {
  * other part and read the textures back (VRAM -> TEX_BUF). */
 void n_loader_ModelRecord(void) {
     FRAME(0x28);
+    model_slot_check();
     s32 t = g_setupType;
     if (t < 0x32) {
         if ((u32)(t - 0x1F) < 3) {
@@ -377,9 +666,12 @@ void n_loader_ModelRecord(void) {
             return;
         }
         u32 dst = g_loadPtr;
+        u32 src = GV(u32, split_source() + 0xC) + split_source();
+        model_decode_check(src, dst);
         g_partB = dst;
-        u32 size = GCALL2(F_DECOMPRESS, GV(u32, TEX_BUF + 0xC) + TEX_BUF, dst);
+        u32 size = GCALL2(F_DECOMPRESS, src, dst);
         g_loadPtr += size >> 2 << 2;
+        if (modmem_active()) modmem_stage_release();
         vram_transfer(sp, F_STORE_IMAGE);
     }
     if (g_setupType == 0x9A) {
@@ -428,7 +720,13 @@ void n_loader_ModelRecord(void) {
 void n_loader_CopyModelWork(void) {
     u32 rec = model_addr(g_modelCount - 1);
     u32 src = GV(u32, rec + 0x10);
-    g_partB = src + (GV(u32, rec + 0x18) >> 2 << 2);
+    u32 stride = GV(u32, rec + 0x18) >> 2 << 2;
+    if (modmem_active()) {
+        uint64_t expected=(uint64_t)src+(uint64_t)stride*((uint64_t)(u32)g_instance+1);
+        if (stride && expected!=g_loadPtr) rt_fatal("mods: instance work would cease to be contiguous");
+        modmem_require(g_loadPtr, stride ? stride : 4, "contiguous instance work copy");
+    }
+    g_partB = src + stride;
     for (;;) {
         GV(u32, g_loadPtr) = GV(u32, src);
         src += 4;
@@ -444,6 +742,7 @@ void n_loader_CopyModelWork(void) {
 /* 800757F0 (step 8): the enemy's object record, pointing at its model
  * record, placement and work data. */
 void n_loader_EnemyRecord(void) {
+    if (modmem_active()) modmem_checkpoint((u32)g_modelCount, g_loadPtr);
     u32 e = obj_addr(g_objectCount);
     copy_record_polled(e, OBJ_TEMPLATE, 0x8007584C);
     GV(u8, e + 0x314) = (u8)g_objectCount;
@@ -617,6 +916,7 @@ void n_loader_NextItem(void) {
 /* 80075F28 (step 19): request the pickup's next file: kind 1 its model
  * (to the heap), kinds 0 and 2 to WORK_BUF. */
 void n_loader_RequestItemFile(void) {
+    modmem_require_fresh();
     FRAME(0x20);
     s32 i = g_listIndex;
     u32 f = g_fileList + (u32)i * 12;
@@ -689,12 +989,19 @@ static void item_record(void) {
  * kind 2 unpacks the model (and textures) and copies its data to the
  * heap, then (kinds 1 and 2) the pickup's object record. */
 void n_loader_ItemFileDone(void) {
+    modmem_require_fresh();
     FRAME(0x20);
     if (g_cdState != 0) { V0 = 0; return; }
     s32 kind = GV(s32, g_fileList + (u32)g_listIndex * 12 + 4);
     if (kind == 2) {
         u32 data = (u32)g_cdSize + WORK_BUF;
+        if (modmem_active()) data = modmem_scratch((uint64_t)GV(u32,WORK_BUF) + 34, "pickup decode");
         GCALL2(F_DECOMPRESS, WORK_BUF, data);
+        if (modmem_active()) {
+            u32 first = GV(u32,data+4), end = GV(u32,data+8);
+            if (end < first || end > GV(u32,WORK_BUF)) rt_fatal("mods: invalid pickup model span");
+            modmem_require(g_loadPtr, (uint64_t)end-first, "pickup model copy");
+        }
         s16 t = GV(s16, g_setupEntry);
         if (t >= 0x5D || t < 0x5B) GCALL1(F_UPLOAD_TIMS, data + GV(u32, data + 8));
         u32 dst = g_loadPtr;
@@ -738,7 +1045,7 @@ void n_loader_Reload(void) {
     g_setupType = GV(s16, setup + 0x1C);
     g_loaderStep = end_of_list(GV(s16, setup + 0x1C)) ? 0x11 : 2;
     u32 m = GV(u32, model_addr(g_modelCount - 1) + 0x14);
-    g_loadPtr = GV(u32, GV(u32, m + 4) + 4);
+    g_loadPtr = modmem_active() ? modmem_retain((u32)g_modelCount) : GV(u32, GV(u32, m + 4) + 4);
     V0 = 0;
 }
 
@@ -853,6 +1160,16 @@ void n_loader_ResetEnemies(void) {
 void n_cd_RequestRead(void) {
     if (g_cdState != 0) { V0 = 0; return; }
     u32 ent = A1 + A2 * 4;
+    if (modmem_active()) {
+        uint64_t first = GV(u32,ent), last = GV(u32,ent+4);
+        if (last < first || last-first > UINT32_MAX/2048u) rt_fatal("mods: invalid model read extent");
+        uint64_t bytes = (last-first)*2048;
+        if (A3 >= 0x80200000u) {
+            if (!modmem_stage_read(A1,A2,A3,bytes)) modmem_require(A3,bytes,"model file read");
+        }
+        else if ((A3 == TEX_BUF || A3 == WORK_BUF) && bytes > HEAP_START-A3)
+            rt_fatal("mods: compressed model exceeds original staging buffer");
+    }
     GV(u32, CDREQ + 4) = A0;
     GV(u32, CDREQ + 8) = A1;
     GV(u32, CDREQ + 0xC) = A2;
@@ -867,6 +1184,7 @@ void n_cd_RequestRead(void) {
 
 /* 80076B74: cancel the file request. */
 void n_cd_CancelRead(void) {
+    if (modmem_active()) modmem_stage_cancel();
     g_cdState = 0;
     V0 = 0x800B0000u;                         /* as left by the original */
 }
@@ -906,8 +1224,14 @@ void n_cd_Update(void) {
 /* 80077044: an extra object record (boss parts, from enemy overlays):
  * template copy, model from stage file 0x71 on the heap; returns it. */
 void n_loader_ExtraObject(void) {
+    modmem_require_fresh();
     FRAME(0x28);
     u32 e = g_loadPtr;
+    if (modmem_active()) {
+        u32 bytes, parts[3];
+        if (!modfs_model_request_size(STAGE_FILE_TBL,0x71,&bytes,parts)) rt_fatal("mods: missing extra-object size");
+        modmem_require(e, (uint64_t)0x2310 + bytes, "extra object and model");
+    }
     g_loadPtr = e + 0x2310;
     copy_record_polled(e, OBJ_TEMPLATE, 0x80077098);
     GV(u8, e + 0x314) = (u8)g_objectCount;

@@ -33,6 +33,7 @@
  * Decompiled from the game's code; RAM-identical to the originals (checked
  * with tools/eq). */
 #include "status.h"
+#include "modfs_pc_text.h"
 
 void n_status_SetView(void);
 void n_status_Init(void);
@@ -139,6 +140,8 @@ void n_status_Frame(void) {
 void n_status_SortObjects(void) {
     FRAME(0x70);
     JAL(0x800C4240u, F_HUD_SORT, A0, A1, A2, A3);
+    ModPcBookDraw book_draw;
+    int replace_book = modfs_pc_book_begin(&book_draw);
     if (ST_OBJ_ON != 0) {
         u32 n = GV(u8, OBJECTS);
         GV(u32, 0x800BAA08) = 0;
@@ -163,6 +166,7 @@ void n_status_SortObjects(void) {
             JAL(0x800C435Cu, F_GS_SORT_OBJECT, obj, OT(front ? OT_FRONT : OT_WORLD), SCRATCH_WORK, A3);
         }
     }
+    if (replace_book) modfs_pc_book_end(&book_draw);
     JAL(0x800C43A0u, F_GS_SORT_OT, OT(OT_WORLD), OT(OT_SCREEN), A2, A3);
     JAL(0x800C43C8u, F_GS_SORT_OT, OT(OT_FRONT), OT(OT_SCREEN), A2, A3);
     if (ST_SORT_OLD == 0) { V0 = 0; return; }
@@ -907,9 +911,10 @@ void n_status_ItemNames(void) {
         }
         u32 it = GV(u8, LIST + (u32)(s32)(s16)r);
         u32 txt;
-        if (it == 0xFF) txt = 0x800CF2ECu;
-        else if (it == 0xFE) txt = 0x800CF300u;
+        if (it == 0xFF) txt = modfs_ui_text(0x800CF2ECu);
+        else if (it == 0xFE) txt = modfs_ui_text(0x800CF300u);
         else txt = GV(u32, ITEM_LOOK_TAB + (u32)(s32)GV(s16, ITEMS_B + it * 8) * 4);
+        txt = modfs_list_text(txt);               /* optional display name, full item text kept */
         u32 d = NAMES + (u32)k * 60;
         if (k == 3) { GV(u16, d) = 0xFC01; d += 2; }
         u16 c = GV(u16, txt);

@@ -543,6 +543,7 @@ void n_loader_CopyModelWork(void);
 void n_loader_EnemyRecord(void);
 void n_loader_ExtraObject(void);
 void n_loader_Idle(void);
+void n_loader_LoadSync(void);
 void n_loader_ItemFileDone(void);
 void n_loader_ListSounds(void);
 void n_loader_ModelRecord(void);
@@ -3934,7 +3935,7 @@ static const RtFunc tab_test[] = {
     {0x80073C0Cu, 0, 0, &in_test[66]},
     {0x80073C5Cu, n_shadow_Add, 0, &in_test[67]},
     {0x80073F88u, n_roomscript_Branch, 0, &in_test[68]},
-    {0x8007428Cu, 0, 0, &in_test[69]},
+    {0x8007428Cu, n_loader_LoadSync, 0, &in_test[69]},
     {0x80074AD0u, n_loader_Idle, 0, &in_test[70]},
     {0x80074AD8u, n_loader_Begin, 0, &in_test[71]},
     {0x80074D9Cu, n_loader_RequestModel, 0, &in_test[72]},
@@ -10882,3 +10883,5 @@ const int rt_module_count = 57;
 
 /* Translations the decompiled wrappers ("~name" in native.txt) call. */
 void f_test_8008F3BC(void) { interp_resume(&rt_modules[1], &tab_test[438]); }
+
+void f_test_8007428C(void) { interp_resume(&rt_modules[1], &tab_test[69]); }

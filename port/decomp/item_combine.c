@@ -157,7 +157,7 @@ void n_status_Combine(void) {
             if (GV(s16, w + 4) != (s16)oid) goto fail;
             if (GV(s16, w + 2) == GV(s16, WEAPON_TABLE + (u32)(s32)GV(s16, w) * 8 + 4)) {
                 ST_SOUND_ON = 0;
-                ST_SOUND = 0x800CF310u;            /* full */
+                ST_SOUND = modfs_ui_text(0x800CF310u);            /* full */
                 goto fail;
             }
             GV(u16, icon + 0x2C) = 0;

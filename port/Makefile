@@ -20,11 +20,11 @@ $(BUILD)/gen/%.o: gen/%.c include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(GEN_CFLAGS) -c $< -o $@
 
-$(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h include/recomp.h
+$(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h src/modfs_pc_sfx.h src/modfs_pc_noise.h src/modfs_pc_noise.inc src/modfs_diary.inc src/modfs_pc_text.inc src/modfs_pc_text.h src/modfs_pc_messages.h src/modfs_pc_diaries.h src/modfs_pc_diary.inc src/modfs_pc_diary_keys.inc src/modfs_pc_book.inc src/modfs_flc.h src/modfs_pc_pickups.h src/modfs_memory.h src/modmem.h src/modio.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -c $< -o $@
 
-$(BUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
+$(BUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) src/modmem.h src/modio.h src/modfs_pc_text.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -Idecomp -c $< -o $@
 
@@ -53,11 +53,11 @@ $(WBUILD)/gen/%.o: gen/%.c include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(GEN_CFLAGS) -c $< -o $@
 
-$(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h include/recomp.h
+$(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h src/modfs_pc_sfx.h src/modfs_pc_noise.h src/modfs_pc_noise.inc src/modfs_diary.inc src/modfs_pc_text.inc src/modfs_pc_text.h src/modfs_pc_messages.h src/modfs_pc_diaries.h src/modfs_pc_diary.inc src/modfs_pc_diary_keys.inc src/modfs_pc_book.inc src/modfs_flc.h src/modfs_pc_pickups.h src/modfs_memory.h src/modmem.h src/modio.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -c $< -o $@
 
-$(WBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
+$(WBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) src/modmem.h src/modio.h src/modfs_pc_text.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -Idecomp -c $< -o $@
 
@@ -80,11 +80,11 @@ DMETA_O = $(META:meta/%.c=$(DBUILD)/meta/%.o)
 
 dist: $(DBUILD)/resurv_headless
 
-$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h include/recomp.h
+$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h src/modfs_pc_sfx.h src/modfs_pc_noise.h src/modfs_pc_noise.inc src/modfs_diary.inc src/modfs_pc_text.inc src/modfs_pc_text.h src/modfs_pc_messages.h src/modfs_pc_diaries.h src/modfs_pc_diary.inc src/modfs_pc_diary_keys.inc src/modfs_pc_book.inc src/modfs_flc.h src/modfs_pc_pickups.h src/modfs_memory.h src/modmem.h src/modio.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -DRT_DIST -c $< -o $@
 
-$(DBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
+$(DBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) src/modmem.h src/modio.h src/modfs_pc_text.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
 
@@ -106,13 +106,13 @@ WDMETA_O = $(META:meta/%.c=$(WDBUILD)/meta/%.o)
 
 windist: $(WDBUILD)/RESPeCt.exe
 
-$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h include/recomp.h
+$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h src/modfs_pc.h src/modfs_bmp.h src/modfs_pack.h src/modfs_boss.h src/modfs_wav.h src/modfs_pc_sfx.h src/modfs_pc_noise.h src/modfs_pc_noise.inc src/modfs_diary.inc src/modfs_pc_text.inc src/modfs_pc_text.h src/modfs_pc_messages.h src/modfs_pc_diaries.h src/modfs_pc_diary.inc src/modfs_pc_diary_keys.inc src/modfs_pc_book.inc src/modfs_flc.h src/modfs_pc_pickups.h src/modfs_memory.h src/modmem.h src/modio.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -DRT_DIST -c $< -o $@
 
 $(WDBUILD)/src/render_gpu.o: src/render_gpu.hlsl   # built in (.incbin)
 
-$(WDBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
+$(WDBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) src/modmem.h src/modio.h src/modfs_pc_text.h include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
 

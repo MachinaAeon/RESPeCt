@@ -24,6 +24,7 @@
  * with tools/eq). */
 #include "hud.h"
 #include "game_stack.h"
+#include "modfs_pc_text.h"
 
 void n_hud_DrawPanels(void);
 void n_hud_SetFrameA(void);
@@ -66,7 +67,7 @@ void n_hud_DrawPanels(void) {
     do {
         u32 p = g_curPanel;
         u16 fl = P16(p, PANEL_FLAGS);
-        if (!(fl & 1) && (fl & (u16)GV(s16, 0x800C09D4)) && (fl & 4)) {
+        if (!(fl & 1) && (fl & (u16)GV(s16, 0x800C09D4)) && (fl & 4) && !modfs_pc_diary_panel(p)) {
             if (fl & 0x400) {
                 A0 = ctx;
                 n_hud_DrawWorldSprite();

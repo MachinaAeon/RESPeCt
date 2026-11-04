@@ -53,6 +53,7 @@ typedef struct {
     int pad_deadzone;              /* % of the stick's travel ignored */
     char texture_pack[512];        /* HD pack folder or archive; empty = look next to the exe */
     char pad_bind[PADB_COUNT][16]; /* action per button (config.c lists them) */
+    int dynamic_mod_buffers;       /* experimental model and synchronous TIM buffers, default off */
 } Config;
 
 extern Config g_cfg;

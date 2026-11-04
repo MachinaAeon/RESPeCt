@@ -23,6 +23,8 @@
  * (checked with tools/eq). cd_RunQueue and what it calls, and the ready
  * callback, run from interrupt handlers: see kernel.h. */
 #include "kernel.h"
+#include "modio.h"
+#include "rt.h"
 
 #define k_queue        GV(u32, 0x80062D74)
 #define k_qMax         GV(u16, 0x80062EFC)     /* size - 1 */
@@ -270,6 +272,11 @@ void n_cd_QueueRead(void) {
         V0 = 0xFFFFFFFFu;
         RESTORE_S;
         return;
+    }
+    if(modio_active()) {
+        uint8_t location[3];for(unsigned i=0;i<3;i++)location[i]=GS(u8,pos+i);
+        if(!modio_check_position(location,n,dest))
+            rt_fatal("mods: grown image/font read has no matching staging owner; no CD command published");
     }
     u32 e0 = k_qTail;
     u32 e1 = q_next(e0); k_qTail = (u16)e1; e1 &= 0xFFFF;

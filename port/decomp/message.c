@@ -28,6 +28,9 @@
  * with tools/eq). */
 #include "game_vars.h"
 #include "poll.h"
+#include "modfs_pc_text.h"
+#include "modio.h"
+#include "rt.h"
 
 void n_font_LoadPage(void);
 void n_msg_AddEntry(void);
@@ -109,9 +112,12 @@ void n_font_LoadPage(void) {
     case 1: file = 0x186; break;
     case 2: file = 0x187; break;
     }
+    int lease=modio_acquire(0x800A195Cu,file,dest,&dest);
+    if(!lease)rt_fatal("mods: grown font staging is already in use");
     GS(u32, sp + 0x10) = dest;                          /* argument 5 */
     GCALL4(F_FILE_LOAD, 0x8006C32C, 0x80058534, 0x800A195C, file);
     GCALL1(F_TEXTURE_UPLOAD, dest);
+    if(lease==2 && !modio_release(0x800A195Cu,file))rt_fatal("mods: font staging ownership changed during upload");
 }
 
 static void init_glyph(u32 s, u16 h, u16 tpage, u8 v) {
@@ -130,6 +136,7 @@ static void init_glyph(u32 s, u16 h, u16 tpage, u8 v) {
 /* 8007CD04: set up the glyph sprites, the "more" markers (16x8 at u 0x98
  * on tpage 0x15, positioned at y 0x3E) and clear the message entries. */
 void n_msg_InitSprites(void) {
+    modfs_pc_pickup(UINT32_MAX);
     for (u32 i = 0; i < 2 * GLYPHS_PER_BUF; i++) init_glyph(GLYPHS + i * SPRITE_SIZE, 0xE, 0x15, 0);
     for (u32 k = 0; k < 2; k++) {
         u32 s = MSG_MARKER + k * SPRITE_SIZE;     /* only these fields */
@@ -149,6 +156,7 @@ void n_msg_InitSprites(void) {
 
 /* 8007D7D0: drop the message box if one is up. */
 void n_msg_Cancel(void) {
+    modfs_pc_pickup(UINT32_MAX);
     if (g_msgState != 0) {
         g_msgBlink = 0;
         GV(u32, g_msgEntries) = 0;
@@ -199,13 +207,26 @@ void n_msg_Update(void) {
     /* lay out and draw the text */
     g_msgSprites = 0;
     u32 s = glyph_buffer();
+    struct { u32 entry, first, end; } raster[8];
+    u32 nraster = 0;
     for (u32 i = 0; i < 8; i++) {
         u32 e = g_msgEntries + i * 0x10;
-        if (GV(u32, e) != 0) s = GCALL2(F_MSG_LAYOUT, e, s);
+        if (GV(u32, e) != 0) {
+            u32 first = s;
+            s = GCALL2(F_MSG_LAYOUT, e, s);
+            raster[nraster].entry = e; raster[nraster].first = first; raster[nraster++].end = s;
+        }
     }
     s = glyph_buffer();
-    for (s32 i = 0; i < g_msgSprites; i++, s += SPRITE_SIZE)
-        GCALL3(F_GS_SORT_SPRITE, s, msg_ot(), 0);
+    for (s32 i = 0; i < g_msgSprites; i++, s += SPRITE_SIZE) {
+        int replaced = 0;
+        for (u32 r = 0; r < nraster; r++) if (s >= raster[r].first && s < raster[r].end) {
+            replaced = modfs_pc_message(GV(u32, raster[r].entry), GV(s16, s + SP_X) + 160,
+                GV(s16, s + SP_Y) + 120, GV(u16, s + SP_W), GV(u16, s + SP_H));
+            break;
+        }
+        if (!replaced) GCALL3(F_GS_SORT_SPRITE, s, msg_ot(), 0);
+    }
 
     switch (g_msgPrompt) {
     case 1: case 6: case 7:
@@ -353,7 +374,9 @@ void n_msg_DrawText(void) {
     }
     s = GLYPHS + buf * (GLYPHS_PER_BUF * SPRITE_SIZE);
     for (s32 i = 0; i < n; i++, s += SPRITE_SIZE)
-        GCALL3(F_GS_SORT_SPRITE, s, OT_MAIN + buf * 0x14, 0);
+        if (!modfs_pc_caption_message(GV(s16, s + SP_X) + 160, GV(s16, s + SP_Y) + 120,
+                GV(u16, s + SP_W), GV(u16, s + SP_H)))
+            GCALL3(F_GS_SORT_SPRITE, s, OT_MAIN + buf * 0x14, 0);
 }
 
 /* 8007F16C: on alternate 32 frames, draw the controller's button hint
@@ -393,6 +416,7 @@ void n_msg_AddEntry(void) {
     for (u32 i = 0;; i++) {
         u32 e = g_msgEntries + i * 0x10;
         if (GV(u32, e) == 0) {
+            modfs_pc_entry(A0);
             GV(u32, e) = A0;
             GV(u16, e + 4) = (u16)A1;
             GV(u16, e + 6) = (u16)A2;
@@ -406,6 +430,7 @@ void n_msg_AddEntry(void) {
         if (i + 1 >= 8) break;
         LOOP_POLL(0x8007CEA8);
     }
+    modfs_pc_entry(0);                         /* a failed add cannot arm the next entry */
     V0 = 1;
 }
 
@@ -667,6 +692,7 @@ void n_msg_Show(void) {
     u32 text = A0, kind = A1;
     if (g_msgState != 0) { V0 = (u32)g_msgState; return; }
     if (kind >= 5) { V0 = 0; return; }
+    modfs_pc_pickup(UINT32_MAX);
     LOOP_POLL(0x8007D71C);
     s32 x, y, z, n;
     switch (kind) {
@@ -799,6 +825,7 @@ void n_caption_Run(void) {
     }
     s32 n0 = (s32)GS(u32, sp), n1 = (s32)GS(u32, sp + 4);
     s32 w = n1 < n0 ? n0 * 4 : n1 * 4;
+    modfs_pc_caption((u32)(s32)GV(s16, pc + 2), (p - CAPTION_TEXT) / 2);
     g_captionText = p;
     g_captionX = -w;
     g_captionY = y;

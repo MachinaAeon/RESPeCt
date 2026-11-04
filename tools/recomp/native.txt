@@ -401,6 +401,7 @@ ovl59     80101D64  moth_Update
 ovl59     80101FF4  moth_SwoopStep
 ovl59     801020F4  moth_GrabStep
 ovl59     80102144  moth_StateActive
+test      8007428C  ~loader_LoadSync
 test      80074AD0  loader_Idle
 test      80074AD8  loader_Begin
 test      80074D9C  loader_RequestModel
