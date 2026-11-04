@@ -3,8 +3,23 @@
 RESPeCt plays the game straight from your PS1 disc image. Mods change it
 without touching the disc: files in a `mods` folder next to `RESPeCt.exe`
 take the place of the game's while it plays. The PC version's files
-(gun_bio's `PSX_DATA`, `Resource` and `nab` folders) work too, so mods made
-for the PC version can be used here.
+(gun_bio's `PSX_DATA`, `Resource` and `nab` folders) work for the mappings
+listed below. This is not blanket compatibility with every PC mod: PC
+message and diary BMPs have different representations and pagination.
+
+## PC asset packages
+
+For a PC mod that retains `PSX_DATA`, `Resource` and `nab`, see
+[Automatic PC asset-mod compatibility](PC_RESOURCE_COMPATIBILITY.md).
+The candidate accepts the PSX_DATA wrapper. `tools/pc_mod.py check` accounts
+for every supplied file; `import` refuses unknown resources and conflicts
+instead of copying a silently partial mod. A recognized route still needs
+runtime and gameplay verification. Full PC asset compatibility remains open.
+
+The candidate also accepts the verified PC `noise/noise.bin` layout through
+an ordered delta adapter, and the event-verified `WAV/ENEMY/DOG/SND-001.WAV`.
+See [PC audio compatibility](PC_AUDIO_COMPATIBILITY.md); this does not mean
+that all PC WAV filenames or enlarged banks are supported.
 
 ## Quick start
 
@@ -43,6 +58,8 @@ mods/
 | Items, Vincent | `item/.../A.HMD`, `item/.../*.TIM`, `people/VIC700/A.HMD` | `extract`, `PSX_DATA` |
 | Bosses' models, enemy textures | `RESOURCE/TAIRANT.HMD`, `RESOURCE/DEBUGTA00.TIM`... | `extract`, the PC's `Resource` |
 | 2D screens: maps, results, title and menus, fonts | `map/MAP00_1.png`, `RESULT/RANK_A.png`, `RESOURCE/TITLE10.png`... (BMP works too) | `extract`, `PSX_DATA`, `Resource` |
+| Room messages, item names/descriptions, three inventory labels and character mappings | `text/ROOMS.txt`, `GAME.txt`, `ITEMS.txt`, `UI.txt`, `LIST.txt`, `CHARS.txt` | `extract` |
+| A PS1 diary page | `diary/00/01.png` (document 0, page 1) | `extract` |
 | An enemy's skin | `nab/ENEMnn.png`, nn its type (00 to 30) | `extract` |
 | An enemy's shape, textures and animations, the PC's way | `nab/ENEMnn.NAB`, `nab/ENEMnn.NAC` | the PC's `nab` |
 | Streamed music, voices, a movie's sound | `X/BGM_32.STR/05.wav`: a channel of a stream; or the PC's name, `wav/Scene05_1.wav` | `extract`, the PC's `PSX_DATA/wav` |
@@ -83,8 +100,13 @@ changes those tables when a file grows, as far as the game's memory goes:
   the sound chip's 512 KB, shared with the other banks open (see below).
 - A file inside one of the packed archives (items, enemy textures in
   `Resource`) keeps its size: smaller is fine, bigger isn't.
-- Pictures are written at the size the PS1 has for them; another size is
-  scaled to it. For more detail than the PS1 has, use a texture pack.
+- Pictures keep their native TIM dimensions and layout. Larger supported
+  pictures also register an HD replacement (below); native data remains
+  suitable for the original code. Diary pages must fit their original
+  compressed block after conversion; otherwise the original block stays.
+- The runtime has 8 MiB of main RAM, of which the original game owns 2 MiB.
+  Only explicitly relocated text data uses the extra area here. This does
+  not enlarge every model, room, animation or sound buffer automatically.
 
 The log says how big each changed block is, and by how much a file that
 doesn't fit is too big.
@@ -101,6 +123,120 @@ RESPeCt writes it into the PS1 picture in that picture's own format:
   and the new picture is drawn with the first one's colours;
 - see-through where a PNG's alpha is, and where the original was
   see-through and the new picture is still black there.
+
+## Text and fonts
+
+`extract/text` contains UTF-8 files. Each entry starts on its own `@` line;
+edit the following lines up to the next entry. Keep the identifiers, and
+retain the original control tags unless deliberately changing the prompt.
+Only entries supplied by a mod replace the originals; later mods win.
+
+| File | Identifier | Content |
+| --- | --- | --- |
+| `text/ROOMS.txt` | `@block.number`, e.g. `@0.0` | ROOMENV messages |
+| `text/GAME.txt` | numeric `@number` | Item/file names and the TEST strings present in the extraction |
+| `text/ITEMS.txt` | numeric `@number` | BIGTIM item descriptions |
+| `text/LIST.txt` | numeric `@number`, 0–44 | Optional compact inventory names; full GAME names remain intact |
+| `text/UI.txt` | `@RETURN`, `@NO_ITEM`, `@FULLY_LOADED` | Three inline inventory labels, stored in mod RAM |
+| `text/CHARS.txt` | `character glyph-number`, one mapping per line | Custom glyph mapping, e.g. `ì 128` |
+
+A literal line break, or `{n}`, starts a new line. Other tags are `{sp}`
+(space), `{more}`, `{more2}`, `{stop}`, `{wait 30}`, `{color 2}`,
+`{speed 1}`, `{choice1}`, `{choice2}`, `{choiced}`. Advanced round-trip
+tags are `{g128}` (glyph), `{xFFFF}` (raw code) and `{noend}`. The end code
+is added automatically unless `{noend}` is given. Never remove a choice or
+wait tag merely to make a translation fit: it can control an event.
+
+Draw added characters in `FONT/FONT186.png` through `FONT188.png`, then
+map them in `CHARS.txt`; cells 128–143 are available in the existing
+18-column, 8x14 glyph layout. Text files being UTF-8 does not create a
+Unicode font. Custom tokens use the longest match; ties use the later
+mod's mapping.
+
+Item names (`GAME` entries 0–44) and the three UI labels must terminate
+and fit the original inventory row: at most 27 codes before the end,
+including colour codes. Longer item names also produce a layout warning;
+this safety limit is not a guarantee that a name fits the visible box.
+For a long full name, supply a compact list-only name in `text/LIST.txt`
+with the same GAME identifier: at most 18 visible glyphs (144 pixels),
+colour tags and the normal end code. New lines, prompts and waits are
+rejected in compact names. For example:
+
+```
+# text/GAME.txt
+@10
+Proiettili per pistola
+```
+
+```
+# text/LIST.txt
+@10
+Munizioni pistola
+```
+
+The list shows the compact name; other consumers retain the full name.
+The separator Return/NO ITEM labels belong in UI.txt. Nothing is shortened
+automatically. Check your authored names on the actual screen. ROOMENV offsets remain
+signed 16-bit offsets; oversized text parts are rejected before writing.
+Item descriptions still need to fit their BIGTIM block. These controls do
+not provide automatic wrapping or establish complete translation coverage.
+Menu labels drawn as pictures must be edited as pictures; other unmapped
+strings still need identification. PC `Message`/`eventmsg` BMPs are not
+converted into PS1 glyph data automatically. The opt-in
+[PC bitmap manifest](PC_BITMAPS.md) can instead map authored raster
+messages, pickup images and adapted diary crops to original identities,
+while preserving native control streams. It does not infer missing text
+or ambiguous page correspondence.
+
+## Item pictures and HD replacements
+
+`BIGTIM/00.png` through the indices provided by `extract` replace the
+large item pictures. The already mapped PC picture paths (maps, title,
+results and menus) use the same HD registration as BIGTIM.
+
+For these paths and diary pages, an image at least 2x the native width
+and height can also be drawn as an HD texture, at a whole scale factor.
+This uses the existing **F2 / HD textures** setting and resolution 2x or
+higher on either CPU or GPU. Native TIM data is still converted normally;
+HD registration does not change game logic or native VRAM dimensions.
+
+Indexed TIMs with several CLUT rows now receive a separate HD image for
+each distinct palette. Author the replacement using the first palette:
+high-resolution colours are assigned to its indices, then recoloured
+through each original palette. An unchanged native index is preserved
+where possible, including equal colours that differ in another palette.
+Transparency follows the native converter; STP black is not transparent.
+This is palette-aware replacement, not unrestricted true-colour drawing
+for every original palette.
+
+The FONT186/FONT187/FONT188 sheets share palette VRAM. Their HD variants
+also include the other sheets' palette banks, because inventory text can
+use FONT187 colours with FONT188 pixels. Keep the extracted atlas layout,
+including unused cells; a palette contact sheet is not the atlas. The
+native TIM conversion, glyph codes, dimensions and menu logic stay intact.
+
+24-bit TIMs are not promoted. Each promotion is checked against the
+configured HD memory budget before allocation; this is not a cumulative
+budget guarantee for all mod images. A log line says `with an HD
+replacement` only when registration actually succeeded. Loading a state
+restores HD tracking only for complete known rectangles that still match
+VRAM.
+
+## Diary pages
+
+`diary/00/01.png` means PS1 document 0, page 1 (decimal, starting at 1).
+Use the names from `extract/diary`: there are 13 documents and 90 pages
+in the supported USA disc. They include the title pages. Pages are TIMs
+compressed inside `CONFFILE.BIN` (two Fs). A replacement keeps its TIM
+layout, the document's page count and the archive's original block size.
+The block is rebuilt and committed only after it fits; failure preserves
+the original. Larger images can also supply HD detail as described above.
+
+PC `diary/file00/FILE00_1.BMP` is **not** an alias for PS1 page 1: the
+editions differ in page order and how text is split between pages. Adapt
+a PC translation to the extracted PS1 pages; do not simply rename it.
+Background/cover resources and changing document page counts are outside
+this per-page interface.
 
 ## Enemies
 
@@ -122,8 +258,9 @@ into another form, so RESPeCt converts them back:
 **Shapes.** Vertices can be moved as far as you like, and polygons added,
 taken away or moved to another body part: the model is then built again
 (its skeleton, animation and the rest kept), with new polygons on the
-texture page their UVs need. Each enemy in a room has its own copy of the
-model, so a model can grow by up to 48 KB (about 1800 more triangles);
+texture page their UVs need. The loader retains shared model data and contiguous copies of instance
+work. The current converter permits model growth of up to 48 KB
+(about 1800 more triangles);
 the game's memory for a room's enemies ends at 0x801F0000, and if a room
 comes near it the log says so.
 
@@ -150,6 +287,15 @@ take all of it too, with these differences:
   17 small ones the PC stretched to powers of two): each changed picture
   gets a palette made for it (type 33's share one, made for all of
   them), and the copies of them elsewhere on the disc change too.
+
+## Experimental dynamic model buffers
+
+[Dynamic model and animation buffers](DYNAMIC_MOD_BUFFERS.md) extend the
+room-owned decoded heap when explicitly enabled in `[mods]` with
+`dynamic_mod_buffers = 1`. The option defaults to 0. Instance work stays
+contiguous; capacity and saved arena metadata are checked. Compressed
+staging, SPU and original format limits remain. Larger decoded resources
+do not imply every fixed game buffer is relocatable.
 
 ## Streamed sound: voices, music, movies' sound
 
@@ -235,19 +381,34 @@ every movie played is written out again).
 
 ## Saves
 
-Memory card saves work with or without mods. A quick save (savestate)
-made before you added a mod keeps the game's memory as it was; on loading
-it, RESPeCt puts the mods' changes to the game's tables back in (the log
-says how many). Moving a mod out after making a quick save with it can
-leave that save reading the wrong places: load a memory card save then.
+Memory card saves work with or without mods. New quick saves include a
+content/priority identity for the active source mods. Loading one with
+removed or changed mods is refused before the running state is replaced.
+Restore the same source files, mod folder names and order, or use a memory
+card save. This identity is a compatibility check, not an authenticity
+check; unrelated files inside resource subfolders can conservatively
+change it too. The identity also includes the actual order of files
+inside a mod. If filesystem enumeration changes that order, a quick save
+is conservatively refused even when the files are unchanged. Avoid
+multiple paths/formats targeting the same resource inside one mod.
+
+A new quick save with no mods can still use the existing conditional RAM
+and VRAM reapplication when mods are added. This is not a universal state
+migration guarantee. Legacy quick saves have no identity: the log warns
+that compatibility is unverified. They cannot reliably detect which mods
+were active when saved; keep a backup and prefer a memory card save when
+changing mods. Older executables do not enforce the new identity.
 
 ## What can't be changed
 
 - **Game code** (`KERNEL.BIN`, `TEST.BIN`, the overlays): RESPeCt runs it
   translated, not from the disc.
-- **Texts.** The PC version's messages are pictures of text (BMPs); the PS1
-  builds them from font sheets and message data, which are disc files
-  (they can be replaced whole, but there's no tool for the text yet).
+- **Automatic mapping of every PC translation BMP.** An explicit
+  [bitmap manifest](PC_BITMAPS.md) supports authored mappings; use the PS1 UTF-8 text,
+  font and diary interfaces above; not all PC paths have a mapping.
+  `item/PIC` contains pickup-message bitmaps, not BIGTIM item pictures.
+  See [MODDING_LIMITS.md](MODDING_LIMITS.md) for verified correspondences
+  and the information still needed for a complete importer.
 - **The PC's sound effects** (`wav/door`, `wav/enemy`...): other
   recordings than the PS1's; give the PS1's sounds instead (above).
 - **The PC's movies and animations** (`.avi`, `.mpg`, `.FLC`): give frames
@@ -276,3 +437,17 @@ The headless runner (`port/build/.../resurv_headless`) takes `RT_MODS=dir`
 for a mods folder, `RT_EXTRACT=dir` and `RT_MOVIE_DUMP=dir` for the
 originals, and `RT_DUMP_FILE=lba:size=path` to write a disc file as the
 game reads it, mods applied (lba and size from `disc_ids.h`).
+
+## Validation and remaining work
+
+See [MODDING_STATUS.md](MODDING_STATUS.md) for verified capabilities,
+remaining limits and the acceptance checks that have not been performed.
+Asset-free loader regressions run with `python tools/tests/modfs_test.py`
+from the repository root (`CC` can select clang/GCC and target options).
+
+
+Complete PC diary content can also load automatically from its original
+`diary/fileXX/fileXX_N.bmp` paths, without a page manifest. Include every
+foreground/background companion for that document, or layer over an installed
+complete set. See [PC_DIARIES.md](PC_DIARIES.md) for exact paths, counts, priority,
+state compatibility and the separate unsupported PC UI resources.
