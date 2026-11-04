@@ -238,6 +238,7 @@ void hw_advance(uint32_t cycles) {
             gte_precise_frame();
             { void gte_precise_stats(void); if (g_frame % 10 == 0) gte_precise_stats(); }
             plat_frame();
+            { void modplug_frame(void); modplug_frame(); }   /* mods' plugins (modplug.c) */
         }
     }
 }

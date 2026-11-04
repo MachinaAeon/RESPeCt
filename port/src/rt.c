@@ -101,6 +101,16 @@ void rt_call(uint32_t addr) {
 
 void rt_reset_call_cache(void) { memset(call_cache, 0, sizeof call_cache); }
 
+/* modplug.c: a function of the game's code starts at addr (any module, loaded or not). */
+int rt_is_function(uint32_t addr) {
+    for (int i = 0; i < rt_module_count; i++) {
+        const RtModule *m = &rt_modules[i];
+        uint32_t p = addr & 0x1FFFFFFF;
+        if (p >= (m->code_lo & 0x1FFFFFFF) && p < (m->code_hi & 0x1FFFFFFF) && find_func(m, addr)) return 1;
+    }
+    return 0;
+}
+
 /* Functions that may contain pc, nearest first (for resuming a save). */
 int rt_resume_candidates(uint32_t pc, const RtModule **mod, const RtFunc **out, int max) {
     const RtModule *m = find_module(pc);

@@ -67,6 +67,7 @@ mods/
 | A room's music | `NOISE/236/music1.seq` (the PS1's sequence), or `NOISE/236/music1.wav` (a recording, as the PC has its music) | `extract` |
 | A movie's pictures | `M/OPENING.STR/0042.png`: frame 42 | `movie_dump` (below) |
 | Any texture in HD | a texture pack (see the README) | |
+| The game's code: hooks on its functions, its memory | `plugins/name.dll` (native code, off unless switched on) | your own (below) |
 
 Paths aren't case-sensitive, and `/` or `\` both work. Pictures can be
 PNG, BMP, JPG or TGA.
@@ -297,6 +298,35 @@ contiguous; capacity and saved arena metadata are checked. Compressed
 staging, SPU and original format limits remain. Larger decoded resources
 do not imply every fixed game buffer is relocatable.
 
+## Plugins: changing the game's code
+
+What a DLL does to the PC version, a plugin does here: a 64-bit Windows
+DLL in a mod's `plugins` folder (`mods/my-mod/plugins/name.dll`) that
+exports `respect_plugin_init`. Through the interface in
+[port/include/respect_plugin.h](../port/include/respect_plugin.h) it
+
+- hooks any function of the game by its PS1 address (the names and
+  addresses are in `symbol_addrs.txt` and the decompiled `port/decomp`):
+  code before it, which can read and change its arguments or skip it and
+  give its result, and code after it, which can change the result;
+- reads and writes the game's memory (8 MB: the PS1's 2 MB, then what
+  mods use) and its registers, and calls the game's functions;
+- runs code every frame.
+
+[port/plugins/example.c](../port/plugins/example.c) logs every room that
+loads and every message box's text, and gives back health over time:
+
+```
+clang --target=x86_64-w64-mingw32 -shared -O2 -o example.dll example.c -I port/include
+```
+
+Plugins are programs, not data: they run only when the player sets
+`mod_plugins = 1` in `[mods]` of `resurv.ini` (`RT_PLUGINS=1` for the
+headless runner). Otherwise the log says each one wasn't used. With no
+plugin hooking anything the game runs exactly as without them. A quick
+save keeps the game's memory, not a plugin's own variables: keep
+anything that has to survive a save in the game's memory.
+
 ## Streamed sound: voices, music, movies' sound
 
 The disc's streamed sound (XA: the music in `X/BGM_32.STR`, the voices in
@@ -401,8 +431,9 @@ changing mods. Older executables do not enforce the new identity.
 
 ## What can't be changed
 
-- **Game code** (`KERNEL.BIN`, `TEST.BIN`, the overlays): RESPeCt runs it
-  translated, not from the disc.
+- **Game code from the disc** (`KERNEL.BIN`, `TEST.BIN`, the overlays):
+  RESPeCt runs it translated, not from the disc. Change the code with a
+  plugin (above) instead.
 - **Automatic mapping of every PC translation BMP.** An explicit
   [bitmap manifest](PC_BITMAPS.md) supports authored mappings; use the PS1 UTF-8 text,
   font and diary interfaces above; not all PC paths have a mapping.

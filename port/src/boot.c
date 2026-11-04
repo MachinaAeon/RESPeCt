@@ -53,6 +53,9 @@ int rt_boot(const char *disc_path) {
         void modfs_open(void);
         modfs_extract();
         modfs_open();
+        extern char g_mods_dir[1024];
+        void modplug_load(const char *mods_dir);
+        modplug_load(g_mods_dir);                /* their plugins (modplug.c), when switched on */
     }
     uint8_t *exe;
     uint32_t n;

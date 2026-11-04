@@ -265,6 +265,14 @@ static void apply(const char *mod, const char *rel, const char *path) {
     /* Keep the supplied name in state identity and manifest-source exclusion.
      * Only dispatch strips the PC installation's verified PSX_DATA wrapper. */
     mod_hash_file(up, path);
+    {   /* plugins/x.dll: native code, loaded after every file (modplug.c) */
+        int modplug_add(const char *mod, const char *mod_dir, const char *up, const char *path), modplug_enabled(void);
+        if (modplug_add(mod, NULL, up, path)) {
+            if (modplug_enabled()) nused++;
+            else note("mods: %s/%s: a plugin, and plugins are switched off (mod_plugins = 1 in resurv.ini): not used", mod, rel);
+            return;
+        }
+    }
     if (pc_bitmaps_source(mod, up)) return;
     if (!strncmp(up, "PSX_DATA/", 9)) memmove(up, up + 9, strlen(up + 9) + 1);
     long n = 0;
