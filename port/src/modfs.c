@@ -162,6 +162,8 @@ static int diary_apply(const char *mod, const char *rel, const char *up, const c
 static void pc_diary_disable(unsigned doc);
 static int own_picture_apply(const char *mod, const char *rel, const char *up, const char *path);
 static void texts_done(void);
+static int data_apply(const char *mod, const char *rel, const char *up, const char *path);
+static void data_done(void);
 static int write_out(const char *rel, const uint8_t *d, size_t n);
 static void sfx_done(void);
 static int movie_apply(const char *mod, const char *rel, const char *up, const char *path);
@@ -354,6 +356,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
         nused++;
         return;
     }
+    if (data_apply(mod, rel, up, path)) return;
     if (text_apply(mod, rel, up, path)) return;
     if (diary_apply(mod, rel, up, path)) return;
     if (own_picture_apply(mod, rel, up, path)) return;
@@ -2467,6 +2470,288 @@ static int texts_extract(void) {
     files += write_out("text/CHARS.txt", (const uint8_t *)out, o);
     const char *compact = "# Optional shorter inventory names. Use GAME identifiers 0-44 and at most\n# 18 visible glyphs; leave this empty to keep full names. See MODDING.md.\n";
     files += write_out("text/LIST.txt", (const uint8_t *)compact, strlen(compact));
+#undef ADD
+    free(out);
+    return files;
+}
+
+/* ------------------------------------------------------------ game data */
+
+/* Numbers of the game a mod gives as text (decimal; # starts a comment):
+ *   data/COMBAT.txt   in TEST.BIN (combat.c, enemy.c): per weapon (its item id) its
+ *                     fire rate (the game doubles it), "rate <id> <n>"; per shot
+ *                     kind (the weapon, grenades by the ammo loaded) its
+ *                     base damage, three values, and damage class,
+ *                     "shot <kind> <d1> <d2> <d3> <class>"; per enemy type
+ *                     the damage factor in percent for each of the five
+ *                     classes, "factor <type> <c0> <c1> <c2> <c3> <c4>";
+ *                     the hit points of the small enemies (types 0-10) by
+ *                     their placement's hit points value, "hp <n> <points>"
+ *                     (n 0-14), and, for a value of 15 and up, the
+ *                     cumulative chances (percent) of each, "chance <n> <p>";
+ *   data/ROOMS.txt    a room's enemies and pickups (ROOMENV.DAT: block =
+ *                     stage * 30 + room, room_loader.c), "@<block>" then
+ *                     "enemy <type> <flag> <x> <y> <z> <yaw> <pose>
+ *                     <animation> <hit points value>" and "item <type> <flag> <x> <y>
+ *                     <z> <r0> <r1> <r2> <extra>"; a room given lists all
+ *                     of them (others stay). The game makes room for at
+ *                     most 7 objects (enemies and pickups) in a room
+ *                     loaded at once, 10 at all: no more than that, or the
+ *                     room's own number if it has more than 7.
+ * A save made before the mod gets the weapons' numbers when it's loaded. */
+#define W_RATE    0x800A3CB0u                    /* u32 x 11 */
+#define W_SHOT    0x800A3CDCu                    /* s16 x 3 per kind, 11 kinds */
+#define W_CLASS   0x800A3D70u                    /* s16 per kind, 12 */
+#define W_FACTOR  0x800A3D88u                    /* s16 x 5 per enemy type, 34 */
+#define W_HP      0x800A23ACu                    /* s16 x 15: small enemies' hit points (enemy.c) */
+#define W_CHANCE  0x800A23CCu                    /* s32 x 15: cumulative chances, percent */
+#define ITEM_NAMES 0x800A6D5Cu                   /* the items' names (pointers) */
+
+typedef struct { int kind; uint8_t *d; long n; char what[600]; } DataFile;   /* kind: 0 combat, 1 rooms */
+static DataFile *datafiles;
+static int ndatafiles;
+
+static int data_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    int kind = !strcmp(up, "DATA/COMBAT.TXT") ? 0 : !strcmp(up, "DATA/ROOMS.TXT") ? 1 : -1;
+    if (kind < 0) return 0;
+    long n = 0;
+    uint8_t *d = load(path, &n);
+    DataFile *f = d ? realloc(datafiles, (size_t)(ndatafiles + 1) * sizeof *datafiles) : NULL;
+    if (!f) { free(d); note("mods: %s/%s: couldn't read it", mod, rel); return 1; }
+    datafiles = f;
+    f = &datafiles[ndatafiles++];
+    f->kind = kind;
+    f->d = d;
+    f->n = n;
+    snprintf(f->what, sizeof f->what, "%s/%s", mod, rel);
+    nused++;
+    return 1;
+}
+
+/* An item's name (for the comments), as letters. */
+static void item_name(const uint8_t *test, uint32_t id, char *out, size_t cap) {
+    out[0] = 0;
+    uint32_t p = id < 0x60 ? rd32(test + ITEM_NAMES - TEST_BASE + 4 * id) : 0;
+    if (p < TEST_BASE || p >= TEST_BASE + 0x57000) return;
+    int ended;
+    text_decode(test + (p - TEST_BASE), 120, out, cap, &ended);
+    for (char *c = out; *c; c++) if (*c == '\n' || *c == '{') { *c = 0; break; }
+}
+
+/* A block's part k (0 zones, 1 setup: enemies from +4, 2 pickups): where and how long. */
+static int roomenv_list(const uint8_t *d, uint32_t at, uint32_t len, int k, uint32_t *po, uint32_t *pl) {
+    if (len < 28 || rd32(d + at) != 6) return 0;
+    uint32_t a = rd32(d + at + 4 + 4 * (uint32_t)k), b = rd32(d + at + 8 + 4 * (uint32_t)k);
+    if (a < 28 || b < a || b > len) return 0;
+    *po = a;
+    *pl = b - a;
+    return 1;
+}
+/* The entries of a list (0x18 bytes each) before its end mark. */
+static uint32_t list_count(const uint8_t *p, uint32_t len, int setup) {
+    uint32_t n = 0;
+    for (uint32_t o = setup ? 4 : 0; o + 2 <= len; o += 0x18, n++) {
+        uint16_t t = rd16(p + o);
+        if (setup ? (t & 0xF000) == 0xF000 : t == 0xFFFF) return n;
+        if (o + 0x18 > len) break;
+    }
+    return 0xFFFFFFFFu;                          /* (no end mark) */
+}
+
+static void data_done(void) {
+    if (!ndatafiles) return;
+    Touched *test = touch(disc_index("TEST.BIN"));
+    if (!test) return;
+    for (int i = 0; i < ndatafiles; i++) {
+        DataFile *f = &datafiles[i];
+        char *s = malloc((size_t)f->n + 1);
+        memcpy(s, f->d, (size_t)f->n);
+        s[f->n] = 0;
+        if (f->kind == 0) {                      /* the weapons: in TEST.BIN's data, and the RAM of older saves */
+            static uint8_t was[W_FACTOR + 340 - W_RATE], washp[W_CHANCE + 60 - W_HP];
+            memcpy(was, test->data + W_RATE - TEST_BASE, sizeof was);
+            memcpy(washp, test->data + W_HP - TEST_BASE, sizeof washp);
+            int lines = 0, bad = 0, ln = 0;
+            for (char *line = strtok(s, "\n"); line; line = strtok(NULL, "\n")) {
+                ln++;
+                char *h = strchr(line, '#');
+                if (h) *h = 0;
+                char word[16];
+                long a[7];
+                int got = sscanf(line, "%15s %ld %ld %ld %ld %ld %ld", word, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5]);
+                if (got <= 0) continue;
+                uint8_t *at = NULL;
+                if (!strcmp(word, "rate") && got == 3 && a[0] >= 0 && a[0] < 11 && a[1] >= 0 && a[1] < 1000) {
+                    at = test->data + W_RATE - TEST_BASE + 4 * a[0];
+                    wr32(at, (uint32_t)a[1]);
+                } else if (!strcmp(word, "shot") && got == 6 && a[0] >= 0 && a[0] < 11 && a[4] >= 0 && a[4] < 5) {
+                    at = test->data + W_SHOT - TEST_BASE + 6 * a[0];
+                    for (int k = 0; k < 3; k++) wr16(at + 2 * k, (uint16_t)(int16_t)(a[1 + k] < -32768 ? -32768 : a[1 + k] > 32767 ? 32767 : a[1 + k]));
+                    wr16(test->data + W_CLASS - TEST_BASE + 2 * a[0], (uint16_t)a[4]);
+                } else if (!strcmp(word, "factor") && got == 7 && a[0] >= 0 && a[0] < 34) {
+                    at = test->data + W_FACTOR - TEST_BASE + 10 * a[0];
+                    for (int k = 0; k < 5; k++) wr16(at + 2 * k, (uint16_t)(int16_t)(a[1 + k] < 0 ? 0 : a[1 + k] > 32767 ? 32767 : a[1 + k]));
+                } else if (!strcmp(word, "hp") && got == 3 && a[0] >= 0 && a[0] < 15 && a[1] > 0 && a[1] < 32768) {
+                    at = test->data + W_HP - TEST_BASE + 2 * a[0];
+                    wr16(at, (uint16_t)a[1]);
+                } else if (!strcmp(word, "chance") && got == 3 && a[0] >= 0 && a[0] < 15 && a[1] >= 0 && a[1] <= 100) {
+                    at = test->data + W_CHANCE - TEST_BASE + 4 * a[0];
+                    wr32(at, (uint32_t)a[1]);
+                }
+                if (at) lines++;
+                else { note("mods: %s: line %d isn't one of rate/shot/factor/hp/chance with its numbers: not used", f->what, ln); bad++; }
+            }
+            ram_fix(W_RATE, was, test->data + W_RATE - TEST_BASE, sizeof was);
+            ram_fix(W_HP, washp, test->data + W_HP - TEST_BASE, sizeof washp);
+            note("mods: %s: %d weapon and damage numbers%s", f->what, lines, bad ? ", some lines skipped (above)" : "");
+        } else {                                 /* the rooms' enemies and pickups */
+            int fi = disc_index("ROOMENV.DAT");
+            Touched *t = touch(fi);
+            static uint32_t v[1024];
+            uint32_t nb = roomenv_blocks(test, t, v);
+            int rooms = 0, ln = 0;
+            char *save = NULL;
+            uint8_t *en = malloc(0x18 * 64), *it = malloc(0x18 * 64);
+            int ne = 0, ni = 0, cur = -1, bad = 0;
+            for (char *line = strtok_r(s, "\n", &save);; line = strtok_r(NULL, "\n", &save)) {
+                char *h = line ? strchr(line, '#') : NULL;
+                if (h) *h = 0;
+                if (line) ln++;
+                unsigned b;
+                int head = line && sscanf(line, " @%u", &b) == 1;
+                if ((head || !line) && cur >= 0 && !bad) {   /* the room before: its two lists in again */
+                    uint32_t at = v[cur] * 2048, len = (v[cur + 1] - v[cur]) * 2048, so, sl, io, il;
+                    roomenv_list(t->data, at, len, 1, &so, &sl);
+                    roomenv_list(t->data, at, len, 2, &io, &il);
+                    uint32_t oe = list_count(t->data + at + so, sl, 1), oi = list_count(t->data + at + io, il, 0);
+                    uint32_t cap = oe + oi > 7 ? oe + oi : 7;
+                    if (cap > 10) cap = 10;
+                    if ((uint32_t)(ne + ni) > cap) note("mods: %s: @%d: %d enemies and pickups, more than the %u the game has room for there: not used", f->what, cur, ne + ni, cap);
+                    else {
+                        for (int part = 1; part <= 2; part++) {
+                            uint32_t po = part == 1 ? so : io, pl = part == 1 ? sl : il, old = part == 1 ? 4 + oe * 0x18 : oi * 0x18, cnt = part == 1 ? (uint32_t)ne : (uint32_t)ni;
+                            const uint8_t *p = t->data + at + po;
+                            uint8_t *np = calloc(1, pl + cnt * 0x18 + 0x18);
+                            uint32_t w = 0;
+                            if (part == 1) { memcpy(np, p, 4); w = 4; }
+                            memcpy(np + w, part == 1 ? en : it, cnt * 0x18);
+                            w += cnt * 0x18;
+                            memcpy(np + w, p + old, pl - old);       /* its end mark and what follows */
+                            w += pl - old;
+                            if (w == pl && !memcmp(np, p, pl)) { free(np); continue; }
+                            if (w <= pl) { memset(t->data + at + po, 0, pl); memcpy(t->data + at + po, np, w); free(np); }
+                            else if (ngrows < (int)(sizeof grows / sizeof grows[0])) {
+                                Grow *g = &grows[ngrows++];
+                                *g = (Grow){fi, at + po, w, pl, 0, np, ""};
+                                snprintf(g->what, sizeof g->what, "the %s of ROOMENV.DAT block %d", part == 1 ? "enemies" : "pickups", cur);
+                            } else free(np);
+                        }
+                        rooms++;
+                    }
+                }
+                if (!line) break;
+                if (head) {
+                    cur = -1;
+                    bad = 0;
+                    ne = ni = 0;
+                    uint32_t so, sl, io, il;
+                    if (b >= nb || !roomenv_list(t->data, v[b] * 2048, (v[b + 1] - v[b]) * 2048, 1, &so, &sl) ||
+                        !roomenv_list(t->data, v[b] * 2048, (v[b + 1] - v[b]) * 2048, 2, &io, &il) ||
+                        list_count(t->data + v[b] * 2048 + so, sl, 1) == 0xFFFFFFFFu || list_count(t->data + v[b] * 2048 + io, il, 0) == 0xFFFFFFFFu) {
+                        note("mods: %s: @%u: no such room (ROOMENV.DAT block): not used", f->what, b);
+                        continue;
+                    }
+                    cur = (int)b;
+                    continue;
+                }
+                char word[8];
+                long a[10];
+                int got = sscanf(line, "%7s %ld %ld %ld %ld %ld %ld %ld %ld %ld", word, &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7], &a[8]);
+                if (got <= 0) continue;
+                if (cur < 0) continue;
+                int is_e = !strcmp(word, "enemy"), is_i = !strcmp(word, "item");
+                if ((!is_e && !is_i) || got != 10 || (is_e ? ne : ni) >= 64 || (is_e && (a[0] & 0xF000) == 0xF000) || (is_i && a[0] < 0)) {
+                    note("mods: %s: line %d isn't an enemy or item line with its nine numbers: room %d not used", f->what, ln, cur);
+                    bad = 1;
+                    continue;
+                }
+                uint8_t *e = (is_e ? en + 0x18 * ne++ : it + 0x18 * ni++);
+                wr16(e, (uint16_t)a[0]);
+                wr16(e + 2, (uint16_t)a[1]);
+                wr32(e + 4, (uint32_t)a[2]);
+                wr32(e + 8, (uint32_t)a[3]);
+                wr32(e + 12, (uint32_t)a[4]);
+                for (int k = 0; k < 4; k++) wr16(e + 16 + 2 * k, (uint16_t)a[5 + k]);
+            }
+            free(en);
+            free(it);
+            note("mods: %s: %d rooms' enemies and pickups", f->what, rooms);
+        }
+        free(s);
+        free(f->d);
+    }
+    free(datafiles);
+    datafiles = NULL;
+    ndatafiles = 0;
+}
+
+/* The originals as data/COMBAT.txt and data/ROOMS.txt. */
+static int data_extract(void) {
+    int files = 0;
+    Touched *test = touch(disc_index("TEST.BIN")), *t = touch(disc_index("ROOMENV.DAT"));
+    if (!test || !t) return 0;
+    size_t cap = 2 << 20, o = 0;
+    char *out = malloc(cap), name[200];
+#define ADD(...) do { if (o < cap) o += (size_t)snprintf(out + o, cap - o, __VA_ARGS__); } while (0)
+    const uint8_t *T = test->data - TEST_BASE;
+    ADD("# The weapons, their damage and the enemies' hit points (TEST.BIN, see combat.c and enemy.c). Damage of a hit = shot base damage\n"
+        "# x factor (for the enemy's type and the shot's class) / 100 x the body part's factor / 100,\n"
+        "# then by distance. A weapon is its item (the number of its name in text/GAME.txt, minus 1).\n"
+        "# rate <weapon> <fire rate: the game uses it doubled>\n");
+    for (uint32_t k = 0; k < 11; k++) { item_name(test->data, k, name, sizeof name); ADD("rate %u %u    # %s\n", k, rd32(T + W_RATE + 4 * k), name); }
+    ADD("# shot <kind> <base damage: three values> <class 0-4>: the kind is the weapon; the grenade gun's\n"
+        "# are 8, 9 and 10 by the grenades loaded\n");
+    for (uint32_t k = 0; k < 11; k++)
+        ADD("shot %u %d %d %d %d\n", k, (int16_t)rd16(T + W_SHOT + 6 * k), (int16_t)rd16(T + W_SHOT + 6 * k + 2), (int16_t)rd16(T + W_SHOT + 6 * k + 4),
+            (int16_t)rd16(T + W_CLASS + 2 * k));
+    ADD("# factor <enemy type> <percent for class 0> <1> <2> <3> <4>\n");
+    for (uint32_t k = 0; k < 34; k++) {
+        ADD("factor %u", k);
+        for (int c = 0; c < 5; c++) ADD(" %d", (int16_t)rd16(T + W_FACTOR + 10 * k + 2 * c));
+        ADD("\n");
+    }
+    ADD("# hp <n> <hit points>: the small enemies' (types 0-10) by their placement's last number\n"
+        "# (data/ROOMS.txt); 15 and up picks one at random, by the cumulative chances in percent:\n");
+    for (uint32_t k = 0; k < 15; k++) ADD("hp %u %d\n", k, (int16_t)rd16(T + W_HP + 2 * k));
+    for (uint32_t k = 0; k < 15; k++) ADD("chance %u %d\n", k, (int32_t)rd32(T + W_CHANCE + 4 * k));
+    files += write_out("data/COMBAT.txt", (const uint8_t *)out, o);
+    o = 0;
+    ADD("# The rooms' enemies and pickups (ROOMENV.DAT: @block, block = stage * 30 + room; see room_loader.c).\n"
+        "# enemy <type> <game flag: not placed when set> <x> <y> <z> <yaw> <pose> <animation (+32768: starts hidden)>\n"
+        "#       <hit points: for types 0-10 a row of hp in data/COMBAT.txt (15 and up: at random)>\n"
+        "# item <item> <game flag: taken> <x> <y> <z> <rotation x> <y> <z> <extra>\n"
+        "# A room you list has exactly these; at most 7 enemies and pickups together (10 where the room had more).\n");
+    static uint32_t v[1024];
+    uint32_t nb = roomenv_blocks(test, t, v);
+    for (uint32_t b = 0; b < nb; b++) {
+        uint32_t at = v[b] * 2048, len = (v[b + 1] - v[b]) * 2048, so, sl, io, il;
+        if (v[b + 1] == v[b] || !roomenv_list(t->data, at, len, 1, &so, &sl) || !roomenv_list(t->data, at, len, 2, &io, &il)) continue;
+        uint32_t ne = list_count(t->data + at + so, sl, 1), ni = list_count(t->data + at + io, il, 0);
+        if (ne == 0xFFFFFFFFu || ni == 0xFFFFFFFFu) continue;
+        ADD("@%u    # stage %u, room %u\n", b, b / 30, b % 30);
+        for (uint32_t k = 0; k < ne; k++) {
+            const uint8_t *e = t->data + at + so + 4 + 0x18 * k;
+            ADD("enemy %d %d %d %d %d %u %d %u %u\n", (int16_t)rd16(e), (int16_t)rd16(e + 2), (int32_t)rd32(e + 4), (int32_t)rd32(e + 8),
+                (int32_t)rd32(e + 12), rd16(e + 16), (int16_t)rd16(e + 18), rd16(e + 20), rd16(e + 22));
+        }
+        for (uint32_t k = 0; k < ni; k++) {
+            const uint8_t *e = t->data + at + io + 0x18 * k;
+            item_name(test->data, rd16(e), name, sizeof name);
+            ADD("item %d %d %d %d %d %u %u %u %u    # %s\n", (int16_t)rd16(e), (int16_t)rd16(e + 2), (int32_t)rd32(e + 4), (int32_t)rd32(e + 8),
+                (int32_t)rd32(e + 12), rd16(e + 16), rd16(e + 18), rd16(e + 20), rd16(e + 22), name);
+        }
+    }
+    files += write_out("data/ROOMS.txt", (const uint8_t *)out, o);
 #undef ADD
     free(out);
     return files;
@@ -5146,6 +5431,7 @@ int modfs_extract(void) {
     }
     /* the texts, the font's pages, the items' pictures */
     files += texts_extract();
+    files += data_extract();
     files += diary_extract();
     files += ui_extract();
     for (unsigned k = 0x186; k <= 0x188; k++) {
@@ -5365,6 +5651,7 @@ void modfs_open(void) {
     sfx_done();
     music_done();
     texts_done();
+    data_done();
     sync_buffers_reserve();
     grow_all();
     sync_buffers_index();

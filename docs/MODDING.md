@@ -67,6 +67,8 @@ mods/
 | A room's music | `NOISE/236/music1.seq` (the PS1's sequence), or `NOISE/236/music1.wav` (a recording, as the PC has its music) | `extract` |
 | A movie's pictures | `M/OPENING.STR/0042.png`: frame 42 | `movie_dump` (below) |
 | Any texture in HD | a texture pack (see the README) | |
+| Weapons' fire rate and damage, damage per enemy type, the small enemies' hit points | `data/COMBAT.txt` | `extract` |
+| A room's enemies (type, place, hit points) and pickups | `data/ROOMS.txt` (`@block`, as in `text/ROOMS.txt`) | `extract` |
 | The game's code: hooks on its functions, its memory | `plugins/name.dll` (native code, off unless switched on) | your own (below) |
 
 Paths aren't case-sensitive, and `/` or `\` both work. Pictures can be
@@ -297,6 +299,32 @@ room-owned decoded heap when explicitly enabled in `[mods]` with
 contiguous; capacity and saved arena metadata are checked. Compressed
 staging, SPU and original format limits remain. Larger decoded resources
 do not imply every fixed game buffer is relocatable.
+
+## Game data: weapons, enemies, pickups
+
+Two text files hold numbers of the game itself; `extract` writes them
+with comments, and given back unchanged they leave the disc as it is.
+
+- `data/COMBAT.txt` (TEST.BIN; the formulas are in `port/decomp/combat.c`):
+  `rate <weapon> <n>` each weapon's fire rate (the game uses it doubled; a
+  weapon is its item, named in the comment), `shot <kind> <d1> <d2> <d3>
+  <class>` each shot kind's base damage and damage class (the kind is the
+  weapon; the grenade gun's are 8 to 10 by the grenades loaded),
+  `factor <enemy type> <five percents>` how much each damage class hurts
+  each of the 34 enemy types, `hp <n> <points>` the hit points of the
+  small enemies (types 0 to 10) by their placement's value, and `chance`
+  the odds for a value of 15 or more, which picks one at random. A quick
+  save made before the mod gets these numbers when it's loaded.
+- `data/ROOMS.txt` (ROOMENV.DAT; `port/decomp/room_loader.c`): for each
+  room (`@block`, block = stage x 30 + room) its `enemy` lines (type, the
+  game flag that stops it from being placed, position, yaw, pose, the
+  animation it starts in, +32768 to start hidden, and its hit points
+  value) and `item` lines (item, the flag set once it's taken, position,
+  rotation). A room in the file has exactly the lines given: move,
+  change, add or take away enemies and pickups. The game keeps room for 7
+  objects (enemies and pickups together) in a room loaded at once and 10
+  in all, so a room can't have more than 7, or its own number where the
+  original has more; the log says so. The room's block grows as needed.
 
 ## Plugins: changing the game's code
 
