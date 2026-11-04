@@ -35,6 +35,7 @@
 #include "modfs_pack.h"
 #include "modfs_boss.h"
 #include "modfs_wav.h"
+#include "modfs_pc_bgm.h"
 #include "modfs_pc_sfx.h"
 #include "modfs_pc_noise.h"
 #include "modmem.h"
@@ -366,6 +367,11 @@ static void apply(const char *mod, const char *rel, const char *path) {
     if (sfx_apply(mod, rel, up, path)) return;
     if (sound_apply(mod, rel, up, path)) return;
     if (movie_apply(mod, rel, up, path)) return;
+    if (!strncmp(up, "BGM/", 4) && strlen(up) > 4 && !strcmp(up + strlen(up) - 4, ".WAV")) {
+        note("mods: %s/%s: the PC's music, but none of the PS1's sequences is clearly this one (modfs_pc_bgm.h);"
+             " give it as NOISE/<block>/music1.wav (the log says which plays in a room): not used", mod, rel);
+        return;
+    }
     note("mods: %s/%s: not a file of the disc or of the PC version's PSX_DATA: not used", mod, rel);
 }
 
@@ -1145,6 +1151,12 @@ static int seq_apply(const char *mod, const char *rel, unsigned blk, unsigned pa
 /* NOISE/012/03.wav: waveform 3 of NOISE.BIN's block 12 (done once every mod is in). */
 static int sfx_apply(const char *mod, const char *rel, const char *up, const char *path) {
     char alias[64];
+    for (size_t i = 0; i < sizeof modfs_pc_bgm / sizeof modfs_pc_bgm[0]; i++)   /* the PC's music by its name (modfs_pc_bgm.h) */
+        if (!strcmp(up, modfs_pc_bgm[i].pc)) {
+            snprintf(alias, sizeof alias, "NOISE/%u/MUSIC%u.WAV", (unsigned)modfs_pc_bgm[i].block, (unsigned)modfs_pc_bgm[i].music);
+            up = alias;
+            break;
+        }
     for (size_t i = 0; i < sizeof modfs_pc_sfx / sizeof modfs_pc_sfx[0]; i++)
         if (!strcmp(up, modfs_pc_sfx[i].pc)) {
             snprintf(alias, sizeof alias, "NOISE/%u/%u.WAV", modfs_pc_sfx[i].block, modfs_pc_sfx[i].vag);

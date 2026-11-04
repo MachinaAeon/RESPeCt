@@ -49,6 +49,8 @@ class Catalog:
         self.paths = {}
         self.disc = {}
         self.noise_profile = pc_noise.read_profile(source / "modfs_pc_noise.h")
+        self.pc_bgm = {n: (int(b), int(m)) for n, b, m in re.findall(
+            r'\{"([^"]+)", (\d+), (\d+)\}', (source / "modfs_pc_bgm.h").read_text(encoding="utf-8"))}
         for name, lba, size, digest in re.findall(
                 r'\{"([^"]+)", (\d+)u, (\d+)u, 0x([0-9A-F]+)ull\}',
                 (source / "disc_ids.h").read_text(encoding="utf-8")):
@@ -137,6 +139,9 @@ class Catalog:
                 return {"kind":"pc-diary", "targets":[f"pc-diary:{native}:"+ ("background" if background else "foreground")+f":{index}"],
                         "archives":["CONFFILE.BIN"], "diary_pc":number,"diary_native":native,"diary_foregrounds":fg,"diary_backgrounds":bg,
                         "canvas":[512,448 if background else 512],"max_bytes":8*1024*1024}
+        if name in self.pc_bgm:                  # a PC music WAV with a measured room sequence
+            block, music = self.pc_bgm[name]
+            return {"kind": "sound", "targets": [f"sound:{block}:music:{music}"], "archives": ["NOISE.BIN"]}
         sound = re.fullmatch(r"NOISE/([0-9]+)/(?:([0-9]+)\.WAV|MUSIC([0-9]+)\.(WAV|SEQ))", name)
         if sound and all(int(x) <= 0xffffffff for x in [sound[1], sound[2] or sound[3]]):
             return {"kind": "sound", "targets": [f"sound:{int(sound[1])}:" + ("sfx:" + str(int(sound[2])) if sound[2] else "music:" + str(int(sound[3])))], "archives": ["NOISE.BIN"]}

@@ -418,6 +418,12 @@ them, and times events by where the music is. Two ways to change it:
 Which set a room uses: `resurv.log` has a line each time a room's music
 starts (`music: NOISE/236/music1.seq`).
 
+The PC version's music WAVs (`PSX_DATA/BGM/012-BGM.WAV`...) are recordings
+of these sequences. 18 of them were matched to their sequence by their
+sound (each sequence recorded in RESPeCt and compared,
+`tools/mod_bgmnames.py`), and go there by their PC name. For the others no
+sequence is clearly the same: the log says so; give them by the NOISE name.
+
 ## Movies
 
 A movie's pictures are replaced one frame at a time, by the frame's
