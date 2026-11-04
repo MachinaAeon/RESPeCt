@@ -241,7 +241,13 @@ static int saved_sync_resume(StateIO *io,const Chunk *ram) {
     return 0;
 }
 
-static int extended_model_pointer(uint32_t p) { return p >= 0x80200000u && p < 0x80800000u; }
+/* The rooms' window, when a mod moved it to extended RAM (modfs.c): the
+ * room's data, not the model arena's. */
+extern uint32_t g_room_win_base, g_room_win_end;
+static int in_room_window(uint32_t p, uint64_t bytes) {
+    return g_room_win_base >= 0x80200000u && p >= g_room_win_base && (uint64_t)p + bytes <= g_room_win_end;
+}
+static int extended_model_pointer(uint32_t p) { return p >= 0x80200000u && p < 0x80800000u && !in_room_window(p, 0); }
 static int saved_arena_range(const ModMemoryState *s,uint32_t address,uint64_t bytes) {
     uint64_t end=(uint64_t)address+bytes;
     return (address>=s->base && end<=s->cursor) ||
@@ -252,6 +258,7 @@ static int saved_arena_range(const ModMemoryState *s,uint32_t address,uint64_t b
 static int saved_cd_range(const ModMemoryState *s,uint32_t address,uint64_t bytes) {
     uint32_t physical=address&0x1FFFFFFFu;
     if (physical<RAM_GAME) return bytes<=(uint64_t)RAM_GAME-physical;
+    if (physical<RAM_SIZE && in_room_window(0x80000000u+physical,bytes)) return 1;
     return s && physical<RAM_SIZE && saved_arena_range(s,0x80000000u+physical,bytes);
 }
 static int saved_cd_queue_valid(const Chunk *ram,const ModMemoryState *s) {
@@ -406,8 +413,23 @@ static void staging_state(StateIO *io) {
         io->bad=1;
     }
 }
+/* The rooms' memory (modfs.c): a state whose room is where this run
+ * doesn't keep it (made before a mod moved it, or with it moved) can't go on. */
+static void room_window_state(StateIO *io) {
+    if (io->mode != SS_CHECK) return;
+    extern int modfs_room_window_state_ok(uint32_t obj_end);
+    const Chunk *ram = find_chunk(io, "rt.g_ram");
+    int in_game = 0;
+    for (int i = 0; i < rt_module_count; i++)
+        if (!strcmp(rt_modules[i].name, "test") && saved_module_matches(ram, &rt_modules[i])) in_game = 1;
+    if (in_game && !modfs_room_window_state_ok(saved_word(ram, 0x800B3D54u))) {
+        if (!io->bad) snprintf(io->err, sizeof io->err, "made with the rooms' memory elsewhere (a mod with bigger rooms added or removed): load a memory card save");
+        io->bad = 1;
+    }
+}
 static void visit_all(StateIO *io) {
     mods_state(io);
+    room_window_state(io);
     staging_state(io);
     arena_state(io);
     pc_bitmap_state(io);

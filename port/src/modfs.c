@@ -14,7 +14,8 @@
  * is laid out again with it, the archive moves past the end of the disc
  * (its directory entry says where) and the game's table of its blocks
  * (in TEST.BIN, 0x800A5B90) is changed to match, up to what the room's
- * object file can take in memory (0x80108000-0x80150000). Files that hold
+ * object file can take in memory (0x80108000-0x80150000, or more with the
+ * rooms' memory moved: room_window_place). Files that hold
  * game code (the game runs translated, from what it read) can't be
  * replaced, nor streams whole; their sound goes by channel instead:
  * X/BGM_32.STR/05.wav is what the game plays from that file's channel 5
@@ -438,6 +439,95 @@ static int iso_record(const char *path, uint32_t *sec, uint32_t *off) {
  * in STGBG2, 142 sectors). */
 #define OBJ_ROOM    (142u * 2048)
 
+/* The rooms' memory. The game keeps the room's object file (its block of
+ * B/STGBGn.BIN, read by room_load.c; in stages 1, 5 and 6 the scenery's
+ * slots, read by 80090DC4 and its kin) from 0x80108000, and puts more after
+ * it, past 0x800B3D54 (the next room's file while a door opens, the room's
+ * sound set, a script's image or music), up to 0x80150000. A mod's room
+ * bigger than the biggest the game has moves all that to extended RAM,
+ * bigger by as much: the native readers use g_room_win_base/end, the game's
+ * own code in TEST.BIN that builds those two addresses is changed (room_code).
+ * What only borrows the old place for a moment (the enemies' files, the
+ * sound banks, a door's model at its top, the title's and the typewriter's
+ * pictures) stays there, now out of the room's way. Off unless a room
+ * needs it: then the PS1's layout, byte for byte. */
+uint32_t g_room_win_base = 0x80108000u, g_room_win_end = 0x80150000u;
+static uint32_t ext_used;                        /* (with ext_alloc) */
+static void ram_fix(uint32_t addr, const uint8_t *was, const uint8_t *now, uint32_t n);
+#define ROOM_OLD     0x80108000u
+#define ROOM_OLD_END 0x80150000u
+#define ROOM_MAX     (1024u * 1024u)             /* the biggest room block a mod can bring */
+static uint32_t room_need;                       /* the biggest room block past OBJ_ROOM (grow_all) */
+static uint32_t room_bytes;                      /* the moved window's size (0: not moved) */
+/* TEST.BIN's code (run from RAM) that builds the window's start (lui,ori)
+ * or end (lui), as the disc has it. */
+static const struct { uint32_t addr, word; } room_code[] = {
+    {0x80090DDCu, 0x3C148010u}, {0x80090E10u, 0x36948000u},   /* the scenery's slots */
+    {0x800911ACu, 0x3C028010u}, {0x800911B0u, 0x34428000u},   /* ...and 0x800B3D54 past them */
+    {0x80091854u, 0x3C048010u}, {0x80091858u, 0x34848000u},   /* a scenery slot's file */
+    {0x80091C38u, 0x3C048010u}, {0x80091C3Cu, 0x34848000u},
+    {0x80091EDCu, 0x3C118010u}, {0x80091EE0u, 0x36318000u},
+    {0x8008D8ACu, 0x3C038010u}, {0x8008D8B0u, 0x34638000u},   /* scripts: a block of the room's file */
+    {0x8008D8F4u, 0x3C038010u}, {0x8008D8F8u, 0x34638000u},
+    {0x80088DF0u, 0x3C028015u},                                /* the end, for what goes past 0x800B3D54 */
+    {0x80092BE4u, 0x3C028015u},                                /* ...the room's sound set */
+};
+
+static int room_code_found(const Touched *test) {
+    for (size_t i = 0; i < sizeof room_code / sizeof room_code[0]; i++) {
+        uint32_t o = room_code[i].addr - TEST_BASE;
+        if (!test || o + 4 > test->nsec * 2048 || rd32(test->data + o) != room_code[i].word) return 0;
+    }
+    return 1;
+}
+
+/* How big a room's block can be: the PS1's, or with the window moved, as
+ * much as extended RAM leaves (after the mods' pictures, and some for the
+ * enemies' models when those can grow too). */
+static uint32_t room_cap(const Touched *test) {
+    if (!room_code_found(test)) return OBJ_ROOM;
+    uint64_t left = (uint64_t)(RAM_SIZE - RAM_GAME) - (((uint64_t)ext_used + 0xFFFFu) & ~UINT64_C(0xFFFF));
+    uint64_t keep = 0x48000u + 0x10000u + (modmem_enabled() ? 0x200000u : 0);
+    uint64_t cap = left > keep ? (left - keep) & ~UINT64_C(2047) : 0;
+    if (cap > ROOM_MAX) cap = ROOM_MAX;
+    return cap > OBJ_ROOM ? (uint32_t)cap : OBJ_ROOM;
+}
+
+/* Every mod in: a room bigger than the PS1's moves the window (modfs_open). */
+static void room_window_place(void) {
+    const char *force = getenv("RT_ROOM_WINDOW");    /* (tests: moved with no room needing it) */
+    if (!room_need && force && atoi(force)) room_need = OBJ_ROOM;
+    if (!room_need) return;
+    Touched *test = touch(disc_index("TEST.BIN"));
+    uint32_t base = (0x80200000u + ext_used + 0xFFFFu) & ~0xFFFFu;
+    uint32_t bytes = (room_need + 0x48000u + 0xFFFFu) & ~0xFFFFu;
+    if (!room_code_found(test) || (uint64_t)base + bytes > 0x80000000u + RAM_SIZE)
+        rt_fatal("mods: the rooms' memory can't be moved after all (TEST.BIN changed, or no extended RAM left)");
+    for (size_t i = 0; i < sizeof room_code / sizeof room_code[0]; i++) {
+        uint8_t *p = test->data + room_code[i].addr - TEST_BASE, was[4], now[4];
+        uint32_t w = room_code[i].word, hi = (w & 0xFFFFu) == 0x8015u ? (base + bytes) >> 16 : base >> 16;
+        memcpy(was, p, 4);
+        wr32(p, w >> 26 == 15 ? (w & 0xFFFF0000u) | hi : w & 0xFFFF0000u);   /* lui: the new high half; ori: 0 */
+        memcpy(now, p, 4);
+        ram_fix(room_code[i].addr, was, now, 4);
+    }
+    g_room_win_base = base;
+    g_room_win_end = base + bytes;
+    room_bytes = bytes;
+    g_ram_ext_used = 1;
+    note("mods: the rooms' memory moved to %08X-%08X (the biggest room %u bytes, the PS1 has room for %u)",
+         base, base + bytes, room_need, OBJ_ROOM);
+}
+
+/* savestate.c: a quick save made with the rooms' memory where it isn't
+ * now (its room still in the other place) can't go on. */
+int modfs_room_window_state_ok(uint32_t obj_end) {
+    const char *force = getenv("RT_ROOM_WINDOW");    /* (tests: 2 lets one in, its room stays where it was) */
+    if (force && atoi(force) == 2) return 1;
+    if (room_bytes) return obj_end < ROOM_OLD || obj_end > ROOM_OLD_END;
+    return obj_end < 0x80200000u;
+}
+
 /* A sector's place as the CD's position (BCD minute, second, frame). */
 static void bcd_msf(uint32_t lba, uint8_t msf[3]) {
     uint32_t a = lba + 150;
@@ -452,7 +542,7 @@ static void bcd_msf(uint32_t lba, uint8_t msf[3]) {
  * or (0) wherever in RAM the old is found (the tables' copies in the
  * overlays, loaded where the game puts them). */
 typedef struct { uint32_t addr, n; uint8_t *was, *now; } RamFix;
-static RamFix ramfixes[64];
+static RamFix ramfixes[128];
 static int nramfix;
 
 static void ram_fix(uint32_t addr, const uint8_t *was, const uint8_t *now, uint32_t n) {
@@ -608,7 +698,9 @@ static void grow_all(void) {
             continue;
         }
         /* how big each kind of block can be */
-        uint32_t cap[4] = {OBJ_ROOM, OBJ_ROOM, OBJ_ROOM, OBJ_ROOM};
+        int rooms = !fixed && kinds == 1 && !strncasecmp(disc_files[fi].name, "B/STGBG", 7);
+        uint32_t rmax = rooms ? room_cap(test) : OBJ_ROOM;   /* (more with the rooms' memory moved) */
+        uint32_t cap[4] = {rmax, rmax, rmax, rmax};
         uint64_t extra = 0;
         if (fixed)
             cap[0] = cap[1] = cap[2] = cap[3] = fixed;
@@ -630,6 +722,10 @@ static void grow_all(void) {
                 uint64_t want=((uint64_t)grows[g].size+2047)&~UINT64_C(2047);
                 if (cap && want<=cap && want>reserve) reserve=want;
                 break;
+            }
+            if (rmax > OBJ_ROOM) {                /* what a file can add: itself, padded */
+                uint64_t most = ((((uint64_t)grows[g].size + 3) & ~UINT64_C(3)) + 2047 + 2048) & ~UINT64_C(2047);
+                if (reserve > most) reserve = most;
             }
             extra+=reserve;
         }
@@ -723,6 +819,7 @@ static void grow_all(void) {
             } else if (any)
                 note("mods: %s block %u: its layout isn't one this knows: not used", disc_files[fi].name, b);
             if (!ok) memcpy(out + cur, blk, len);
+            if (ok && rooms && !resident && newlen > OBJ_ROOM && newlen > room_need) room_need = newlen;
             for (int g = gi; g < ngrows; g++)
                 if (grows[g].fi == fi && grows[g].offset - start < len) {
                     if (ok) {
@@ -5664,7 +5761,7 @@ static int cmp_str(const void *a, const void *b) { return strcasecmp(*(char *con
 /* The dynamic heap is separate from the static prefix reapplied on load.
  * Cache the final (possibly relocated) archive sizes once, after grow_all.
  * Never touch a relocated archive by its former LBA: find its named copy. */
-uint32_t modfs_static_end(void) { return 0x80200000u + ((ext_used + 15u) & ~15u); }
+uint32_t modfs_static_end(void) { return room_bytes ? g_room_win_end : 0x80200000u + ((ext_used + 15u) & ~15u); }
 int modfs_dynamic_models(void) { return mod_memory_models && nused > 0; }
 static Touched *memory_archive(const char *name) {
     for (int i = 0; i < ntouched; i++) if (!strcmp(touched[i].name, name)) return &touched[i];
@@ -5815,6 +5912,7 @@ void modfs_open(void) {
     sync_buffers_index();
     movie_done();
     memory_prepare();
+    room_window_place();
     if (ext_used) {                              /* (kept for the saves loaded later) */
         ext_image = malloc(ext_used);
         if (ext_image) memcpy(ext_image, g_ram + RAM_GAME, ext_used);

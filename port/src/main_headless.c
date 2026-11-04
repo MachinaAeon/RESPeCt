@@ -223,6 +223,19 @@ void plat_frame(void) {
             for (const char *q = getenv("RT_GUSE_AT"); q && *q; q = strchr(q, ',') ? strchr(q, ',') + 1 : NULL)
                 if ((unsigned)atoi(q) == g_frame) g_sg_use = 1;
         }
+        /* RT_DOOR_AT=frame:n: take the room's door n then, as the door script
+         * does once it opens (room_change.c, n_op_Door) */
+        const char *dr = getenv("RT_DOOR_AT");
+        unsigned dfr; int dn;
+        if (dr && sscanf(dr, "%u:%d", &dfr, &dn) == 2 && dfr == g_frame) {
+            uint32_t door = MEM_R32(0x800B3D30) + (uint32_t)dn * 0x18;
+            uint16_t c = (uint16_t)MEM_R16(door + 2);
+            MEM_W16(0x800B3D2C, 1);
+            MEM_W16(0x800B3D2E, MEM_R16(door + 4));
+            MEM_W16(0x800B3D34, (int16_t)c < 0 ? (uint16_t)((0u - c) & 0xFF) : c);
+            MEM_W32(0x800B3D30, door);
+            rt_log("door: taking door %d (%08X), to %04X", dn, door, c);
+        }
         /* RT_RAMDUMP=n:dir: write main RAM to dir/rNNNNN.bin every n frames
          * (for comparing two builds frame by frame) */
         const char *rd = getenv("RT_RAMDUMP");

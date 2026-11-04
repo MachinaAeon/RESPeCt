@@ -35,7 +35,7 @@ void n_room_StreamStep(void);
 #define OBJECTS         0x800A89C0u
 #define OBJECT_SIZE     0x318
 #define OBJECT_COUNT    14
-#define OBJ_FILE        0x80108000u           /* where the object file goes */
+#define OBJ_FILE        g_room_win_base       /* where the object file goes (0x80108000; modfs.c can move it) */
 #define g_loadRoom      GV(s32, 0x800B3E20)
 #define g_loadStage     GV(s32, 0x800B4BA0)
 #define g_altRoom       GV(s32, 0x800A8614)   /* secondary destination code */
@@ -160,7 +160,8 @@ void n_room_InitModels(void) {
 void n_room_StreamIdle(void) {}
 
 /* 800929AC: loader start: if the next room's object file fits between
- * the current room's data (its size at 0x800BBCD8) and 0x80150000, start
+ * the current room's data (its size at 0x800BBCD8) and 0x80150000 (or
+ * the moved window's end, g_room_win_end), start
  * reading it (0x80076B14, asynchronous) and wait; otherwise give up and
  * load it at the room change. */
 void n_room_StreamStart(void) {
@@ -177,7 +178,7 @@ void n_room_StreamStart(void) {
         s32 fi = (s16)file;
         u32 s = g_fileSectors + (u32)fi * 4;
         u32 end = GV(u32, 0x800BBCD8) + ((GV(u32, s + 4) - GV(u32, s)) << 11) + OBJ_FILE;
-        if (0x80150000u < end) {
+        if (g_room_win_end < end) {
             g_streamState = 0;
             GV(u8, 0x800B3CC0) = 1;
         } else {

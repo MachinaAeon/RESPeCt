@@ -36,6 +36,10 @@ typedef int64_t s64;
 /* An array in game RAM. */
 #define GA(type, addr) ((type *)(g_ram + ((addr) & 0x7FFFFF)))
 
+/* The rooms' window (0x80108000-0x80150000, or moved to extended RAM for
+ * a mod's bigger room: modfs.c). */
+extern uint32_t g_room_win_base, g_room_win_end;
+
 /* Game address -> host pointer: main RAM, or the scratchpad (1 KB of fast
  * RAM at 0x1F800000, where the game sometimes keeps its stack). */
 static inline void *gp(u32 addr) {

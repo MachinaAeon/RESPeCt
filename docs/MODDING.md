@@ -100,9 +100,12 @@ changes those tables when a file grows, as far as the game's memory goes:
 - A whole disc file can use up to the end of its last 2048-byte sector.
 - A room's, door's or effect's file can grow: its block is laid out again,
   the archive moved past the end of the disc, and the game's tables
-  changed to match. A room's block can take up to 290816 bytes (the
-  biggest the game loads), a door's model up to 71680 and its data up to
-  69632, an effect set up to 20480.
+  changed to match. A room's block can take up to 1 MB (1048576 bytes,
+  less if the mods' pictures already fill much of the extra memory); the
+  PS1 has room for 290816 (the biggest the game loads). A bigger one moves
+  the rooms' memory, see below. The scenery slots of stages 1, 5 and 6 keep
+  their own sizes (20, 12 and 23 sectors). A door's model can take up to
+  71680 bytes and its data up to 69632, an effect set up to 20480.
 - An enemy's block can take up to 93 sectors (190464 bytes, packed), the
   biggest the game loads.
 - A room's sound set (its bank and music, `NOISE.BIN`) can grow to 290816
@@ -120,6 +123,25 @@ changes those tables when a file grows, as far as the game's memory goes:
 
 The log says how big each changed block is, and by how much a file that
 doesn't fit is too big.
+
+### The rooms' memory
+
+The game keeps the room it's in at 0x80108000-0x80150000 (288 KB): its
+block of `B/STGBGn.BIN` (or stages 1, 5 and 6's scenery slots), and after
+it what the room uses for a while: the next room's block, read while a
+door opens, the room's sound set, a script's picture or music. When a
+mod's room block is bigger than 290816 bytes, RESPeCt moves all of that to
+the extra memory, bigger by as much (the log says
+`mods: the rooms' memory moved to 80200000-...`). The game's code that
+builds those addresses is changed with it; what only borrows the old place
+for a moment (enemy files, sound banks, a door's model, the title's and
+the typewriter's pictures) stays there, out of the room's way now. Without
+such a room nothing moves: the memory is the PS1's, byte for byte.
+
+Rooms, doors, the scenery stages, game loads and quick saves were checked
+with a room 415744 bytes big: the same frames as without the mod. A quick
+save made with the rooms' memory in the other place (before adding such a
+mod, or after removing it) is refused; load a memory card save instead.
 
 ## 2D pictures
 
@@ -493,8 +515,9 @@ changing mods. Older executables do not enforce the new identity.
   and the information still needed for a complete importer.
 - **The PC's sound effects** (`wav/door`, `wav/enemy`...): other
   recordings than the PS1's; give the PS1's sounds instead (above).
-- **The PC's movies and animations** (`.avi`, `.mpg`, `.FLC`): give frames
-  instead (above).
+- **The PC's `.FLC` animations** other than the ones listed above: give
+  frames instead. Its `.avi` and `.mpg` movies play when the FFmpeg DLLs
+  are next to the exe (Movies, above).
 - Everything else the PC version has in its own forms; the log says so
   for each file.
 

@@ -60,9 +60,9 @@ See PC_AUDIO_COMPATIBILITY.md for the withdrawn candidates and the stronger
 evidence needed before reintroducing them. Natural playback/listening and
 complete automatic PC resource compatibility remain open.
 
-The next useful scenery extension remains gated: two interpreted STGBG consumers
-and shared current/next-room/image/font/sound scratch ownership are not resolved.
-No scenery cap was lifted by this increment.
+The room cap is lifted (M21): a room block past 290816 bytes moves the room
+window to extended RAM. The scenery slots' own sizes (stages 1, 5, 6) and the
+fixed scratch buffers that only borrow the old window stay as they are.
 
 ## Implemented in this candidate
 
@@ -84,6 +84,7 @@ No scenery cap was lifted by this increment.
 | M11a | PC raster-message and diary import path absent | `pc-bitmaps.txt` explicitly maps ROOM/captions, PICKUP and DIARY crops; original control streams continue; native fallback for ambiguous pointers, choices, missing images and screen overlays | 15 bitmap scenarios; actual unique native message and diary BMP shown with CPU/GPU; missing-source pixels match native; bitmap state resumes. See PC_BITMAPS.md |
 | M12a | Model/animation growth restricted to guessed per-asset allowances | Experimental default-off `dynamic_mod_buffers` manages a bounded decoded room heap, shared/instance ownership, scratch, guards and versioned state; final archive sizes indexed at boot | 23 loader groups + 13 state groups, 14 metadata assertions; actual 07/04â†’07/00 door loaded a +400,000-byte animation payload and 616,448-byte packed block into owned memory; CPU/GPU resume, real in-flight continuation and synchronous fresh boot verified. See DYNAMIC_MOD_BUFFERS.md |
 | M19 | No way to change the game's code without rebuilding RESPeCt (the PC's DLL mods) | Plugins: `mods/<mod>/plugins/*.dll` with `respect_plugin_init` (`port/include/respect_plugin.h`, `modplug.c`): hooks before/after any game function (skip, arguments, result) through `interp_call`, RAM/register access, game calls, frame callbacks. Off unless `mod_plugins = 1` | Example plugin (`port/plugins/example.c`) in real headless runs from a save: message text read, room load logged, health regen measured in RAM; off by default reported in the log. No plugin: frames and audio identical to the previous build from boot and from a save. Not yet: plugin state in quick saves, a non-Windows build |
+| M21 | A room's block capped at the PS1's 290816 bytes | Over that (up to 1 MB), the room window 0x80108000-0x80150000 moves to extended RAM: native readers (`room_load.c`, `sound.c`) use `g_room_win_base/end`; the 16 TEST.BIN instructions that build the window's start or end in interpreted code (scenery slots, script block reads, the allocations past 0x800B3D54) are rewritten in the served file. Fixed scratch users (enemy files, sound banks, door model, title, typewriter, story text) stay at the old addresses. Quick saves from the other layout are refused | Headless, a 415744-byte stage 7 room 4: new game, game loads in stages 1, 5, 6, 7, 8, 14, four doors (one into the big room), quick saves in the room and mid-door: frames identical to no mod (forced move without mods: identical too). No-mod runs identical to the reference exe. Not yet: natural play, death/continue in a big room |
 | M20 | Game data only changeable through code or whole binary files | `data/COMBAT.txt` (fire rate, shot damage and class, the 34 types' damage factors, the small enemies' hit points and their odds; TEST.BIN, with the RAM of older saves fixed) and `data/ROOMS.txt` (each room's enemy and pickup lists, ROOMENV.DAT, growing; at most 7 objects, or the original number up to 10) | Extracted and given back: ROOMENV.DAT and TEST.BIN byte-identical. Real headless run from a save: changed numbers in RAM, a moved enemy and an added pickup in the loaded room. Not yet: the bosses' and larger enemies' own hit-point tables (+0x840), body-part factors, scripts and triggers |
 
 No mod means no page replacements, UI overrides or relocated text. The

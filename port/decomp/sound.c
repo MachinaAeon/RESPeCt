@@ -328,7 +328,7 @@ void n_snd_LoadStageBank(void) {
     u32 f = GCALL0(F_STAGE_BANK_FILE);
     GCALL3(F_BANK_LOAD_TO, 6, f, g_bankOverride);
     u32 to = g_bankOverride;
-    if (to > 0x8014FFFFu) GCALL0(F_BANK_OVERFLOW);
+    if (to > g_room_win_end - 1) GCALL0(F_BANK_OVERFLOW);   /* (0x8014FFFF, or the moved window's) */
     else g_bankOverrideLast = to;
     g_bankOverride = 0;
 }

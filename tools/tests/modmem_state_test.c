@@ -14,6 +14,8 @@ uint32_t g_frame,g_poll_pc,g_resume_pc;
 int g_resume_miss;
 uint64_t modfs_signature(void) { return 1; }
 uint32_t modfs_static_end(void) { return 0x80200130; }
+uint32_t g_room_win_base = 0x80108000u, g_room_win_end = 0x80150000u;   /* (modfs.c: the rooms' window, not moved) */
+int modfs_room_window_state_ok(uint32_t obj_end) { return obj_end < 0x80200000u; }
 static int dynamic_models=1;
 int modfs_dynamic_models(void) { return dynamic_models; }
 int modfs_model_request_size(uint32_t table,int index,uint32_t *packed,uint32_t parts[3]) {
