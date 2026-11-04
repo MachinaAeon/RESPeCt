@@ -230,13 +230,28 @@ static uint64_t mod_hash(uint64_t h, const void *data, size_t n) {
     for (size_t i = 0; i < n; i++) { h ^= p[i]; h *= UINT64_C(1099511628211); }
     return h;
 }
+/* A mod's file in the mods' identity (quick saves): its name and size,
+ * and its bytes: all of them up to 1 MB; for a bigger one (a stream's
+ * WAV, a whole archive) its time of change, the first and the last 64 KB
+ * (reading every big file again took longer than the mods themselves). */
 static void mod_hash_file(const char *up, const char *path) {
     uint64_t h = mod_hash(UINT64_C(14695981039346656037), up, strlen(up) + 1);
-    FILE *f = fopen(path, "rb");
-    uint8_t buf[16384];
-    size_t n;
+    struct stat st;
+    FILE *f = stat(path, &st) ? NULL : fopen(path, "rb");
     if (!f) return;
-    while ((n = fread(buf, 1, sizeof buf, f)) != 0) h = mod_hash(h, buf, n);
+    int64_t meta[2] = {(int64_t)st.st_size, st.st_size > (1 << 20) ? (int64_t)st.st_mtime : 0};
+    h = mod_hash(h, meta, sizeof meta);
+    static uint8_t buf[1 << 16];
+    size_t n;
+    if (st.st_size <= (1 << 20))
+        while ((n = fread(buf, 1, sizeof buf, f)) != 0) h = mod_hash(h, buf, n);
+    else {
+        n = fread(buf, 1, sizeof buf, f);
+        h = mod_hash(h, buf, n);
+        fseek(f, -(long)sizeof buf, SEEK_END);
+        n = fread(buf, 1, sizeof buf, f);
+        h = mod_hash(h, buf, n);
+    }
     fclose(f);
     uint8_t digest[8];
     for (int i = 0; i < 8; i++) digest[i] = (uint8_t)(h >> (i * 8));
@@ -5729,6 +5744,20 @@ static void memory_prepare(void) {
     }
 }
 
+/* mods/disabled.txt (the settings' Mods page): folders switched off, a name a line. */
+static int mod_switched_off(const char *name) {
+    char p[1100], line[256];
+    snprintf(p, sizeof p, "%s/disabled.txt", g_mods_dir);
+    FILE *f = fopen(p, "r");
+    int off = 0;
+    while (f && !off && fgets(line, sizeof line, f)) {
+        line[strcspn(line, "\r\n")] = 0;
+        off = line[0] && line[0] != '#' && !strcasecmp(line, name);
+    }
+    if (f) fclose(f);
+    return off;
+}
+
 void modfs_open(void) {
     if (!g_mods_dir[0]) return;
     char *names[256];
@@ -5762,6 +5791,7 @@ void modfs_open(void) {
         struct stat st;
         if (stat(path, &st) || !S_ISDIR(st.st_mode)) { note("mods: %s (order.txt): no such folder", names[i]); continue; }
         if (names[i][0] == '_') { note("mods: %s: switched off (its name starts with _)", names[i]); free(names[i]); continue; }
+        if (mod_switched_off(names[i])) { note("mods: %s: switched off (disabled.txt, the settings' Mods page)", names[i]); free(names[i]); continue; }
         int before = nused;
         mod_file_hash = UINT64_C(14695981039346656037); mod_file_count = 0;
         pc_bitmaps_load(names[i], path);

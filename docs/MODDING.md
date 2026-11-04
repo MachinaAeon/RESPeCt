@@ -81,6 +81,13 @@ PNG, BMP, JPG or TGA.
   line; `#` or `;` starts a comment). When two mods change the same file,
   the later one wins.
 - A folder whose name starts with `_` is switched off.
+- The settings (F1) have a **Mods** page: each mod on or off (kept in
+  `mods/disabled.txt`, one folder name a line), plugins and the bigger
+  enemy models on or off, a button that opens the mods folder and one that
+  asks for the originals (`extract`). Changes apply on the next start.
+- A mod made for the PC version goes in as it is, `PSX_DATA` folder and
+  all: copy it into `mods`. `tools/pc_mod.py check` (or the portable
+  importer) says beforehand which of its files RESPeCt uses.
 - Files at the top of a mod that aren't the disc's (a readme, pictures of
   it) are left alone.
 

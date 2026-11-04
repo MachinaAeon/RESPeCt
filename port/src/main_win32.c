@@ -12,6 +12,7 @@
  */
 #include <windows.h>          /* before rt.h: its R macro clashes with winnt.h */
 #include <commdlg.h>
+#include <shellapi.h>
 #include <xinput.h>
 
 #include "rt.h"
@@ -861,8 +862,8 @@ typedef struct {
     const char *hint;
 } MenuItem;
 
-static const char *page_names[] = {"Mouse & game", "Video", "Audio", "Keys", "Saves", "Cheats"};
-#define NPAGES 6
+static const char *page_names[] = {"Mouse & game", "Video", "Audio", "Keys", "Saves", "Cheats", "Mods"};
+#define NPAGES 7
 static MenuItem items[96];
 static int nitems;
 static int menu_page, menu_sel, menu_binding = -1, menu_bind_armed;
@@ -876,6 +877,62 @@ static const char *action_labels[ACT_COUNT] = {
 static void add_item(int page, int type, const char *label, void *val, double lo, double hi, double step,
                      const char *hint) {
     items[nitems++] = (MenuItem){page, type, label, val, lo, hi, step, hint};
+}
+
+/* The Mods page: each mod folder on or off (mods/disabled.txt, read on
+ * the next start: the files of a running game stay where they are), the
+ * mods' options, and the folders. */
+#define MAX_MENU_MODS 24
+static char mod_names[MAX_MENU_MODS][96];
+static int mod_on[MAX_MENU_MODS], mod_on_was[MAX_MENU_MODS], nmenu_mods;
+
+static int mod_disabled(const char *name) {
+    extern char g_mods_dir[1024];
+    char p[1100], line[256];
+    snprintf(p, sizeof p, "%s\\disabled.txt", g_mods_dir);
+    FILE *f = fopen(p, "r");
+    int off = 0;
+    while (f && !off && fgets(line, sizeof line, f)) {
+        line[strcspn(line, "\r\n")] = 0;
+        off = !_stricmp(line, name);
+    }
+    if (f) fclose(f);
+    return off;
+}
+
+static void mods_list(void) {
+    extern char g_mods_dir[1024];
+    char pat[1100];
+    snprintf(pat, sizeof pat, "%s\\*", g_mods_dir);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    nmenu_mods = 0;
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == '.' || fd.cFileName[0] == '_') continue;
+        if (nmenu_mods == MAX_MENU_MODS) break;
+        snprintf(mod_names[nmenu_mods], sizeof mod_names[0], "%s", fd.cFileName);
+        mod_on[nmenu_mods] = mod_on_was[nmenu_mods] = !mod_disabled(fd.cFileName);
+        nmenu_mods++;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+}
+
+/* The panel closes: the mods switched on or off go into disabled.txt. */
+static void mods_save(void) {
+    extern char g_mods_dir[1024];
+    int changed = 0;
+    for (int i = 0; i < nmenu_mods; i++) changed |= mod_on[i] != mod_on_was[i];
+    if (!changed) return;
+    char p[1100];
+    snprintf(p, sizeof p, "%s\\disabled.txt", g_mods_dir);
+    FILE *f = fopen(p, "w");
+    if (!f) { show_toast("Couldn't write mods\\disabled.txt"); return; }
+    fputs("# Mods switched off (one folder name a line), from the Mods page of the settings.\n", f);
+    for (int i = 0; i < nmenu_mods; i++) if (!mod_on[i]) fprintf(f, "%s\n", mod_names[i]);
+    fclose(f);
+    for (int i = 0; i < nmenu_mods; i++) mod_on_was[i] = mod_on[i];
+    show_toast("Mods: the change applies when RESPeCt starts again");
 }
 
 static void menu_build(void) {
@@ -943,6 +1000,17 @@ static void menu_build(void) {
              "The magazine is refilled from your spare ammo as you fire, so you never reload. Ammo is still used up.");
     add_item(5, IT_ACTION, "Give all weapons", (void *)3, 0, 0, 0,
              "Adds every weapon to your inventory, loaded, with plenty of ammo for each.");
+    mods_list();
+    for (int i = 0; i < nmenu_mods; i++)
+        add_item(6, IT_BOOL, mod_names[i], &mod_on[i], 0, 1, 1,
+                 "This mod's files (folder mods\\...). PC version mods go in as they are. Applies on the next start; what each file did is in resurv.log.");
+    add_item(6, IT_BOOL, "Plugins (native code)", &g_cfg.mod_plugins, 0, 1, 1,
+             "Run the DLLs mods bring in their plugins folder, like the PC version's DLL mods. Only for mods you trust. Next start.");
+    add_item(6, IT_BOOL, "Bigger enemy models (experimental)", &g_cfg.dynamic_mod_buffers, 0, 1, 1,
+             "Enemy models and animations bigger than the PS1's memory takes, in the extra memory. Next start.");
+    add_item(6, IT_ACTION, "Open the mods folder", (void *)4, 0, 0, 0, "Opens the mods folder: one folder per mod.");
+    add_item(6, IT_ACTION, "Write the originals", (void *)5, 0, 0, 0,
+             "Makes an extract folder; on the next start every file a mod can replace is written there, named as a mod names it.");
     add_item(4, IT_SLOT, "Slot", &save_slot, 1, SAVE_SLOTS, 1,
              "Pick a slot with Left/Right (Shift: 10 at a time), or F6/F7 at any time. F5 saves to it and F9 loads it, even without this panel.");
     add_item(4, IT_ACTION, "Save here", (void *)1, 0, 0, 0, "Save the game exactly as it is now into this slot.");
@@ -1038,6 +1106,15 @@ static void change(int i, int dir) {
         menu_toggle();                       /* close the panel; the game runs on */
         if ((intptr_t)it->val == 1) quick_save();
         else if ((intptr_t)it->val == 2) quick_load();
+        else if ((intptr_t)it->val == 4) {
+            extern char g_mods_dir[1024];
+            CreateDirectoryA(g_mods_dir, NULL);
+            ShellExecuteA(NULL, "open", g_mods_dir, NULL, NULL, SW_SHOWNORMAL);
+        } else if ((intptr_t)it->val == 5) {
+            extern char g_extract_dir[1024];
+            CreateDirectoryA(g_extract_dir, NULL);
+            show_toast("The originals will be written to the extract folder on the next start");
+        }
         else if (game_player_in_control()) { g_give_all_request = 1; show_toast("All weapons added"); }
         else show_toast("Weapons can be given while you're playing");
         return;
@@ -1092,6 +1169,7 @@ static void menu_toggle(void) {
         menu_open = 0;
         menu_binding = -1;
         save_settings();
+        mods_save();
         suppress_keys = 1;
         pending_dx = pending_dy = 0;
         if (was_captured) set_capture(1);
