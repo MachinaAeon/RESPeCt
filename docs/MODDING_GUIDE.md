@@ -76,7 +76,7 @@ mods/
 | Sound effects | `NOISE/<bank>/<n>.wav` | `extract/NOISE` has every sound by bank. A longer sound than the bank has room for still plays whole |
 | The PC's sound effects by name | `wav/enemy/zombie0/snd-002.wav`... | The 45 that are the PS1's own recordings (enemies, keys) |
 | A room's music | `NOISE/<block>/music1.seq` (sequence) or `music1.wav` (a recording) | The log says which music plays in a room |
-| The PC's music by name | `BGM/012-BGM.WAV`... | The 18 that match the PS1's music |
+| The PC's music by name | `BGM/012-BGM.WAV`... | 36 of the 38 tracks: every one that is a PS1 sequence, also in the sets that share it |
 | Voices, streamed music, movie sound | `X/BGM_32.STR/05.wav` (channel 5), or the PC's `wav/Scene05_1.wav` | Kept in step with the game |
 | A movie, frame by frame | `M/OPENING.STR/0042.png` (frame 42) | Make a `movie_dump` folder to get the original frames |
 | A whole movie as a video | `avi/Opening.avi` (PC names) or `M/OPENING.STR/video.mp4` | Needs 64-bit FFmpeg DLLs next to `RESPeCt.exe` (`avformat-6x`, `avcodec-6x`, `avutil-5x/60`, `swscale-x`); Classic Rebirth's are 32-bit and don't work |
@@ -160,9 +160,9 @@ program's code); the same mod is written against RESPeCt's API.
 
 Put a PC mod's folder in `mods` as it is, with or without `PSX_DATA`,
 `Resource` and `nab`. With the whole PC installation given as one mod,
-RESPeCt uses 1384 files: every one the PS1 game has an equivalent of. These
+RESPeCt uses 1429 files: every one the PS1 game has an equivalent of. These
 are the rooms, doors, effects, items, enemies, the bosses' models, textures,
-the mapped screens, voices, movies, 18 music tracks, 45 sound effects and
+the mapped screens, voices, movies, 36 music tracks, 45 sound effects and
 162 message pictures. Loading them takes about 3 seconds at start. The log
 says for each of the others what it is and what to give instead:
 
@@ -172,7 +172,8 @@ says for each of the others what it is and what to give instead:
 | the other `Message` / `eventmsg` pictures | not one of the PS1's room messages (generic ones, other languages, empty placeholders) | the text files |
 | `menu/`, `Anm/*.FLC`, map cursor and frames, `item/PIC` | the PC's own screens | the PS1's pictures (in `extract`) |
 | `DOORNEW/*1.HMD`, `item/ITEM_xx`, some effect and people models | models only the PC has | the PS1's models |
-| 32 `BGM/*.WAV` | no PS1 music clearly matches them | `NOISE/<block>/music1.wav` |
+| `BGM/045-BGM.WAV`, `004-REAL-MOVIE.WAV` and the short sounds in `BGM` (TV, `Effect`) | no PS1 music or sound is clearly the same | `NOISE/<block>/music1.wav` or `NOISE/<bank>/<n>.wav` |
+| `BGM/044-BGM.WAV`, `058-BGM-WITH-M2.WAV` next to `017-BGM`, `058-BGM-WITH-M1` | the same PS1 music as those (the better match is used) | either one alone works |
 | `.RSD`, `.PLY`, `.MAT`, `.GRP`, `.BAT`... | the makers' source files | (ignored) |
 
 `python tools/pc_mod.py check <folder>` tells beforehand which files of a

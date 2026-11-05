@@ -84,9 +84,9 @@ PNG, BMP, JPG or TGA.
 
 A PC mod goes in as it is: put its folder (with or without `PSX_DATA`,
 `Resource`, `nab`) in `mods`. Checked with the whole PC installation as
-one mod: every PC file the PS1 game has an equivalent of is used (1384,
+one mod: every PC file the PS1 game has an equivalent of is used (1429,
 rooms, doors, effects, items, enemies, bosses' models, textures, the
-mapped screens, voices, movies, 18 of the music tracks, 45 sound effects:
+mapped screens, voices, movies, 36 of the 38 music tracks, 45 sound effects:
 the enemies' and the keys' that are the PS1's own recordings, 162 message
 pictures, shown in place of the PS1's text), in 3 seconds at
 start. A room or scenery block can now be bigger than on the PS1 (see
@@ -98,7 +98,8 @@ Sizes). The log names each of the others and what to give instead:
 | the other `Message/*.BMP`, `eventmsg/*.bmp` (350) | not a room message of the PS1 (generic ones, other languages, 1x1 placeholders) | `text/ROOMS.txt` and the other text files: plain UTF-8, any language |
 | `menu/`, `Anm/*.FLC`, `map/` cursor and frames, `item/PIC` | the PC's own screens; the PS1 draws its own | the PS1's pictures (`extract`: `map/`, `RESULT/`, `RESOURCE/TITLE10.png`...) |
 | `DOORNEW/*1.HMD`, `item/ITEM_xx`, some `effect` and `people` models | models only the PC has | the PS1's `DOOR_xx.HMD`, `item/.../A.HMD`... |
-| 32 `BGM/*.WAV` | no PS1 music clearly matches them | `NOISE/<block>/music1.wav` for the room's music |
+| `BGM/045-BGM.WAV`, `004-REAL-MOVIE.WAV`, the short `BGM` sounds (`016-TELE-*`, `003/004-BGM2`, `Effect/*`) (14) | no PS1 sequence or sound is clearly the same | `NOISE/<block>/music1.wav` for a room's music, `NOISE/<bank>/<n>.wav` for a sound |
+| `BGM/044-BGM.WAV`, `058-BGM-WITH-M2.WAV` with `017-BGM.WAV`, `058-BGM-WITH-M1.WAV` | two PC rooms' recordings of one PS1 sequence: the better match is used | (either one alone is used) |
 | `.RSD`, `.PLY`, `.MAT`, `.GRP`, `.BAT`... | the makers' sources, no game reads them | (ignored) |
 | a DLL mod | PC code for `gun_bio.exe` | a plugin (below), written against RESPeCt's API |
 
@@ -498,10 +499,16 @@ Which set a room uses: `resurv.log` has a line each time a room's music
 starts (`music: NOISE/236/music1.seq`).
 
 The PC version's music WAVs (`PSX_DATA/BGM/012-BGM.WAV`...) are recordings
-of these sequences. 18 of them were matched to their sequence by their
-sound (each sequence recorded in RESPeCt and compared,
-`tools/mod_bgmnames.py`), and go there by their PC name. For the others no
-sequence is clearly the same: the log says so; give them by the NOISE name.
+of these sequences. 36 of the 38 were matched to their sequence by their
+sound (every sequence of every set recorded in RESPeCt, 45 s each, with
+`tools/plugins/seqrec.c`, and the WAVs' 5 s pieces looked for in the
+recordings, `tools/mod_bgmnames.py`), and go there by their PC name. Some
+sequences are on the disc in more than one set (the same bytes: set 14's
+second is also set 0's and 23's): a PC WAV of one goes to each. Two PC
+rooms can have their own WAV of one sequence (`017-BGM` and `044-BGM`):
+with both in a mod, the better match is used and the log names the other.
+For `045-BGM` and the PC's short sounds in `BGM` (the TV, `Effect`) nothing
+is clearly the same: the log says so; give them by the NOISE name.
 
 ## Movies
 

@@ -171,6 +171,20 @@ class PcModTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIsNotNone(self.catalog.lookup(name.upper()))
 
+    def test_pc_music_goes_to_every_set_with_its_sequence(self):
+        row = self.catalog.lookup("BGM/008-BGM-WITH-M.WAV")
+        self.assertEqual(row["targets"], ["sound:230:music:2", "sound:244:music:2", "sound:253:music:1"])
+        self.assertIs(row["pc_bgm_alt"], False)
+
+    def test_two_pc_rooms_of_one_sequence_keep_the_better_match(self):
+        changed = bytearray(wav()); changed[-1] = 9
+        self.put("PSX_DATA/BGM/017-BGM.WAV", wav())
+        self.put("PSX_DATA/BGM/044-BGM.WAV", bytes(changed))
+        rows = {r["source"].split("/")[-1]: r for r in self.scan()["files"]}
+        self.assertEqual(rows["017-BGM.WAV"]["status"], "recognized")
+        self.assertEqual(rows["044-BGM.WAV"]["status"], "duplicate")
+        self.assertIn("017-BGM.WAV", rows["044-BGM.WAV"]["reason"])
+
     def test_bad_nac_command_reference_is_blocked(self):
         keys = 2
         self.put("nab/ENEM00.NAC", struct.pack("<I", keys) + bytes(112 * keys) + struct.pack("<I", 2) + bytes(8) + struct.pack("<II", 0, 7))

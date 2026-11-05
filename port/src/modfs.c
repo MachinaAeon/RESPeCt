@@ -428,8 +428,9 @@ static void apply(const char *mod, const char *rel, const char *path) {
     if (sound_apply(mod, rel, up, path)) return;
     if (movie_apply(mod, rel, up, path)) return;
     if (!strncmp(up, "BGM/", 4) && strlen(up) > 4 && !strcmp(up + strlen(up) - 4, ".WAV")) {
-        note("mods: %s/%s: the PC's music, but none of the PS1's sequences is clearly this one (modfs_pc_bgm.h);"
-             " give it as NOISE/<block>/music1.wav (the log says which plays in a room): not used", mod, rel);
+        note("mods: %s/%s: one of the PC's music or sound files that none of the PS1's sequences clearly is (modfs_pc_bgm.h);"
+             " give it as NOISE/<block>/music1.wav for a room's music (the log says which plays in a room)"
+             " or NOISE/<bank>/<n>.wav for a sound: not used", mod, rel);
         return;
     }
     if (pc_only_note(mod, rel, up)) return;
@@ -1312,7 +1313,7 @@ static int64_t wav_loop(const uint8_t *d, long n, uint32_t *rate) {
 }
 
 static uint32_t noise_banks(Touched *t, uint32_t *v, Bank **bk);
-static int music_apply(const char *mod, const char *rel, unsigned blk, unsigned part, const char *path);
+static int music_apply(const char *mod, const char *rel, unsigned blk, unsigned part, const char *path, int alt);
 
 /* NOISE/012/music1.seq: a room's sound set's first sequence (its music),
  * as the disc has it (pQES), in its place; bigger, its block laid out
@@ -1364,12 +1365,16 @@ static int seq_apply(const char *mod, const char *rel, unsigned blk, unsigned pa
 /* NOISE/012/03.wav: waveform 3 of NOISE.BIN's block 12 (done once every mod is in). */
 static int sfx_apply(const char *mod, const char *rel, const char *up, const char *path) {
     char alias[64];
-    for (size_t i = 0; i < sizeof modfs_pc_bgm / sizeof modfs_pc_bgm[0]; i++)   /* the PC's music by its name (modfs_pc_bgm.h) */
-        if (!strcmp(up, modfs_pc_bgm[i].pc)) {
-            snprintf(alias, sizeof alias, "NOISE/%u/MUSIC%u.WAV", (unsigned)modfs_pc_bgm[i].block, (unsigned)modfs_pc_bgm[i].music);
-            up = alias;
-            break;
+    int sets = 0, was = nused;
+    for (size_t i = 0; i < sizeof modfs_pc_bgm / sizeof modfs_pc_bgm[0]; i++)   /* the PC's music by its name (modfs_pc_bgm.h), */
+        if (!strcmp(up, modfs_pc_bgm[i].pc)) {                                  /* in each set that has that sequence */
+            music_apply(mod, rel, (unsigned)modfs_pc_bgm[i].block, (unsigned)modfs_pc_bgm[i].music, path, modfs_pc_bgm[i].alt);
+            sets++;
         }
+    if (sets) {                                  /* one file: it counts once, and one it took the place of (all its */
+        nused = was + (nused - was == sets);     /* sets: the same name, or one of the same sequence) no more */
+        return 1;
+    }
     for (size_t i = 0; i < sizeof modfs_pc_sfx / sizeof modfs_pc_sfx[0]; i++)
         if (!strcmp(up, modfs_pc_sfx[i].pc)) {
             snprintf(alias, sizeof alias, "NOISE/%u/%u.WAV", modfs_pc_sfx[i].block, modfs_pc_sfx[i].vag);
@@ -1381,7 +1386,7 @@ static int sfx_apply(const char *mod, const char *rel, const char *up, const cha
     char rest[8] = "";
     long n = 0;
     if (sscanf(up + 6, "%u/MUSIC%u%7s", &blk, &vag, rest) == 3 && !strcmp(rest, ".SEQ")) return seq_apply(mod, rel, blk, vag, path);
-    if (sscanf(up + 6, "%u/MUSIC%u%7s", &blk, &vag, rest) == 3 && !strcmp(rest, ".WAV")) return music_apply(mod, rel, blk, vag, path);
+    if (sscanf(up + 6, "%u/MUSIC%u%7s", &blk, &vag, rest) == 3 && !strcmp(rest, ".WAV")) return music_apply(mod, rel, blk, vag, path, 0);
     if (sscanf(up + 6, "%u/%u%7s", &blk, &vag, rest) != 3 || strcmp(rest, ".WAV")) {
         note("mods: %s/%s: name it by the bank's block and the sound's number (NOISE/012/03.wav), or a room's music (NOISE/240/music1.seq or .wav): not used", mod, rel);
         return 1;
@@ -1616,7 +1621,7 @@ static void sfx_done(void) {
 #define SND_SEQ_IDS   0x80062E70u                /* s16 x 2: its sequences' ids */
 #define SS_SCORE      0x80064678u                /* libsnd: per id, its sequence's state */
 
-typedef struct { uint32_t block, part, frames, loop; int16_t *pcm; uint8_t *wav; long n; char what[600]; } Music;
+typedef struct { uint32_t block, part, frames, loop; int alt; int16_t *pcm; uint8_t *wav; long n; char what[600]; } Music;
 static Music musics[64];
 static int nmusics;
 
@@ -1645,17 +1650,34 @@ static int seq_mute(uint8_t *d, uint32_t n) {
     return 0;
 }
 
-static int music_apply(const char *mod, const char *rel, unsigned blk, unsigned part, const char *path) {
+/* alt: another PC room's WAV of a sequence (modfs_pc_bgm.h): in one mod, the
+ * WAV that matches the sequence best (alt 0) is used for it. */
+static int music_apply(const char *mod, const char *rel, unsigned blk, unsigned part, const char *path, int alt) {
+    size_t ml = strlen(mod);
+    for (int i = 0; i < nmusics; i++)
+        if (musics[i].block == blk && musics[i].part == part && alt && !musics[i].alt
+            && !strncmp(musics[i].what, mod, ml) && musics[i].what[ml] == '/') {
+            note("mods: %s/%s: block %u's music %u is %s's (the same music, that one matches it better): not used there",
+                 mod, rel, blk, part, musics[i].what);
+            return 1;
+        }
     long n = 0;
     uint8_t *d = load(path, &n);
     if (!d) { note("mods: %s/%s: couldn't read it", mod, rel); return 1; }
     for (int i = 0; i < nmusics; i++)            /* a later mod wins */
-        if (musics[i].block == blk && musics[i].part == part) { free(musics[i].wav); musics[i] = musics[--nmusics]; nused--; break; }
+        if (musics[i].block == blk && musics[i].part == part) {
+            note("mods: %s/%s: block %u's music %u, in place of %s", mod, rel, blk, part, musics[i].what);
+            free(musics[i].wav);
+            musics[i] = musics[--nmusics];
+            nused--;
+            break;
+        }
     if (nmusics == (int)(sizeof musics / sizeof musics[0])) { free(d); note("mods: %s/%s: too many: not used", mod, rel); return 1; }
     Music *m = &musics[nmusics++];
     memset(m, 0, sizeof *m);
     m->block = blk;
     m->part = part;
+    m->alt = alt;
     m->wav = d;
     m->n = n;
     snprintf(m->what, sizeof m->what, "%s/%s", mod, rel);

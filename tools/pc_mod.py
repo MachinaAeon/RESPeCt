@@ -49,8 +49,11 @@ class Catalog:
         self.paths = {}
         self.disc = {}
         self.noise_profile = pc_noise.read_profile(source / "modfs_pc_noise.h")
-        self.pc_bgm = {n: (int(b), int(m)) for n, b, m in re.findall(
-            r'\{"([^"]+)", (\d+), (\d+)\}', (source / "modfs_pc_bgm.h").read_text(encoding="utf-8"))}
+        self.pc_bgm, self.pc_bgm_alt = {}, set()  # a PC music WAV -> each set's sequence it is
+        for n, b, m, alt in re.findall(r'\{"([^"]+)", (\d+), (\d+), (\d)\}', (source / "modfs_pc_bgm.h").read_text(encoding="utf-8")):
+            self.pc_bgm.setdefault(n, []).append((int(b), int(m)))
+            if alt == "1":                       # another room's WAV of a sequence a better match has
+                self.pc_bgm_alt.add(n)
         for name, lba, size, digest in re.findall(
                 r'\{"([^"]+)", (\d+)u, (\d+)u, 0x([0-9A-F]+)ull\}',
                 (source / "disc_ids.h").read_text(encoding="utf-8")):
@@ -146,8 +149,8 @@ class Catalog:
                         "archives":["CONFFILE.BIN"], "diary_pc":number,"diary_native":native,"diary_foregrounds":fg,"diary_backgrounds":bg,
                         "canvas":[512,448 if background else 512],"max_bytes":8*1024*1024}
         if name in self.pc_bgm:                  # a PC music WAV with a measured room sequence
-            block, music = self.pc_bgm[name]
-            return {"kind": "sound", "targets": [f"sound:{block}:music:{music}"], "archives": ["NOISE.BIN"]}
+            return {"kind": "sound", "targets": [f"sound:{block}:music:{music}" for block, music in self.pc_bgm[name]], "archives": ["NOISE.BIN"],
+                    "pc_bgm_alt": name in self.pc_bgm_alt}
         sound = re.fullmatch(r"NOISE/([0-9]+)/(?:([0-9]+)\.WAV|MUSIC([0-9]+)\.(WAV|SEQ))", name)
         if sound and all(int(x) <= 0xffffffff for x in [sound[1], sound[2] or sound[3]]):
             return {"kind": "sound", "targets": [f"sound:{int(sound[1])}:" + ("sfx:" + str(int(sound[2])) if sound[2] else "music:" + str(int(sound[3])))], "archives": ["NOISE.BIN"]}
@@ -356,6 +359,12 @@ def inspect_package(source, catalog):
         if len(indices) < 2:
             continue
         first = rows[indices[0]]
+        best = [i for i in indices if rows[i].get("pc_bgm_alt") is False]
+        if len(best) == 1 and all(rows[i].get("pc_bgm_alt") for i in indices if i != best[0]):
+            for i in indices:                    # two PC rooms' WAVs of one PS1 sequence: the better match's
+                if i != best[0]:
+                    rows[i].update(status="duplicate", reason="the same PS1 music as " + rows[best[0]]["source"] + ", which is used")
+            continue
         if all(rows[i]["sha256"] == first["sha256"] and rows[i]["targets"] == first["targets"] for i in indices):
             for i in indices[1:]:
                 rows[i].update(status="duplicate", reason="byte-identical alias of " + first["source"])
