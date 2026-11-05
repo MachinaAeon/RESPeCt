@@ -7,7 +7,7 @@ from pathlib import Path
 import argparse,hashlib,json,shutil,subprocess,sys,zipfile
 
 TABLES=['disc_ids.h','modfs_pc.h','modfs_bmp.h','modfs_pack.h','modfs_wav.h',
-        'modfs_pc_sfx.h','modfs_pc_pickups.h','modfs_pc_noise.h','modfs_pc_messages.h','modfs_pc_diaries.h']
+        'modfs_pc_sfx.h','modfs_pc_sfx_events.h','modfs_pc_bgm.h','modfs_pc_pickups.h','modfs_pc_noise.h','modfs_pc_messages.h','modfs_pc_diaries.h']
 
 def build(output, python_root, compiler):
     root=Path(__file__).resolve().parents[1];output=Path(output);runtime=Path(python_root)

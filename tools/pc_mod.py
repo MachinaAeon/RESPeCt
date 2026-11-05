@@ -82,6 +82,12 @@ class Catalog:
         text = (source / "modfs_pc_sfx.h").read_text(encoding="utf-8")
         for path, block, vag in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u\}', text):
             self.paths[path] = {"kind": "sound", "targets": [f"sound:{int(block)}:sfx:{int(vag)}"], "archives": ["NOISE.BIN"]}
+        # the PC's other recordings, by the event they play for (tools/mod_sfxevents.py); rank > 0: another PC
+        # file of the same PS1 waveform wins when both are given
+        text = (source / "modfs_pc_sfx_events.h").read_text(encoding="utf-8")
+        for path, block, vag, rank in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u, (\d+)u\}', text):
+            self.paths.setdefault(path, {"kind": "sound", "targets": [f"sound:{int(block)}:sfx:{int(vag)}"], "archives": ["NOISE.BIN"],
+                                         "sfx_rank": int(rank)})
 
         text=(source / "modfs_pc_messages.h").read_text(encoding="utf-8")
         for path,block,index,words,crc in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u, (\d+)u, 0x([0-9A-F]+)u\}',text):
@@ -359,6 +365,15 @@ def inspect_package(source, catalog):
         if len(indices) < 2:
             continue
         first = rows[indices[0]]
+        ranked = [i for i in indices if "sfx_rank" in rows[i]]
+        if len(ranked) == len(indices):          # PC sounds of one PS1 waveform: the lowest ranked wins
+            low = min(rows[i]["sfx_rank"] for i in indices)
+            win = [i for i in indices if rows[i]["sfx_rank"] == low]
+            if len(win) == 1:
+                for i in indices:
+                    if i != win[0]:
+                        rows[i].update(status="duplicate", reason="the same PS1 sound as " + rows[win[0]]["source"] + ", which is used")
+                continue
         best = [i for i in indices if rows[i].get("pc_bgm_alt") is False]
         if len(best) == 1 and all(rows[i].get("pc_bgm_alt") for i in indices if i != best[0]):
             for i in indices:                    # two PC rooms' WAVs of one PS1 sequence: the better match's

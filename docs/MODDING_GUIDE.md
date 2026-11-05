@@ -74,7 +74,7 @@ mods/
 | The PC's message pictures | `Message/0015-00.BMP`... | 173 of them are shown in place of the PS1's text automatically, the doors' too ("It's locked.", "You've used <key>") |
 | Diary pages | `diary/00/01.png` (document 0, page 1), or the PC's `diary/fileXX/...` | |
 | Sound effects | `NOISE/<bank>/<n>.wav` | `extract/NOISE` has every sound by bank. A longer sound than the bank has room for still plays whole |
-| The PC's sound effects by name | `wav/enemy/zombie0/snd-002.wav`... | The 45 that are the PS1's own recordings (enemies, keys) |
+| The PC's sound effects by name | `wav/enemy/zombie0/snd-002.wav`, `wav/door/0A-1.wav`, `wav/foot/015-0L.wav`... | Enemies, doors, footsteps, keys: to the PS1 sound of the same event. Where the PS1 has one sound for several PC files (both feet, a step shared by many rooms) the log says which one is used |
 | A room's music | `NOISE/<block>/music1.seq` (sequence) or `music1.wav` (a recording) | The log says which music plays in a room |
 | The PC's music by name | `BGM/012-BGM.WAV`... | 36 of the 38 tracks: every one that is a PS1 sequence, also in the sets that share it |
 | Voices, streamed music, movie sound | `X/BGM_32.STR/05.wav` (channel 5), or the PC's `wav/Scene05_1.wav` | Kept in step with the game |
@@ -160,15 +160,15 @@ program's code); the same mod is written against RESPeCt's API.
 
 Put a PC mod's folder in `mods` as it is, with or without `PSX_DATA`,
 `Resource` and `nab`. With the whole PC installation given as one mod,
-RESPeCt uses 1429 files: every one the PS1 game has an equivalent of. These
+RESPeCt uses 1905 files: every one the PS1 game has an equivalent of. These
 are the rooms, doors, effects, items, enemies, the bosses' models, textures,
-the mapped screens, voices, movies, 36 music tracks, 45 sound effects and
+the mapped screens, voices, movies, 36 music tracks, 762 sound effects and
 162 message pictures. Loading them takes about 3 seconds at start. The log
 says for each of the others what it is and what to give instead:
 
 | PC files | Why not used | Instead |
 | --- | --- | --- |
-| most `wav/door`, `wav/foot`, `wav/weap`, `wav/event` sounds | other recordings than the PS1's | `NOISE/<bank>/<n>.wav`, the PS1 sound it stands for |
+| `wav/weap`, `item/wav`, most `wav/event` sounds | not routed yet | `NOISE/<bank>/<n>.wav`, the PS1 sound it stands for |
 | the other `Message` / `eventmsg` pictures | not one of the PS1's room messages (generic ones, other languages, empty placeholders) | the text files |
 | `menu/`, `Anm/*.FLC`, map cursor and frames, `item/PIC` | the PC's own screens | the PS1's pictures (in `extract`) |
 | `DOORNEW/*1.HMD`, `item/ITEM_xx`, some effect and people models | models only the PC has | the PS1's models |

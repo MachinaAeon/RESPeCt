@@ -38,6 +38,7 @@
 #include "modfs_wav.h"
 #include "modfs_pc_bgm.h"
 #include "modfs_pc_sfx.h"
+#include "modfs_pc_sfx_events.h"
 #include "modfs_pc_noise.h"
 #include "modmem.h"
 #include "modfs_memory.h"
@@ -1180,7 +1181,7 @@ int modfs_xa(uint32_t lba, const uint8_t *s) {
  * chunk; else from the original's). */
 #define NOISE_TABLE 0x80058D2Cu
 
-typedef struct { uint32_t block, vag; uint8_t *wav; long n; int places, cut, bad; double secs; uint32_t rate; char what[600];
+typedef struct { uint32_t block, vag; uint8_t *wav; long n; int places, cut, bad, rank; double secs; uint32_t rate; char what[600];
                  int16_t *whole; uint32_t whole_frames, whole_rate; } Sfx;   /* whole: the WAV, mono at its own rate (spu.c plays it) */   /* cut: in how many banks */
 static Sfx *sfxs;
 static int nsfx;
@@ -1375,10 +1376,18 @@ static int sfx_apply(const char *mod, const char *rel, const char *up, const cha
         nused = was + (nused - was == sets);     /* sets: the same name, or one of the same sequence) no more */
         return 1;
     }
-    for (size_t i = 0; i < sizeof modfs_pc_sfx / sizeof modfs_pc_sfx[0]; i++)
+    int rank = 0;
+    for (size_t i = 0; i < sizeof modfs_pc_sfx / sizeof modfs_pc_sfx[0]; i++)   /* the PS1's own recordings */
         if (!strcmp(up, modfs_pc_sfx[i].pc)) {
             snprintf(alias, sizeof alias, "NOISE/%u/%u.WAV", modfs_pc_sfx[i].block, modfs_pc_sfx[i].vag);
             up = alias;
+            break;
+        }
+    for (size_t i = 0; up != alias && i < sizeof modfs_pc_sfx_events / sizeof modfs_pc_sfx_events[0]; i++)   /* by their event */
+        if (!strcmp(up, modfs_pc_sfx_events[i].pc)) {
+            snprintf(alias, sizeof alias, "NOISE/%u/%u.WAV", modfs_pc_sfx_events[i].block, modfs_pc_sfx_events[i].vag);
+            up = alias;
+            rank = (int)modfs_pc_sfx_events[i].rank;
             break;
         }
     if (strncmp(up, "NOISE/", 6)) return 0;
@@ -1399,6 +1408,7 @@ static int sfx_apply(const char *mod, const char *rel, const char *up, const cha
     memset(s, 0, sizeof *s);
     s->block = blk;
     s->vag = vag;
+    s->rank = rank;
     s->wav = d;
     s->n = n;
     snprintf(s->what, sizeof s->what, "%s/%s", mod, rel);
@@ -1495,9 +1505,22 @@ static void sfx_done(void) {
     }
     uint8_t *d = t ? t->data : NULL;
     for (uint32_t k = 0; who && k <= base[nb]; k++) who[k] = -1;
-    /* which sound each waveform gets: the copies of the one a mod names, then the one it names (a later mod wins) */
-    for (int pass = 0; who && pass < 2; pass++)
-        for (int i = 0; i < nsfx; i++) {
+    /* which sound each waveform gets: the copies of the one a mod names, then the one it names (a later mod
+     * wins; inside a mod, of the PC files of one waveform the lowest ranked, modfs_pc_sfx_events.h: they go
+     * highest rank first) */
+    int *ord = malloc(sizeof *ord * (size_t)nsfx), no = 0;
+    for (int i = 0, j; ord && i < nsfx; i = j) {
+        size_t ml = strcspn(sfxs[i].what, "/");
+        int top = 0;
+        for (j = i; j < nsfx && strcspn(sfxs[j].what, "/") == ml && !strncmp(sfxs[j].what, sfxs[i].what, ml); j++)
+            if (sfxs[j].rank > top) top = sfxs[j].rank;
+        for (int r = top; r >= 0; r--)
+            for (int k = i; k < j; k++)
+                if (sfxs[k].rank == r) ord[no++] = k;
+    }
+    for (int pass = 0; who && ord && pass < 2; pass++)
+        for (int oi = 0; oi < nsfx; oi++) {
+            int i = ord[oi];
             Sfx *s = &sfxs[i];
             if (s->block >= nb || !bk[s->block].vs || s->vag < 1 || s->vag > bk[s->block].vs) {
                 if (pass) { note("mods: %s: NOISE.BIN has no bank in block %u with a sound %u: not used", s->what, s->block, s->vag); nused--; }
@@ -1593,12 +1616,18 @@ static void sfx_done(void) {
             if (s->cut) snprintf(cut, sizeof cut, "; %d of its banks keep less of it, RESPeCt plays it whole", s->cut);
             note("mods: %s: in place of NOISE.BIN's sound %u of block %u%s (%d bank%s; %.2f s at %u Hz%s)", s->what, s->vag, s->block,
                  s->places > 1 ? " and its copies" : "", s->places, s->places > 1 ? "s" : "", s->secs, s->rate, cut);
+        } else if (s->places == 0 && !s->bad && who && s->block < nb && s->vag >= 1 && s->vag <= bk[s->block].vs) {
+            int w = who[base[s->block] + s->vag];
+            note("mods: %s: NOISE.BIN's sound %u of block %u is %s's (the same sound%s): not used", s->what, s->vag, s->block,
+                 w >= 0 && w != i ? sfxs[w].what : "another file", s->rank ? "; the PS1 plays one sound where the PC has more" : "");
+            nused--;
         }
         free(s->wav);
     }
     free(sfxs);
     sfxs = NULL;
     nsfx = 0;
+    free(ord);
     free(who);
     free(bk);
     free(base);

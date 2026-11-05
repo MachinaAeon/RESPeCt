@@ -17,13 +17,18 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 import pc_mod
 
-# Routes are the PS1's own recordings (tools/mod_sfxnames.py: the same sound
-# by cross-correlation); numeric action IDs alone are not evidence. These
-# stay out: two equal candidates (DOG006) or below the threshold.
+# Routes: the PS1's own recordings (tools/mod_sfxnames.py: the same sound by
+# cross-correlation) and, for the PC's other recordings, the event: the PC
+# file's number is the PS1 sound number in the kind's bank (gun_bio 00471260,
+# a port of the PS1 code), the bank's VAB gives its waveform
+# (tools/mod_sfxevents.py). All 45 recorded pairs follow that table, the
+# repeated tones too (zombie 5/7/9/11, dog 15).
 ROUTES = (("DOG/SND-001.WAV", 23, 2), ("DOG/SND-003.WAV", 23, 4), ("CROW/SND-004.WAV", 22, 5),
           ("ZOMBIE1/SND-002.WAV", 33, 3))
-UNPROVEN = ("DOG/SND-006.WAV", "CROW/SND-002.WAV", "CROW/SND-003.WAV",
-            "RICKER/SND-004.WAV", "RICKER/SND-007.WAV")
+BY_EVENT = (("DOG/SND-006.WAV", 23, 7), ("CROW/SND-002.WAV", 22, 3), ("CROW/SND-003.WAV", 22, 4),
+            ("RICKER/SND-004.WAV", 21, 5), ("RICKER/SND-007.WAV", 21, 8), ("RICKER/SND-012.WAV", 21, 6),
+            ("HUNTER/SND-004.WAV", 36, 4))
+NO_SUCH_SOUND = ("CHO2/SND-000.WAV", "DOG/SND-016.WAV")   # (no bank for CHO2 on the PS1; the dog's has 16 sounds)
 
 
 def pcm(value=0):
@@ -75,13 +80,18 @@ class PcSfxRoutesTests(unittest.TestCase):
             self.assertEqual(sum(p.is_file() and p.suffix.upper() == ".WAV" for p in (Path(tmp) / "imported").rglob("*")), 1)
             self.assertEqual((root / "NOISE/023/02.WAV").read_bytes(), pcm())
 
-    def test_unproven_and_cross_family_cues_stay_unsupported(self):
-        for path in UNPROVEN + ("RICKER/SND-005.WAV", "RICKER/SND-006.WAV", "RICKER/SND-008.WAV", "HUNTER/SND-004.WAV"):
+    def test_other_recordings_go_by_their_event(self):
+        for path, block, vag in BY_EVENT:
+            with self.subTest(path=path):
+                self.assertEqual(self.catalog.lookup("WAV/ENEMY/" + path)["targets"], [f"sound:{block}:sfx:{vag}"])
+        for path in NO_SUCH_SOUND:
             with self.subTest(path=path):
                 self.assertIsNone(self.catalog.lookup("WAV/ENEMY/" + path))
         self.assertEqual(self.catalog.lookup("WAV/ENEMY/DOG/SND-001.WAV")["targets"], ["sound:23:sfx:2"])
+        self.assertEqual(self.catalog.lookup("WAV/DOOR/00-0.WAV")["targets"], ["sound:60:sfx:1"])
+        self.assertEqual(self.catalog.lookup("WAV/FOOT/000-0L.WAV")["targets"], ["sound:343:sfx:1"])
 
-    def test_production_loader_registers_only_proven_targets(self):
+    def test_production_loader_registers_recorded_and_event_targets(self):
         cc = shlex.split(os.environ.get("CC", "clang"), posix=os.name != "nt")
         with tempfile.TemporaryDirectory(prefix="respect-sfx-native-") as tmp:
             out = Path(tmp)
@@ -91,17 +101,17 @@ class PcSfxRoutesTests(unittest.TestCase):
 int main(void) {
     FILE *f=fopen("cue.wav","wb"); check(f!=NULL,"audio fixture");
     fwrite("RIFF",1,4,f); fclose(f);
-    const char *names[]={"DOG/SND-006", "CROW/SND-002", "CROW/SND-003", "RICKER/SND-004", "RICKER/SND-007"};
-    for(unsigned i=0;i<sizeof names/sizeof names[0];i++) {
-        char rel[256];snprintf(rel,sizeof rel,"PSX_DATA/WAV/ENEMY/%s.WAV",names[i]);
-        apply("route-test",rel,"cue.wav");
-        check(nsfx==0,"unproven cross-version alias cannot register a replacement");
-    }
+    apply("route-test","PSX_DATA/WAV/ENEMY/CHO2/SND-000.WAV","cue.wav");
+    check(nsfx==0,"a PC sound with no PS1 sound registers nothing");
     apply("route-test","WAV/ENEMY/DOG/SND-001.WAV","cue.wav");
-    check(nsfx==1 && sfxs[0].block==23 && sfxs[0].vag==2,"independently proven step route retained");
+    check(nsfx==1 && sfxs[0].block==23 && sfxs[0].vag==2 && sfxs[0].rank==0,"recorded dog step route retained");
+    apply("route-test","PSX_DATA/WAV/ENEMY/DOG/SND-006.WAV","cue.wav");
+    check(nsfx==2 && sfxs[1].block==23 && sfxs[1].vag==7,"the dog's sound 6 by its event");
+    apply("route-test","PSX_DATA/WAV/FOOT/000-0R.WAV","cue.wav");
+    check(nsfx==3 && sfxs[2].block==343 && sfxs[2].vag==1 && sfxs[2].rank>0,"the right foot: the room's one step sound, ranked after the left");
     apply("route-test","NOISE/21/9.WAV","cue.wav");
-    check(nsfx==2 && sfxs[1].block==21 && sfxs[1].vag==9,"explicit native waveform route remains available");
-    puts("PASS: unproven aliases rejected, native route and verified dog step retained");
+    check(nsfx==4 && sfxs[3].block==21 && sfxs[3].vag==9,"explicit native waveform route remains available");
+    puts("PASS: recorded and event routes, native route kept, no route without a PS1 sound");
     return 0;
 }
 ''', encoding="utf-8")

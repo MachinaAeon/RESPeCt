@@ -250,15 +250,13 @@ int main(int argc,char **argv){
  }
  if(!strcmp(argv[1],"pc-audio-families")) {
    FILE *f=fopen("cue.wav","wb");check(f!=NULL,"audio fixture");fwrite("RIFF",1,4,f);fclose(f);
-   const char *unmatched[]={"DOG/SND-006","CROW/SND-002","CROW/SND-003","CROW/SND-006"};   /* (no same recording) */
-   for(unsigned i=0;i<sizeof unmatched/sizeof unmatched[0];i++){
-     char rel[256];snprintf(rel,sizeof rel,"PSX_DATA/WAV/ENEMY/%s.WAV",unmatched[i]);apply("test",rel,"cue.wav");
-     check(nsfx==0,"numeric action identity is insufficient for automatic sound routing");
-   }
-   const struct {const char *name;unsigned block,vag;} rows[]={{"DOG/SND-005",23,6},{"CROW/SND-004",22,5}};   /* the same recordings */
+   apply("test","PSX_DATA/WAV/ENEMY/CHO2/SND-000.WAV","cue.wav");
+   check(nsfx==0,"a PC sound the PS1 has no bank sound for registers nothing");
+   const struct {const char *name;unsigned block,vag;} rows[]={{"DOG/SND-005",23,6},{"CROW/SND-004",22,5},   /* the same recordings */
+     {"DOG/SND-006",23,7},{"CROW/SND-002",22,3},{"CROW/SND-003",22,4},{"CROW/SND-006",22,7}};   /* by their event: the bank's sound n */
    for(unsigned i=0;i<sizeof rows/sizeof rows[0];i++){
      char rel[256];snprintf(rel,sizeof rel,"PSX_DATA/WAV/ENEMY/%s.WAV",rows[i].name);apply("test",rel,"cue.wav");
-     check(nsfx==(int)i+1 && sfxs[i].block==rows[i].block && sfxs[i].vag==rows[i].vag,"a PC recording reaches the bank sound it is");
+     check(nsfx==(int)i+1 && sfxs[i].block==rows[i].block && sfxs[i].vag==rows[i].vag,"a PC sound reaches the bank sound that plays for its event");
    }
    puts("PASS");return 0;
  }

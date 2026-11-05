@@ -101,60 +101,46 @@ that sound and its copies in the other banks. Checked in the headless
 runner: in stage 2 room 1, 328 of 416 notes played were the mod's sounds
 given by the PC's names (wav/enemy/dog).
 
-This replaces the numbering guesses below: DOG003/005/008/009 and CROW004
-are now routed by their recordings (DOG005 to bank 23's sound 6, not the 12
-its action number suggested); DOG006 (two equal candidates), CROW002/003
-and RICKER004/007 (below the threshold) stay out.
+### PC sounds by their event
 
-### Withdrawn loose-WAV candidates
+`modfs_pc_sfx_events.h` (`tools/mod_sfxevents.py`, from the PC's
+`PSX_DATA`, NOISE.BIN, KERNEL.BIN and TEST.BIN) routes the other PC
+recordings by the event the PC plays them for, read from gun_bio (a port
+of the PS1 code, `C:\code\PC_GUN_BIO_2\PSX\`):
 
-Ten previously listed aliases have been removed from automatic routing:
-DOG003/005/006/008/009, CROW002/003/004, RICKER004/007. The previous
-investigation established dispatcher paths and PS1 VAB tone assignments, but
-equated numeric action states across different executables without proving
-that their events match. That is insufficient to choose a replacement target.
-The importer blocks these filenames; the runtime leaves native sound data
-untouched. Use an explicitly identified `NOISE/<block>/<waveform>.WAV` instead.
-The separate DOG001 locomotion/step route above remains supported.
+| PC file | gun_bio | PS1 sound |
+| --- | --- | --- |
+| `wav/enemy/<kind>/snd-NNN.wav` | 00471260 (kind, NNN) | the kind's bank (TEST 0x800A22BC + 0x14; zombies 30 and 33), sound NNN: program NNN >> 4, tone NNN & 15 |
+| `wav/door/XY-n.wav` | 004711C0 (door scene XY, n) | block 0x3C + XY (room_change.c step 9 loads it into bank 6), sound n |
+| `wav/foot/NNN-f{L,R}.wav` | 004721C0 (room NNN, floor f) | the room's bank 6, block 0x10E + 0x800A2364[stage] + room, sound f (0x800BB194) |
+| `wav/key1/key-NNN.wav` | 004722B0 (NNN) | block 0, sound NNN |
 
-Additional checks ruled out a simple numbering explanation: PC families13/14
-are dispatched to RICKER without a cue shift; PS1 VAB waveform indices are
-one-based and its tone consumer preserves the cue argument. Decoded sample
-similarity also disagrees with the two withdrawn RICKER pairings. Similarity
-alone is not used to invent replacement aliases. Reintroducing any candidate
-requires matching original event semantics, conditions and timing, followed
-by natural playback/listening acceptance.
+The PC rooms 0-121 are its stageNNNN() functions, each loading one PS1
+stage and room through 00472A10; the table is in the tool, and all 36
+matched music WAVs fall in their room's sound set. The enemy rule gives
+all 45 recorded pairs above (the repeated tones too: zombie 5/7/9/11, dog
+15). 717 more files: 158 enemy, 248 door, 310 footstep, 1 key; CHO2 has no
+PS1 bank. Where several PC files are one PS1 waveform, each goes to the
+sound it names and the copies get the lowest ranked (enemies, keys,
+footsteps with the left foot first, doors; by name); `pc_mod.py` marks the
+others duplicate. Checked headless: through stage 8 room 0's door, the
+door scene's notes are the mod's (bench check 25).
 
-## WAV format validation
+The recordings agree with the event routes below: DOG005 is bank 23's sound
+5 (waveform 6), not the 12 an action number suggested.
 
-The PCM reader and importer now reject truncated fmt/data chunks, empty or
-partial PCM frames and unsupported encoding/channel layouts. RIFF traversal
-uses checked sizes. The loop metadata reader follows the same bounds. The
-resampling frame count and source position avoid integer overflow. Valid
-16-bit mono/stereo PCM, including ordinary extra metadata chunks, retains the
-existing converter path. No new timing multiplier or gameplay patch is added.
+### Earlier withdrawn candidates
 
-## Evidence and limits
-
-- Asset-free tests cover ordered copying, omitted/different reference banks,
-  invalid layouts, memory budgets, reserved VAB entries, structural headers,
-  malformed PCM, rate arithmetic, source preservation and conflicts.
-- Five sequential real headless runs cover no mod, unchanged PC archive,
-  one valid bank delta, a later incompatible bank after a valid delta, and
-  the loose DOG WAV. The unchanged and rejected archives match native bytes;
-  the valid delta changes exactly its one intended native byte.
-- The WAV run changes only NOISE23 waveform2. All other 1694 decoded waveforms
-  match their original extracted WAVs. Its final encoded output also matches
-  the pre-validation-hardening output for the same valid input.
-- CPU, original RAM, cycle counter, native VRAM and displayed inventory pixels
-  match controls at the compared frames. The no-mod state also matches the
-  preceding candidate. The installed executable and original saves are intact.
-
-These are loading/conversion/regression tests. They do not prove natural dog
-encounter playback, acoustic quality, spatial listening, music loops, movie
-synchronization or complete interactive input acceptance. No such gameplay
-acceptance is claimed. The original PC noise reference does not provide an
-automatic identity map for all loose WAV filenames.
+DOG006, CROW002/003 and RICKER004/007 were once withdrawn: numeric action
+states had been equated across the two executables without proof that the
+events match. That proof is now the PC code itself: gun_bio's enemy sound
+function (00471260) builds `snd-NNN` from the sound number its callers, the
+ported PS1 enemy code, pass, and the PS1 plays that number from the kind's
+bank (snd_CueEnemyKind: nibbles = program, tone). Every one of the 45 pairs
+found by recording follows it, repeated tones included. These files are
+other recordings of those events (their sound differs from the PS1's, as
+the earlier comparison found), so they go there by event, like the doors
+and footsteps (`modfs_pc_sfx_events.h`).
 
 ### Historical conversion tests are not event proof
 

@@ -185,6 +185,14 @@ class PcModTests(unittest.TestCase):
         self.assertEqual(rows["044-BGM.WAV"]["status"], "duplicate")
         self.assertIn("017-BGM.WAV", rows["044-BGM.WAV"]["reason"])
 
+    def test_both_feet_of_one_ps1_step_keep_the_left(self):
+        changed = bytearray(wav()); changed[-1] = 9
+        self.put("PSX_DATA/wav/foot/000-0L.wav", wav())
+        self.put("PSX_DATA/wav/foot/000-0R.wav", bytes(changed))
+        rows = {r["source"].split("/")[-1]: r for r in self.scan()["files"]}
+        self.assertEqual(rows["000-0L.wav"]["status"], "recognized")
+        self.assertEqual(rows["000-0R.wav"]["status"], "duplicate")
+
     def test_bad_nac_command_reference_is_blocked(self):
         keys = 2
         self.put("nab/ENEM00.NAC", struct.pack("<I", keys) + bytes(112 * keys) + struct.pack("<I", 2) + bytes(8) + struct.pack("<II", 0, 7))
@@ -232,7 +240,7 @@ class PcModTests(unittest.TestCase):
         pc = self.catalog.lookup("WAV/ENEMY/DOG/SND-001.WAV")
         self.assertIsNotNone(pc)
         self.assertEqual(pc["targets"], self.catalog.lookup("NOISE/23/2.WAV")["targets"])
-        self.assertIsNone(self.catalog.lookup("WAV/ENEMY/DOG/SND-006.WAV"))   # (two equal candidates: not routed)
+        self.assertEqual(self.catalog.lookup("WAV/ENEMY/DOG/SND-006.WAV")["targets"], ["sound:23:sfx:7"])   # (by its event)
 
     def test_pc_noise_preflight_accepts_only_valid_atomic_package(self):
         import pc_noise
@@ -274,15 +282,15 @@ class PcModTests(unittest.TestCase):
             with self.subTest(kind=kind):self.assertEqual(self.scan()["summary"]["blocked"],1)
 
     def test_dog_crow_sounds_go_by_recording_not_by_number(self):
-        # The same recording (tools/mod_sfxnames.py) routes; a numbering guess doesn't:
-        # DOG005 is bank 23's sound 6, not the 12 its action number suggested.
+        # The same recording (tools/mod_sfxnames.py) and the event's bank sound (tools/mod_sfxevents.py)
+        # agree: DOG005 is bank 23's waveform 6 (sound 5), not the 12 an action number suggested.
         for family,cue,block,vag in [("DOG",3,23,4),("DOG",5,23,6),("DOG",8,23,9),("DOG",9,23,10),("CROW",4,22,5)]:
             with self.subTest(family=family,cue=cue):
                 row=self.catalog.lookup(f"WAV/ENEMY/{family}/SND-{cue:03}.WAV")
                 self.assertEqual(row["targets"],self.catalog.lookup(f"NOISE/{block}/{vag}.WAV")["targets"])
-        for family,cue in [("DOG",6),("CROW",2),("CROW",3),("CROW",6)]:
+        for family,cue,block,vag in [("DOG",6,23,7),("CROW",2,22,3),("CROW",3,22,4),("CROW",6,22,7)]:
             with self.subTest(family=family,cue=cue):
-                self.assertIsNone(self.catalog.lookup(f"WAV/ENEMY/{family}/SND-{cue:03}.WAV"))
+                self.assertEqual(self.catalog.lookup(f"WAV/ENEMY/{family}/SND-{cue:03}.WAV")["targets"],[f"sound:{block}:sfx:{vag}"])
 
     def test_verified_pickup_profiles_are_canvas_and_stream_guarded(self):
         for item,words,crc in [(1,31,'6702FD76'),(20,37,'B967BFF9'),(32,34,'BB38C67C'),(41,37,'9645E781'),(64,44,'C88BE6A5')]:
