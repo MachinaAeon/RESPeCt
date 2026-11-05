@@ -31,7 +31,7 @@ EMPTY(decomp_state) EMPTY(texpack_state)
 int rt_in_interrupt(void) { return 0; }
 int thread_current(void) { return 0; }
 void render_sync(void) {} void render_reload(void) {} void gte_reset_caches(void) {}
-void spu_reset_output(void) {} void cd_reapply_volume(void) {} void rt_reset_call_cache(void) {}
+void spu_reset_output(void) {} void spu_hd_state_loaded(void) {} void cd_reapply_volume(void) {} void rt_reset_call_cache(void) {}
 void modfs_state_loaded(void) {} void thread_resume_all(void) { abort(); }
 static int ss_done;
 void plat_ss_done(int a,int b,const char *c) { (void)a;(void)b;(void)c; ss_done++; }

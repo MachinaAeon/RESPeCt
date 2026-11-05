@@ -59,7 +59,7 @@ void rt_fatal(const char *fmt,...){(void)fmt;abort();}
 int modplug_add(const char *mod, const char *mod_dir, const char *up, const char *path) { (void)mod; (void)mod_dir; (void)up; (void)path; return 0; }
 int modplug_enabled(void) { return 0; }
 /* spu.c: mods' sounds played whole (not in these tests) */
-void spu_hd_add(uint32_t crc, uint32_t len, const int16_t *pcm, uint32_t frames, uint32_t wav_rate, uint32_t rate, int64_t loop, uint32_t lead) { (void)crc; (void)len; (void)pcm; (void)frames; (void)wav_rate; (void)rate; (void)loop; (void)lead; }
+void spu_hd_add(uint32_t crc, uint32_t len, const int16_t *pcm, uint32_t frames, uint32_t wav_rate, uint32_t rate, int64_t loop, uint32_t lead, int block) { (void)crc; (void)len; (void)pcm; (void)frames; (void)wav_rate; (void)rate; (void)loop; (void)lead; (void)block; }
 /* modvideo.c: no videos in these tests */
 struct Video *modvideo_open(const char *path, const char **why) { (void)path; *why = "no videos in tests"; return NULL; }
 int modvideo_frames(struct Video *v) { (void)v; return 0; }

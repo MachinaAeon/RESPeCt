@@ -656,7 +656,7 @@ static void bcd_msf(uint32_t lba, uint8_t msf[3]) {
  * or (0) wherever in RAM the old is found (the tables' copies in the
  * overlays, loaded where the game puts them). */
 typedef struct { uint32_t addr, n; uint8_t *was, *now; } RamFix;
-static RamFix ramfixes[128];
+static RamFix ramfixes[256];
 static int nramfix;
 
 static void ram_fix(uint32_t addr, const uint8_t *was, const uint8_t *now, uint32_t n) {
@@ -1451,10 +1451,11 @@ static uint32_t sfx_encode(Sfx *s, const int16_t *pcm, uint32_t frames, uint32_t
 
 /* The SPU plays sound s whole, at the WAV's own rate and length, where the
  * game starts the waveform just written (out, n bytes; its original's
- * shape orig, onb blocks, at rate): spu.c finds it by the CRC of its blocks
- * up to the end flag. */
-static void sfx_whole(Sfx *s, const uint8_t *out, uint32_t n, const uint8_t *orig, uint32_t onb, uint32_t rate) {
-    void spu_hd_add(uint32_t crc, uint32_t len, const int16_t *pcm, uint32_t frames, uint32_t wav_rate, uint32_t rate, int64_t loop, uint32_t lead);
+ * shape orig, onb blocks, at rate; NOISE.BIN block block): spu.c finds it
+ * by the CRC of its blocks up to the end flag. */
+static void sfx_whole(Sfx *s, const uint8_t *out, uint32_t n, const uint8_t *orig, uint32_t onb, uint32_t rate, uint32_t block) {
+    void spu_hd_add(uint32_t crc, uint32_t len, const int16_t *pcm, uint32_t frames, uint32_t wav_rate, uint32_t rate, int64_t loop, uint32_t lead,
+                    int block);
     uint32_t rs;
     int64_t from = wav_loop(s->wav, s->n, &rs);
     if (!s->whole && rs) {
@@ -1473,7 +1474,11 @@ static void sfx_whole(Sfx *s, const uint8_t *out, uint32_t n, const uint8_t *ori
     while (len < n && !(out[len - 16 + 1] & 1)) len += 16;
     Shape sh = vag_shape(orig, onb);
     int64_t loop = !sh.loop ? -1 : from >= 0 ? from : (int64_t)((uint64_t)sh.from * 28 * s->whole_rate / rate);
-    spu_hd_add((uint32_t)mz_crc32(0, out, len), len, s->whole, s->whole_frames, s->whole_rate, rate, loop, 28 * sh.lead);
+    spu_hd_add((uint32_t)mz_crc32(0, out, len), len, s->whole, s->whole_frames, s->whole_rate, rate, loop, 28 * sh.lead, -1);
+    /* and the original's blocks in this bank, for a savestate made before the mod (spu.c) */
+    uint32_t olen = 16;
+    while (olen < 16 * onb && !(orig[olen - 16 + 1] & 1)) olen += 16;
+    spu_hd_add((uint32_t)mz_crc32(0, orig, olen), olen, s->whole, s->whole_frames, s->whole_rate, rate, loop, 28 * sh.lead, (int)block);
 }
 
 /* NOISE.BIN's table of blocks (KERNEL.BIN's), and its banks: the number of blocks, 0 if not found. */
@@ -1599,7 +1604,7 @@ static void sfx_done(void) {
             if (mono[j]) {
                 Sfx *s = &sfxs[who[base[b] + j]];
                 now[j] = sfx_encode(s, mono[j], frames[j], rate[j], d + at, sz / 16, give[j], o);
-                sfx_whole(s, o, now[j], d + at, sz / 16, rate[j]);
+                sfx_whole(s, o, now[j], d + at, sz / 16, rate[j], b);
                 s->places++;
             } else
                 memcpy(o, d + at, sz);
@@ -1730,18 +1735,24 @@ static void music_done(void) {
         Music *m = &musics[i];
         uint32_t at = m->block < nb && bk[m->block].vs ? v[m->block] * 2048 : 0, c = at ? rd32(t->data + at) : 0;
         const char *why = "couldn't read it";
+        uint8_t *seq = NULL, *was = NULL;
+        uint32_t len = 0;
         if (m->part < 1 || m->part + 2 > c) why = "NOISE.BIN has no such music (a room's sound set: blocks 230 and up)";
         else {
-            uint32_t off = at + rd32(t->data + at + 4 + 4 * m->part), len = rd32(t->data + at + 8 + 4 * m->part) - (off - at);
-            uint8_t *seq = t->data + off;
+            uint32_t off = at + rd32(t->data + at + 4 + 4 * m->part);
+            len = rd32(t->data + at + 8 + 4 * m->part) - (off - at);
+            seq = t->data + off;
             for (int g = 0; g < ngrows; g++)     /* (a mod's own sequence there) */
                 if (grows[g].fi == fi && grows[g].offset == off) { seq = grows[g].data; len = grows[g].size; }
             uint32_t rs;
             int64_t from = wav_loop(m->wav, m->n, &rs);
+            if ((was = malloc(len))) memcpy(was, seq, len);
             if (!seq_mute(seq, len)) why = "its sequence isn't one this can silence";
             else if ((m->pcm = wav_load(m->wav, m->n, 44100, &m->frames, &why)) && m->frames) {
                 m->loop = from >= 0 && rs ? (uint32_t)((uint64_t)from * 44100 / rs) : 0;
                 if (m->loop >= m->frames) m->loop = 0;
+                if (was) ram_fix(0, was, seq, len);   /* (a savestate from before: the sequence there silenced too) */
+                free(was);
                 note("mods: %s: in place of NOISE.BIN block %u's music %u (%.1f s%s)", m->what, m->block, m->part, m->frames / 44100.0,
                      from >= 0 ? ", repeating from its loop start" : "");
                 free(m->wav);
@@ -1749,6 +1760,8 @@ static void music_done(void) {
                 continue;
             }
         }
+        if (was) memcpy(seq, was, len);          /* (the sequence left as it was: the music plays) */
+        free(was);
         note("mods: %s: %s: not used", m->what, why);
         nused--;
         free(m->wav);

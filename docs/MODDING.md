@@ -589,7 +589,11 @@ is conservatively refused even when the files are unchanged. Avoid
 multiple paths/formats targeting the same resource inside one mod.
 
 A new quick save with no mods can still use the existing conditional RAM
-and VRAM reapplication when mods are added. This is not a universal state
+and VRAM reapplication when mods are added. Sounds and music follow too: in
+a quick save made before a mod, the sound chip still holds the original
+sounds, and RESPeCt plays the mod's WAV where the game starts one of those
+(until the game loads that memory again); a room's music given as a WAV has
+its sequence silenced there as well, so the two don't play together. This is not a universal state
 migration guarantee. Legacy quick saves have no identity: the log warns
 that compatibility is unverified. They cannot reliably detect which mods
 were active when saved; keep a backup and prefer a memory card save when

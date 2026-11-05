@@ -558,6 +558,7 @@ static void load_now(const char *path, char *msg, size_t msgn) {
     render_reload();
     gte_reset_caches();
     spu_reset_output();
+    { void spu_hd_state_loaded(void); spu_hd_state_loaded(); }   /* (a mod's sounds where the save has the originals) */
     { void cd_reapply_volume(void); cd_reapply_volume(); }
     rt_reset_call_cache();
     { extern int thread_current(void);

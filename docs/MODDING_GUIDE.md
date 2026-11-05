@@ -227,6 +227,9 @@ Memory card saves always work with or without mods. A quick save (F5)
 remembers which mods were on: loading it with other mods is refused, with
 the reason on screen, so it can't break. Adding or removing a mod with
 bigger rooms also refuses older quick saves; load a memory card save.
+A quick save made before you added a mod loads with it: its sounds, music
+and texts are the mod's straight away; what the room had already loaded
+(models, some textures) may change only from the next room.
 
 ## 6. When something doesn't show up
 
