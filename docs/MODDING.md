@@ -84,17 +84,17 @@ PNG, BMP, JPG or TGA.
 
 A PC mod goes in as it is: put its folder (with or without `PSX_DATA`,
 `Resource`, `nab`) in `mods`. Checked with the whole PC installation as
-one mod: every PC file the PS1 game has an equivalent of is used (1905,
+one mod: every PC file the PS1 game has an equivalent of is used (1930,
 rooms, doors, effects, items, enemies, bosses' models, textures, the
-mapped screens, voices, movies, 36 of the 38 music tracks, 762 sound effects:
-the enemies', doors', footsteps' and keys', by the event they play for, 162 message
+mapped screens, voices, movies, 36 of the 38 music tracks, 790 sound effects:
+the enemies', weapons', doors', footsteps' and keys', by the event they play for, 162 message
 pictures, shown in place of the PS1's text), in 3 seconds at
 start. A room or scenery block can now be bigger than on the PS1 (see
 Sizes). The log names each of the others and what to give instead:
 
 | PC files | Why not used | Instead |
 | --- | --- | --- |
-| `wav/weap`, `item/wav`, `wav/event` (but one), `enemy/cho2` | the PS1 code that plays them isn't followed yet (CHO2: the PS1 has no bank for it) | `NOISE/<bank>/<n>.wav`, the sound it stands for (`extract` writes them all, by bank) |
+| `item/wav`, `wav/event` (but one), `enemy/cho2` | one PC WAV for a whole event, no single PS1 sound (CHO2: the PS1 has no bank for it) | `NOISE/<bank>/<n>.wav`, the sound it stands for (`extract` writes them all, by bank) |
 | the other `Message/*.BMP`, `eventmsg/*.bmp` (350) | not a room message of the PS1 (generic ones, other languages, 1x1 placeholders) | `text/ROOMS.txt` and the other text files: plain UTF-8, any language |
 | `menu/`, `Anm/*.FLC`, `map/` cursor and frames, `item/PIC` | the PC's own screens; the PS1 draws its own | the PS1's pictures (`extract`: `map/`, `RESULT/`, `RESOURCE/TITLE10.png`...) |
 | `DOORNEW/*1.HMD`, `item/ITEM_xx`, some `effect` and `people` models | models only the PC has | the PS1's `DOOR_xx.HMD`, `item/.../A.HMD`... |
@@ -476,22 +476,25 @@ sound can be as long as you like; only a quick save loaded in the middle
 of one goes on with the bank's version.
 
 The PC version's sound effects (`wav/door`, `wav/enemy`, `wav/foot`,
-`wav/key1`) go to the PS1 sound that plays for the same event, by their PC
-names. The PC version is a port of the PS1 code and names its WAVs by the
+`wav/weap`, `wav/key1`) go to the PS1 sound that plays for the same event,
+by their PC names. The PC version is a port of the PS1 code and names its WAVs by the
 same numbers: an enemy's `snd-NNN.wav` is sound NNN of that enemy's bank,
 a door's `XY-n.wav` sound n of the bank the PS1 loads for door scene XY,
 a room's `foot/NNN-fL.wav` the footstep f of that room's bank (the PC's
 room NNN is a PS1 stage and room: `tools/mod_sfxevents.py` has the table),
-`key1/key-NNN.wav` sound NNN of the menu bank. 45 of them are the PS1's own
+`key1/key-NNN.wav` sound NNN of the menu bank, `weap/<weapon>-<action>.wav`
+the weapon's bank: ATTACK the shot, BACK the spent casing's clink, RELOAD
+the reload (the handguns' magazine going in), NO the dry fire. 45 of them are the PS1's own
 recordings; the others are other recordings of the same events, and go
 there too (`modfs_pc_sfx.h`, `modfs_pc_sfx_events.h`). Where the PS1 plays
 one sound for several PC files (both feet; the same step in many rooms;
 the same door sound for several door types), each file goes to the bank
 sound it names, and its copies elsewhere get one of them: the enemies',
 then the keys', footsteps' (left foot first), doors', by name; the log
-names the others. Not routed: the weapons, items and rooms' event sounds
-(`wav/weap`, `item/wav`, `wav/event`): give the PS1's sounds by their
-NOISE names.
+names the others. Not routed: the rooms' event sounds and the items'
+(`wav/event`, `item/wav`, `BGM/Effect`): the PC has one WAV for a whole
+event where the PS1 plays several sounds of the room's bank (or none of
+them is the same event): give the PS1's sounds by their NOISE names.
 
 ## A room's music
 
@@ -585,9 +588,9 @@ changing mods. Older executables do not enforce the new identity.
   `item/PIC` contains pickup-message bitmaps, not BIGTIM item pictures.
   See [MODDING_LIMITS.md](MODDING_LIMITS.md) for verified correspondences
   and the information still needed for a complete importer.
-- **The PC's weapon, item and room event sounds** (`wav/weap`, `item/wav`,
-  `wav/event`): not routed yet; give the PS1's sounds instead (above). The
-  enemies', doors', footsteps' and keys' go by their PC names.
+- **The PC's room event and item sounds** (`wav/event`, `item/wav`): one
+  WAV per whole event on the PC; give the PS1's sounds instead (above).
+  The enemies', weapons', doors', footsteps' and keys' go by their PC names.
 - **The PC's `.FLC` animations** other than the ones listed above: give
   frames instead. Its `.avi` and `.mpg` movies play when the FFmpeg DLLs
   are next to the exe (Movies, above).

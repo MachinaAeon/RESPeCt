@@ -114,13 +114,23 @@ of the PS1 code, `C:\code\PC_GUN_BIO_2\PSX\`):
 | `wav/door/XY-n.wav` | 004711C0 (door scene XY, n) | block 0x3C + XY (room_change.c step 9 loads it into bank 6), sound n |
 | `wav/foot/NNN-f{L,R}.wav` | 004721C0 (room NNN, floor f) | the room's bank 6, block 0x10E + 0x800A2364[stage] + room, sound f (0x800BB194) |
 | `wav/key1/key-NNN.wav` | 004722B0 (NNN) | block 0, sound NNN |
+| `wav/weap/<weapon>-<action>.wav` | 00472620 (weapon id, action) | block id + 1 (bank 1, 8008E324): ATTACK 5 (launchers 3), BACK 1, RELOAD 2 (handguns 3), NO 0 |
 
 The PC rooms 0-121 are its stageNNNN() functions, each loading one PS1
 stage and room through 00472A10; the table is in the tool, and all 36
 matched music WAVs fall in their room's sound set. The enemy rule gives
 all 45 recorded pairs above (the repeated tones too: zombie 5/7/9/11, dog
-15). 717 more files: 158 enemy, 248 door, 310 footstep, 1 key; CHO2 has no
-PS1 bank. Where several PC files are one PS1 waveform, each goes to the
+15). 745 more files: 158 enemy, 28 weapon, 248 door, 310 footstep, 1 key;
+CHO2 has no PS1 bank. The weapons' actions: gun_bio plays ATTACK on a shot
+(8008E368 plays sound 5; the launchers' shot is the round leaving, sound
+3), BACK when the spent casing's animation ends (the PS1's clink, sound
+1), RELOAD when the last round is in (the handguns' magazine-in, sound 3;
+the others load one at a time with sound 2), NO on a dry fire (sound 0).
+Headless: 28 handgun shots play sounds 5 and 1, the reload 2 then 3; with
+the PC's weapon WAVs all of them are the mod's (bench check 26). The
+rooms' event WAVs (`wav/event`) are the PC's recordings of whole events
+(`EVE-ALL`, the TV's loop): no PS1 sound is the same event, so they stay
+NOISE names. Where several PC files are one PS1 waveform, each goes to the
 sound it names and the copies get the lowest ranked (enemies, keys,
 footsteps with the left foot first, doors; by name); `pc_mod.py` marks the
 others duplicate. Checked headless: through stage 8 room 0's door, the

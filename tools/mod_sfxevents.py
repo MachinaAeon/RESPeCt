@@ -22,14 +22,25 @@ n >> 4, tone n & 15), the PC builds a WAV name from the same numbers:
     room's bank 6, block 0x10E + 0x800A2364[stage] + room, one sound for
     both feet.
   - keys and menus: wav/key1/key-NNN.wav: sound NNN of bank 0 (block 0).
+  - weapons: wav/weap/<weapon>-<action>.wav (gun_bio 00472620: the weapon
+    id, the same as the PS1's, and the action); the PS1 loads block id + 1
+    into bank 1 (8008E324). ATTACK is the shot (8008E368: sound 5; the
+    launchers, whose shot removes the round's panel, sound 3), NO the dry
+    fire (sound 0), BACK the spent casing landing (gun_bio plays it when the
+    casing's animation ends, the PS1 its clink: sound 1), RELOAD the reload
+    (gun_bio plays it when the last round is in: the handguns' magazine-in,
+    sound 3; the others load one round at a time, each with sound 2).
+    Checked headless: 28 handgun shots play sounds 5 and 1, the reload 2
+    then 3. The grenade rounds' ATTACK-BLUE/-YELLOW/-WHITE are one PS1
+    sound with ATTACK.
 A sound used by more than one of these (the same waveform: the same
 footstep in many rooms, an enemy's repeated sounds) gets, inside a mod,
 the PC file with the lowest rank: the PS1's own recordings in
-modfs_pc_sfx.h, then enemies, keys, footsteps (left foot first), doors, by
+modfs_pc_sfx.h, then enemies, weapons, keys, footsteps (left foot first), doors, by
 name. Each file still goes to the bank sound it names, unless a better
 ranked one names that too.
-Weapons, items and the rooms' event sounds aren't routed: the PS1 plays
-them from code not yet followed. Writes names and numbers only."""
+Items and the rooms' event sounds aren't routed: the PS1 plays them from
+code not yet followed. Writes names and numbers only."""
 import hashlib, os, re, struct, sys
 
 # PC room (stageNNNN()) -> PS1 (stage, room): gun_bio's room functions each call 00472A10 with them.
@@ -43,6 +54,8 @@ PC_ROOMS = [(7, 4), (7, 0), (0, 0), (0, 4), (0, 2), (0, 1), (0, 5), (0, 6), (9, 
             (1, 1), (1, 2), (1, 3), (1, 4), (6, 0), (5, 0), (2, 0), (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8),
             (2, 9), (2, 10), (2, 11), (2, 12), (2, 13), (2, 14), (2, 15), (2, 16), (17, 0), (17, 1), (17, 2)]
 # PC enemy folder -> PS1 enemy kind (gun_bio 00471260's switch); None: the block itself.
+WEAPONS = {'GUN-A': 0, 'GUN-B': 1, 'GUN-C': 2, 'GUN-D': 3, 'SHORTGUN': 4, 'MAGUNAMU': 5, 'ROCKET': 7, 'GURENEDO': 8}
+ACTIONS = {'ATTACK': 5, 'ATTACK-BLUE': 5, 'ATTACK-YELLOW': 5, 'ATTACK-WHITE': 5, 'NO': 0, 'BACK': 1, 'RELOAD': 2}
 ENEMIES = {'ZOMBIE0': ('block', 30), 'ZOMBIE1': ('block', 33), 'DOG': 11, 'CROW': 12, 'RICKER': 13, 'GOKIBURI': 15,
            'SPIDER': 16, 'CROCODILE': 18, 'IVY': 19, 'TAIRANT': 22, 'GIANTMOTH': 26, 'HUNTER': 28, 'HANK': 30,
            'CHO0': 31, 'CHO1': 32, 'CHO2': 33}
@@ -151,18 +164,27 @@ def main():
             st, rm = PC_ROOMS[int(m.group(1))]
             rows.append((rel, 'foot', sound(0x10E + stage_banks[st] + rm, int(m.group(2)))))
             continue
+        m = re.fullmatch(r'WAV/WEAP/(GUN-[A-D]|SHORTGUN|MAGUNAMU|ROCKET|GURENEDO)-([A-Z-]+)\.WAV', rel)
+        if m and m.group(2) in ACTIONS:
+            nib = ACTIONS[m.group(2)]
+            if nib == 5 and WEAPONS[m.group(1)] >= 7:
+                nib = 3
+            if nib == 2 and WEAPONS[m.group(1)] <= 3:
+                nib = 3
+            rows.append((rel, 'weapon', sound(WEAPONS[m.group(1)] + 1, nib)))
+            continue
         m = re.fullmatch(r'WAV/KEY1/KEY-(\d{3})\.WAV', rel)
         if m:
             rows.append((rel, 'key', sound(0, int(m.group(1)))))
-    # a rank per waveform: the recordings first, then enemies, keys, footsteps (left foot first), doors, by name
-    order = {'enemy': 0, 'key': 1, 'foot': 2, 'door': 3}
+    # a rank per waveform: the recordings first, then enemies, weapons, keys, footsteps (left foot first), doors, by name
+    order = {'enemy': 0, 'weapon': 1, 'key': 2, 'foot': 3, 'door': 4}
     ranks, rank = {}, {}
     for name, (b, v) in sorted(recorded.items()):
         sound(b, 0)
         if banks.get(b) and v < len(banks[b][1]):
             h = hashlib.md5(banks[b][1][v]).hexdigest()
             ranks[h] = ranks.get(h, 0) + 1
-    for rel, kind, r in sorted((x for x in rows if x[2]), key=lambda x: (order[x[1]], x[0].replace('R.WAV', 'Z.WAV'))):
+    for rel, kind, r in sorted((x for x in rows if x[2]), key=lambda x: (order[x[1]], x[0].replace('R.WAV', 'Z.WAV').replace('ATTACK-', 'ATTACKZ'))):
         rank[rel] = ranks.get(r[2], 0)
         ranks[r[2]] = rank[rel] + 1
     kept = [(rel, kind, r) for rel, kind, r in rows if r]

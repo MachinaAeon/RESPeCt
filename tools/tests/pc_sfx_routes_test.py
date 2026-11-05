@@ -90,6 +90,12 @@ class PcSfxRoutesTests(unittest.TestCase):
         self.assertEqual(self.catalog.lookup("WAV/ENEMY/DOG/SND-001.WAV")["targets"], ["sound:23:sfx:2"])
         self.assertEqual(self.catalog.lookup("WAV/DOOR/00-0.WAV")["targets"], ["sound:60:sfx:1"])
         self.assertEqual(self.catalog.lookup("WAV/FOOT/000-0L.WAV")["targets"], ["sound:343:sfx:1"])
+        # weapons: bank 1 is block id + 1; the shot is sound 5 (launchers 3), the casing 1, the
+        # handguns' magazine-in 3, the dry fire 0 (block 1's tones 5/1/3 are waveforms 7/6/1)
+        for path, block, vag in (("GUN-A-ATTACK", 1, 7), ("GUN-A-BACK", 1, 6), ("GUN-A-RELOAD", 1, 1),
+                                 ("GURENEDO-ATTACK", 9, 3), ("GURENEDO-NO", 9, 5), ("SHORTGUN-RELOAD", 5, 3)):
+            with self.subTest(path=path):
+                self.assertEqual(self.catalog.lookup(f"WAV/WEAP/{path}.WAV")["targets"], [f"sound:{block}:sfx:{vag}"])
 
     def test_production_loader_registers_recorded_and_event_targets(self):
         cc = shlex.split(os.environ.get("CC", "clang"), posix=os.name != "nt")
