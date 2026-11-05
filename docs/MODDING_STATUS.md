@@ -1,9 +1,10 @@
 # Mod support status and remaining work
 
-Updated 2026-11-04. Baseline: branch `gpu-renderer`, commit
-`f054f604ab9dcb29b616b6d83832ef08cc1cdbc6`. The changes below are local,
-uncommitted candidates. This file is the persistent follow-up to the
-modding audit; a passing component test does not close the entire roadmap.
+Updated 2026-11-05. Branch `mod-support` (on top of `steady-3d-gpu`, PR #3).
+Every row below is committed; the sections after the table are the dated
+notes of how each part was checked. A passing component test does not close
+the entire roadmap: the open items are listed under *Open / deliberately not
+generalized*.
 
 ## Automatic PC compatibility follow-up
 
@@ -82,7 +83,7 @@ The fixed scratch buffers that only borrow the old window stay as they are.
 | M15a | HD font colours reuse one image for all palettes | One HD image per distinct CLUT; include banks shared by FONT186/187/188; retain native indices, transparency and STP black | Actual CPU/GPU inventory captures use two palette variants. Asset-free cases also cover nonzero transparent index, opaque black and duplicate colours. Final build also rendered correctly in CPU/GPU captures; see acceptance limits below |
 | M18 | Grown packed parts compare beyond the original backup | Keep `was_len` and compare lengths before bytes in `packs_done` | Production-code guard reproduced a 32-byte read from a 16-byte backup before correction; the grown payload now repacks correctly |
 | M11a | PC raster-message and diary import path absent | `pc-bitmaps.txt` explicitly maps ROOM/captions, PICKUP and DIARY crops; original control streams continue; native fallback for ambiguous pointers, choices, missing images and screen overlays | 15 bitmap scenarios; actual unique native message and diary BMP shown with CPU/GPU; missing-source pixels match native; bitmap state resumes. See PC_BITMAPS.md |
-| M12a | Model/animation growth restricted to guessed per-asset allowances | Experimental default-off `dynamic_mod_buffers` manages a bounded decoded room heap, shared/instance ownership, scratch, guards and versioned state; final archive sizes indexed at boot | 23 loader groups + 13 state groups, 14 metadata assertions; actual 07/04â†’07/00 door loaded a +400,000-byte animation payload and 616,448-byte packed block into owned memory; CPU/GPU resume, real in-flight continuation and synchronous fresh boot verified. See DYNAMIC_MOD_BUFFERS.md |
+| M12a | Model/animation growth restricted to guessed per-asset allowances | Experimental default-off `dynamic_mod_buffers` manages a bounded decoded room heap, shared/instance ownership, scratch, guards and versioned state; final archive sizes indexed at boot | 23 loader groups + 13 state groups, 14 metadata assertions; actual 07/04 -> 07/00 door loaded a +400,000-byte animation payload and 616,448-byte packed block into owned memory; CPU/GPU resume, real in-flight continuation and synchronous fresh boot verified. See DYNAMIC_MOD_BUFFERS.md |
 | M19 | No way to change the game's code without rebuilding RESPeCt (the PC's DLL mods) | Plugins: `mods/<mod>/plugins/*.dll` with `respect_plugin_init` (`port/include/respect_plugin.h`, `modplug.c`): hooks before/after any game function (skip, arguments, result) through `interp_call`, RAM/register access, game calls, frame callbacks. Off unless `mod_plugins = 1` | Example plugin (`port/plugins/example.c`) in real headless runs from a save: message text read, room load logged, health regen measured in RAM; off by default reported in the log. No plugin: frames and audio identical to the previous build from boot and from a save. Not yet: plugin state in quick saves, a non-Windows build |
 | M21 | A room's block capped at the PS1's 290816 bytes | Over that (up to 1 MB), the room window 0x80108000-0x80150000 moves to extended RAM: native readers (`room_load.c`, `sound.c`) use `g_room_win_base/end`; the 16 TEST.BIN instructions that build the window's start or end in interpreted code (scenery slots, script block reads, the allocations past 0x800B3D54) are rewritten in the served file. Fixed scratch users (enemy files, sound banks, door model, title, typewriter, story text) stay at the old addresses. Quick saves from the other layout are refused | Headless, a 415744-byte stage 7 room 4: new game, game loads in stages 1, 5, 6, 7, 8, 14, four doors (one into the big room), quick saves in the room and mid-door: frames identical to no mod (forced move without mods: identical too). No-mod runs identical to the reference exe. Not yet: natural play, death/continue in a big room |
 | M22 | Stages 1, 5, 6 scenery blocks capped at their slots (20, 12, 23 sectors) | The four area records (STAGPROG.BIN 0x800F3060/68, 0x800F3668, 0x800F328C: byte 6 slots, byte 7 sectors, read only by TEST's scenery readers) get the biggest block's size, up to 255 sectors; the room window moves, bigger by (slots + 2) x the growth | Headless: the slots 6 sectors bigger (RT_SCENERY_SLOTS), walking in stage 1 (both areas), 5 and 6: frames identical; padded stage 5 blocks (12 -> 18 sectors) render the same, only later by their longer reads. Not yet: natural play through those stages |
@@ -95,6 +96,7 @@ The fixed scratch buffers that only borrow the old window stay as they are.
 | M29 | The rooms' event scripts only changeable as whole ROOMENV.DAT bytes | `data/SCRIPTS.txt`: every room's script table (block part 5) as text, an op a line by name (53 named from the decompiled handlers, the rest OpNN) with its operands; lengths from TEST's table 0x800A2FC8. A listed script goes in its place if it fits (shorter: must end with ThreadEnd), else after the block's data with the table entry pointing there (in the grown copy when the block grows; a refused growth leaves the original) | 429 scripts in 126 rooms decode with no overrun (3 tails written as raw words); given back as extracted ROOMENV.DAT is identical; room 8/0's notice script made longer runs from its new place (bench 27), also when the block grows 2048 -> 4096; a 22 KB one is refused (10240 the game's limit) and the original stays. Asset-free parser test scripts-parse |
 | M30 | Pictures inside packed blocks not among PICTURES | `PICTURES/<file>/<block>-<part>/<n>.png` for OBJ.DAT, EV_OBJ.DAT and ITEMDAT.DAT: the block's part unpacked (the game's LZSS), its TIMs numbered, one replaced in place with the same converter (palette sharing, HD), the block packed again (packs_done, a part nothing changed keeps the disc's packing) | 82 pictures (22, 1, 59), all of them; given back as extracted both archives identical; the zombies' texture tinted red is red in VRAM in stage 0 room 4 (bench 28) |
 | M20 | Game data only changeable through code or whole binary files | `data/COMBAT.txt` (fire rate, shot damage and class, the 34 types' damage factors, the small enemies' hit points and their odds; TEST.BIN, with the RAM of older saves fixed) and `data/ROOMS.txt` (each room's enemy and pickup lists, ROOMENV.DAT, growing; at most 7 objects, or the original number up to 10) | Extracted and given back: ROOMENV.DAT and TEST.BIN byte-identical. Real headless run from a save: changed numbers in RAM, a moved enemy and an added pickup in the loaded room. Since then also `enemy` (types 11-33's four hit points) and `part` (every program's body-part factors per shot kind): the program tables (+0x840) in ENEMPROG.BIN, both slot copies; given back as extracted ENEMPROG.BIN is byte-identical, changed the Cerberus of stage 2 room 1 spawn with the new hit points. The Tyrant (type 22) spawns with the changed numbers too. Types 50+ are stage things and actors with no hit points (alive or not); stage 8 room 0's ambush zombies get 200 from STAGPROG 23. Not yet: the tables' other values, scripts and triggers |
+| M31 | A quick save made before a mod plays the original sounds and music | The sound chip's memory is in the save, with the original samples: each replaced sample is also registered by its original blocks and NOISE.BIN bank, found only in SPU RAM not written since the state was loaded; one original in several banks with different PC files (gun-a/b/c/d) is told apart by the bank the game has loaded (slots at 0x800637C0). A room's music WAV silences its sequence in RAM too (a RAM fix), so the two don't play together | Headless, states saved with no mods and loaded with a PC sound mod: the handgun's shot, casing and reload are the mod's from the first shot (bench 29: 50 of 194 notes, the same sounds as a fresh load), the door 40 of 43; the user's own old quick save played the mod's footsteps and silenced the room's sequence. Played by hand with a PC-named test mod (every sound saying what it is, enemies red through the PC's NAB): all five checks passed |
 
 No mod means no page replacements, UI overrides or relocated text. The
 candidate's no-mod controlled run matches the previous executable's CPU
@@ -205,7 +207,7 @@ commutative sum. Enumeration changes may therefore refuse a state
 conservatively. This preserves the existing file application semantics;
 it does not promise cross-filesystem ordering of overlapping aliases.
 
-## Continuation verification â€” 2026-11-03
+## Continuation verification - 2026-11-03
 
 - Complete content for all13 mapped PC diaries remains supported; the15
   separate diary UI/animation resources remain unsupported.
@@ -222,7 +224,7 @@ it does not promise cross-filesystem ordering of overlapping aliases.
   playback/listening, acquisition and long play remain open. No installed
   runtime replacement or complete PC-mod compatibility is established.
 
-## Presentation and portable workflow continuation â€” 2026-11-03
+## Presentation and portable workflow continuation - 2026-11-03
 
 - PC diary presentation now samples full source detail at the actual output
   resolution with alpha-weighted area reduction. The former native-resolution
