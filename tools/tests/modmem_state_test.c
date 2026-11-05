@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../../port/src/savestate.c"
-#include "../../port/src/modmem.h"
+#include "../../port/src/mods/modmem.h"
 #include "../../port/src/config.h"
 Cpu g_cpu;
 uint8_t g_ram[RAM_SIZE],g_scratch[SCRATCH_SIZE];

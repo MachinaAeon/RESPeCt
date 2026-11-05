@@ -282,7 +282,7 @@ class PcModTests(unittest.TestCase):
             with self.subTest(kind=kind):self.assertEqual(self.scan()["summary"]["blocked"],1)
 
     def test_dog_crow_sounds_go_by_recording_not_by_number(self):
-        # The same recording (tools/mod_sfxnames.py) and the event's bank sound (tools/mod_sfxevents.py)
+        # The same recording (tools/mod_tables/mod_sfxnames.py) and the event's bank sound (tools/mod_tables/mod_sfxevents.py)
         # agree: DOG005 is bank 23's waveform 6 (sound 5), not the 12 an action number suggested.
         for family,cue,block,vag in [("DOG",3,23,4),("DOG",5,23,6),("DOG",8,23,9),("DOG",9,23,10),("CROW",4,22,5)]:
             with self.subTest(family=family,cue=cue):

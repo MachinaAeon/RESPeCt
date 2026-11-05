@@ -17,11 +17,11 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 import pc_mod
 
-# Routes: the PS1's own recordings (tools/mod_sfxnames.py: the same sound by
+# Routes: the PS1's own recordings (tools/mod_tables/mod_sfxnames.py: the same sound by
 # cross-correlation) and, for the PC's other recordings, the event: the PC
 # file's number is the PS1 sound number in the kind's bank (gun_bio 00471260,
 # a port of the PS1 code), the bank's VAB gives its waveform
-# (tools/mod_sfxevents.py). All 45 recorded pairs follow that table, the
+# (tools/mod_tables/mod_sfxevents.py). All 45 recorded pairs follow that table, the
 # repeated tones too (zombie 5/7/9/11, dog 15).
 ROUTES = (("DOG/SND-001.WAV", 23, 2), ("DOG/SND-003.WAV", 23, 4), ("CROW/SND-004.WAV", 22, 5),
           ("ZOMBIE1/SND-002.WAV", 33, 3))
@@ -123,8 +123,8 @@ int main(void) {
 ''', encoding="utf-8")
             exe = out / ("routes.exe" if os.name == "nt" else "routes")
             subprocess.run([*cc, "-O1", "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
-                            *["-I" + str(ROOT / p) for p in ("port/include", "port/src", "port/third_party")],
-                            str(source), str(ROOT / "port/src/modfs_memory.c"),str(ROOT/"port/src/modio.c"), "-o", str(exe), "-lm"], check=True)
+                            *["-I" + str(ROOT / p) for p in ("port/include", "port/src", "port/src/mods", "port/src/mods/tables", "port/third_party")],
+                            str(source), str(ROOT / "port/src/mods/modfs_memory.c"),str(ROOT/"port/src/mods/modio.c"), "-o", str(exe), "-lm"], check=True)
             subprocess.run([str(exe)], cwd=out, check=True)
 
 

@@ -1,6 +1,9 @@
 # Mod loader regressions
 
-Run `python tools/tests/modfs_test.py` from the repository root. `CC` selects
+`python tools/tests/c_tests.py` builds and runs every C test below (or the
+ones named); the `*_test.py` files here are Python tests run on their own.
+
+Run `python tools/tests/c_tests.py modfs_test` from the repository root. `CC` selects
 an existing C compiler, e.g. `clang --target=x86_64-w64-mingw32` on Windows.
 No disc, extracted game data, downloads or generated game code are needed.
 Executables and fixture files live in a temporary directory.
@@ -23,14 +26,14 @@ The image decoder is a deterministic RGBA boundary substitute; the HD
 registration sink records the call. These are not decoder, renderer,
 sound or interactive gameplay tests. Real-disc round trips, captured
 runtime pictures and state compatibility need separate integration runs;
-see docs/MODDING_STATUS.md. Do not commit their proprietary fixtures.
+see docs/mods/STATUS.md. Do not commit their proprietary fixtures.
 
 Additional production-code suites:
 
 ```
-python tools/tests/pc_bitmap_test.py
-python tools/tests/modfs_memory_test.py
-python tools/tests/modmem_test.py
+python tools/tests/c_tests.py pc_bitmap_test
+python tools/tests/c_tests.py modfs_memory_test
+python tools/tests/c_tests.py modmem_test
 ```
 
 They respectively exercise 19 bitmap scenarios with the real image decoder;
@@ -56,7 +59,7 @@ archive preflight with generated banks. Package tests also cover verified
 audio aliases, no-op references, conflicts and malformed PCM. Native loader
 scenarios cover atomic bank writes, VAB allocation/header rules and bounded
 WAV decoding/loop traversal. These are asset-free component checks, not
-listening or natural gameplay tests. See docs/PC_AUDIO_COMPATIBILITY.md.
+listening or natural gameplay tests. See docs/mods/PC_COMPATIBILITY.md#pc-audio.
 
 The automatic message continuation checks measured path dispatch, exact canvas,
 current-stream CRC fallback, native box/caption page limits and authored priority.
@@ -68,7 +71,7 @@ Split staging tests add 94/400-sector reads through the production loader and
 real LZ decoder, simultaneous packed/texture ownership, cancel/reuse, selective
 identity/cap checks, relocated archive metadata and ABI2 pre-apply CD queue/span
 validation. These differ from real-disc transition/in-flight save comparisons
-in DYNAMIC_MOD_BUFFERS.md.
+in docs/mods/MEMORY.md.
 
 
 Synchronous-loader tests additionally cover its original seven-slot limit,
@@ -82,7 +85,7 @@ checks, not exhaustive proof of arbitrary MIPS unwinding or old-state migration.
 ## Complete PC diary and additional sound routes
 
 ```
-python tools/tests/pc_diary_test.py
+python tools/tests/c_tests.py pc_diary_test
 python tools/tests/pc_diary_package_test.py
 python tools/tests/pc_sfx_routes_test.py
 ```
@@ -94,8 +97,8 @@ and fractional viewport. Nine package tests read the same identity/count
 metadata and enforce complete foreground/background sets before import. Five
 sound-route groups verify the measured Licker aliases, including the production
 C dispatch and conflicts. They are distinct from actual engine execution,
-natural collection, desktop binding acceptance and listening; see PC_DIARIES.md
-and PC_AUDIO_COMPATIBILITY.md for the integration evidence and limits.
+natural collection, desktop binding acceptance and listening; see docs/mods/PC_COMPATIBILITY.md#pc-diaries
+and docs/mods/PC_COMPATIBILITY.md#pc-audio for the integration evidence and limits.
 
 ## Resident scenery slot bounds
 
@@ -112,7 +115,7 @@ general dynamic scenery ownership, which are not established by this suite.
 `python tools/tests/pc_mod_gui_test.py` runs nine synthetic-package tests through
 the desktop backend and real package copier. It does not emulate Tk as a passing
 UI test. The separate actual portable-window acceptance is described in
-docs/PC_MOD_INSTALLER.md. No proprietary data or bundled interpreter is tracked.
+docs/mods/PC_COMPATIBILITY.md#the-portable-pc-mod-importer. No proprietary data or bundled interpreter is tracked.
 
 The diary runner now has15 scenarios: `hd-detail` catches dropped odd source
 columns at2x, and `area-alpha` catches transparent RGB contamination or nearest-
@@ -126,4 +129,4 @@ total) and three package cases (12 total). Native buffer identity rather than
 the updated cursor determines the title. Tests cover independent page/title
 ownership, invalid/late sources, shared budget, legacy native reader state,
 ambiguity, overlays, mode and full-width/widescreen drawing. Runtime evidence
-and natural-navigation limits are in docs/PC_DIARIES.md.
+and natural-navigation limits are in docs/mods/PC_COMPATIBILITY.md#pc-diaries.

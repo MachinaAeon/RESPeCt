@@ -12,7 +12,7 @@ def pal():return chunk(4,struct.pack('<HBB',1,0,3)+bytes([0,0,0,255,0,0,0,255,0]
 class FlcTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  assert (R/'port/src/modfs_flc.h').exists(),'bounded FLC decoder absent'
+  assert (R/'port/src/mods/modfs_flc.h').exists(),'bounded FLC decoder absent'
   cls.tmp=tempfile.TemporaryDirectory();cls.root=Path(cls.tmp.name)
   code='''#include <stdint.h>
 #include <stdio.h>
@@ -22,7 +22,7 @@ int main(int argc,char **argv){if(argc!=3)return 3;FILE *f=fopen(argv[1],"rb");f
 '''
   c=cls.root/'test.c';c.write_text(code);cls.exe=cls.root/'flc.exe'
   import shlex;cc=shlex.split(os.environ.get('CC','clang'),posix=os.name!='nt')
-  subprocess.run([*cc,'-Wall','-Wextra','-Werror','-I'+str(R/'port/src'),str(c),'-o',str(cls.exe)],check=True)
+  subprocess.run([*cc,'-Wall','-Wextra','-Werror','-I'+str(R/'port/src/mods'),str(c),'-o',str(cls.exe)],check=True)
  @classmethod
  def tearDownClass(cls):cls.tmp.cleanup()
  def decode(self,data,valid=True):
