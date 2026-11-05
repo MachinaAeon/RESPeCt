@@ -7,6 +7,7 @@
 typedef struct {
     unsigned kind, block, id, begin, end;
     int x, y, w, h, iw, ih;
+    int cx, cy, cw, ch;                          /* rgba holds only this part of the iw x ih picture (cw 0: all of it) */
     uint8_t *rgba;
     uint32_t native_words, native_crc; /* zero words: authored range */
 } PcBitmap;
@@ -56,6 +57,46 @@ void modfs_pc_set_state(const ModPcBitmapState *s) {
 
 /* No absolute, parent, empty, drive or alternate-stream components. Resolve
  * case as the normal loader does, and reject symlinks/junctions below root. */
+/* A folder's names, read once (the automatic pictures look up hundreds of
+ * names in the same few folders, each under five extensions). */
+static struct { char dir[1024]; char **names; size_t n; } pc_dirs[32];
+static size_t npc_dirs;
+static void pc_dirs_reset(void) {             /* (each mod's load reads its folders afresh) */
+    for (size_t k = 0; k < npc_dirs; k++) {
+        for (size_t i = 0; i < pc_dirs[k].n; i++) free(pc_dirs[k].names[i]);
+        free(pc_dirs[k].names);
+    }
+    npc_dirs = 0;
+}
+static int pc_dir_find(const char *dir, const char *part, char actual[256]) {
+    size_t k = 0;
+    while (k < npc_dirs && strcmp(pc_dirs[k].dir, dir)) k++;
+    if (k == npc_dirs) {
+        if (npc_dirs == sizeof pc_dirs / sizeof pc_dirs[0]) {      /* full: read it as before */
+            DIR *d = opendir(dir); struct dirent *e; int found = 0;
+            while (d && (e = readdir(d))) if (!strcasecmp(e->d_name, part)) { snprintf(actual, 256, "%s", e->d_name); found = 1; break; }
+            if (d) closedir(d);
+            return found;
+        }
+        snprintf(pc_dirs[k].dir, sizeof pc_dirs[k].dir, "%s", dir);
+        pc_dirs[k].names = NULL; pc_dirs[k].n = 0;
+        DIR *d = opendir(dir); struct dirent *e; size_t cap = 0;
+        while (d && (e = readdir(d))) {
+            if (pc_dirs[k].n == cap) {
+                char **m = realloc(pc_dirs[k].names, (cap = cap ? cap * 2 : 64) * sizeof *m);
+                if (!m) break;
+                pc_dirs[k].names = m;
+            }
+            pc_dirs[k].names[pc_dirs[k].n] = strdup(e->d_name);
+            if (pc_dirs[k].names[pc_dirs[k].n]) pc_dirs[k].n++;
+        }
+        if (d) closedir(d);
+        npc_dirs++;
+    }
+    for (size_t i = 0; i < pc_dirs[k].n; i++)
+        if (!strcasecmp(pc_dirs[k].names[i], part)) { snprintf(actual, 256, "%s", pc_dirs[k].names[i]); return 1; }
+    return 0;
+}
 static int pc_bitmap_path(const char *root, const char *rel, char path[1024]) {
     if (!*rel || strlen(rel) >= 512 || rel[0] == '/' || rel[0] == '\\' || strchr(rel, ':')) return 0;
     if (snprintf(path, 1024, "%s", root) >= 1024) return 0;
@@ -65,10 +106,7 @@ static int pc_bitmap_path(const char *root, const char *rel, char path[1024]) {
         size_t n = (size_t)(end - p);
         if (!n || n > 255 || (n == 1 && p[0] == '.') || (n == 2 && !memcmp(p, "..", 2))) return 0;
         char part[256], actual[256] = ""; memcpy(part, p, n); part[n] = 0;
-        DIR *d = opendir(path); struct dirent *e;
-        while (d && (e = readdir(d))) if (!strcasecmp(e->d_name, part)) { snprintf(actual, sizeof actual, "%s", e->d_name); break; }
-        if (d) closedir(d);
-        if (!actual[0] || strlen(path) + strlen(actual) + 2 > 1024) return 0;
+        if (!pc_dir_find(path, part, actual) || strlen(path) + strlen(actual) + 2 > 1024) return 0;
         strcat(path, "/"); strcat(path, actual);
 #ifdef _WIN32
         DWORD attr = GetFileAttributesA(path);
@@ -107,6 +145,8 @@ static int diary_apply_picture(const char *mod, const char *rel, unsigned doc, u
 static void pc_bitmaps_automatic(const char *mod, const char *root) {
     static const char *const ext[] = {"BMP", "PNG", "JPG", "JPEG", "TGA"};
     const size_t rooms=sizeof modfs_pc_messages/sizeof modfs_pc_messages[0];
+    char last_path[1024] = "";                   /* one picture's rows follow each other: decoded once, shared */
+    uint8_t *last_img = NULL;
     for (size_t i=0;i<rooms+sizeof modfs_pc_pickups/sizeof modfs_pc_pickups[0];i++) {
         unsigned kind=i>=rooms;PcMessageProfile route;
         if(kind){const PcPickupProfile *q=&modfs_pc_pickups[i-rooms];route=(PcMessageProfile){q->pc,0,q->id,q->words,q->crc};}
@@ -116,6 +156,16 @@ static void pc_bitmaps_automatic(const char *mod, const char *root) {
             char rel[512], path[1024];
             snprintf(rel, sizeof rel, "%s%.*s.%s", wrapper ? "PSX_DATA/" : "", (int)(strlen(p->pc) - 4), p->pc, ext[e]);
             if (!pc_bitmap_path(root, rel, path)) continue;
+            if (last_img && !strcmp(path, last_path)) {
+                PcBitmap *b = realloc(pc_bitmaps, (npc_bitmaps + 1) * sizeof *b);
+                if (!b) { note("mods: %s/%s: bitmap allocation failed: not used", mod, rel); continue; }
+                pc_bitmaps = b;
+                b[npc_bitmaps++] = (PcBitmap){.kind=kind, .block=p->block, .id=p->id, .begin=0, .end=p->words,
+                    .x=0, .y=0, .w=320, .h=240, .iw=512, .ih=512, .cx=b[npc_bitmaps-1].cx, .cy=b[npc_bitmaps-1].cy,
+                    .cw=b[npc_bitmaps-1].cw, .ch=b[npc_bitmaps-1].ch, .rgba=last_img, .native_words=p->words, .native_crc=p->crc};
+                note("mods: %s/%s: automatic %s %u.%u bitmap (the same picture), original-stream guard enabled", mod, rel, kind?"PICKUP":"ROOM",p->block,p->id);
+                continue;
+            }
             pc_bitmap_source_add(mod, rel); mod_hash_file(rel, path);
             long n = 0; int iw = 0, ih = 0, channels;
             uint8_t *data = load(path, &n);
@@ -123,11 +173,28 @@ static void pc_bitmaps_automatic(const char *mod, const char *root) {
             uint8_t *img = good ? stbi_load_from_memory(data, (int)n, &iw, &ih, &channels, 4) : NULL;
             free(data);
             if (img && (iw != 512 || ih != 512)) { stbi_image_free(img); img = NULL; }
-            const size_t bytes = 512u * 512u * 4u;
-            int visible = 0;
+            size_t bytes = 512u * 512u * 4u;
+            int visible = 0, bx0 = 512, by0 = 512, bx1 = 0, by1 = 0;
             for (size_t k = 0; img && k < bytes; k += 4) {
                 if (!(img[k] | img[k+1] | img[k+2])) img[k+3] = 0;
-                if (img[k+3]) visible = 1;
+                if (img[k+3]) {
+                    int px = (int)(k / 4 % 512), py = (int)(k / 4 / 512);
+                    visible = 1;
+                    if (px < bx0) bx0 = px;
+                    if (px >= bx1) bx1 = px + 1;
+                    if (py < by0) by0 = py;
+                    if (py >= by1) by1 = py + 1;
+                }
+            }
+            if (visible) {                       /* keep only what shows: the rest is see-through */
+                int cw = bx1 - bx0, ch = by1 - by0;
+                uint8_t *crop = malloc((size_t)cw * ch * 4);
+                if (crop) {
+                    for (int r = 0; r < ch; r++) memcpy(crop + (size_t)r * cw * 4, img + ((size_t)(by0 + r) * 512 + bx0) * 4, (size_t)cw * 4);
+                    stbi_image_free(img);
+                    img = crop;
+                    bytes = (size_t)cw * ch * 4;
+                } else { bx0 = by0 = 0; bx1 = by1 = 512; }
             }
             if (!img || !visible || !pc_picture_fits(0,bytes)) {
                 stbi_image_free(img);
@@ -137,13 +204,16 @@ static void pc_bitmaps_automatic(const char *mod, const char *root) {
             if (!b) { stbi_image_free(img); note("mods: %s/%s: bitmap allocation failed: not used", mod, rel); continue; }
             pc_bitmaps = b;
             b[npc_bitmaps++] = (PcBitmap){.kind=kind, .block=p->block, .id=p->id, .begin=0, .end=p->words,
-                .x=0, .y=0, .w=320, .h=240, .iw=512, .ih=512, .rgba=img, .native_words=p->words, .native_crc=p->crc};
+                .x=0, .y=0, .w=320, .h=240, .iw=512, .ih=512, .cx=bx0, .cy=by0, .cw=bx1-bx0, .ch=by1-by0,
+                .rgba=img, .native_words=p->words, .native_crc=p->crc};
             pc_bitmap_bytes += bytes; nused++;
+            snprintf(last_path, sizeof last_path, "%s", path); last_img = img;
             note("mods: %s/%s: automatic %s %u.%u bitmap, original-stream guard enabled", mod, rel, kind?"PICKUP":"ROOM",p->block,p->id);
         }
     }
 }
 static void pc_bitmaps_load(const char *mod, const char *root) {
+    pc_dirs_reset();
     pc_diaries_load(mod, root);
     pc_bitmaps_automatic(mod, root);
     char manifest[1024];
@@ -205,7 +275,7 @@ static void pc_bitmaps_load(const char *mod, const char *root) {
             PcBitmap *p = realloc(pc_bitmaps, (npc_bitmaps + 1) * sizeof *p);
             if (!p) { free(crop); note("mods: %s/pc-bitmaps.txt:%u: allocation failed: not used", mod, line_no); line = next; continue; }
             pc_bitmaps = p; p += npc_bitmaps++;
-            *p = (PcBitmap){kind, kind == 0 ? v[0] : 0, kind == 0 ? v[1] : v[0], v[ids - 2], v[ids - 1], (int)r[4], (int)r[5], (int)r[6], (int)r[7], (int)r[2], (int)r[3], crop, 0, 0};
+            *p = (PcBitmap){kind, kind == 0 ? v[0] : 0, kind == 0 ? v[1] : v[0], v[ids - 2], v[ids - 1], (int)r[4], (int)r[5], (int)r[6], (int)r[7], (int)r[2], (int)r[3], 0, 0, 0, 0, crop, 0, 0};
             pc_bitmap_bytes += (size_t)bytes; nused++;
             note("mods: %s/pc-bitmaps.txt:%u: authored %s bitmap, original controls retained", mod, line_no, tok[0]);
         }
@@ -334,7 +404,12 @@ void modfs_pc_composite(uint32_t *out, int w, int h, int native_w, int native_h)
         int y0 = (int)((int64_t)p->y * h / 240), y1 = (int)((int64_t)(p->y + p->h) * h / 240);
         if (x1 <= x0 || y1 <= y0) continue;
         for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) {
-            const uint8_t *s = p->rgba + ((size_t)((int64_t)(y - y0) * p->ih / (y1 - y0)) * p->iw + (size_t)((int64_t)(x - x0) * p->iw / (x1 - x0))) * 4;
+            int sx = (int)((int64_t)(x - x0) * p->iw / (x1 - x0)), sy = (int)((int64_t)(y - y0) * p->ih / (y1 - y0));
+            const uint8_t *s;
+            if (p->cw) {                         /* outside the kept part: see-through */
+                if (sx < p->cx || sx >= p->cx + p->cw || sy < p->cy || sy >= p->cy + p->ch) continue;
+                s = p->rgba + ((size_t)(sy - p->cy) * p->cw + (size_t)(sx - p->cx)) * 4;
+            } else s = p->rgba + ((size_t)sy * p->iw + (size_t)sx) * 4;
             uint32_t old = out[(size_t)y * w + x], v = 0, a = s[3];
             for (int c = 0; c < 3; c++) v |= ((s[2 - c] * a + ((old >> (8 * c)) & 255) * (255 - a) + 127) / 255) << (8 * c);
             out[(size_t)y * w + x] = v;

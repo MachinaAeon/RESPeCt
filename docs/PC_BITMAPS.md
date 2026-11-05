@@ -2,9 +2,18 @@
 
 ## Automatic verified messages
 
-Seven measured USA message profiles load directly from a mod's `Message` or
-`eventmsg` directory, including a leading `PSX_DATA/`, without a manifest.
-`modfs_pc_messages.h` is the single metadata table read by runtime and importer.
+162 of the PC's message pictures load directly from a mod's `Message` or
+`eventmsg` directory, including a leading `PSX_DATA/`, without a manifest: 223
+PS1 room messages (a text the PS1 has in several rooms gets the picture in each).
+`modfs_pc_messages.h` is the single metadata table read by runtime and importer,
+written by `tools/mod_msgnames.py`: Windows' OCR of each picture against
+`text/ROOMS.txt`, kept only when the closest PS1 text scores at least 0.85,
+nothing different comes within 0.08, and no other PC picture with other extra
+words ("card key blue" / "red") claims the same PS1 text. It reproduces the
+seven profiles measured before. Pictures in other languages (some of the PC's
+are Chinese), the 1x1 `eventmsg` placeholders and the PC's generic messages
+that aren't room messages ("It's locked.") stay out. A picture is decoded once
+for all its rows and only its visible part is kept (same frames).
 It contains identities, halfword counts and CRCs, never message text or artwork.
 The verified paths below require a 512x512 canvas. BMP/PNG/JPG/JPEG/TGA alternate
 encodings share the identity; final decoding/dimensions remain runtime checks.

@@ -81,17 +81,18 @@ PNG, BMP, JPG or TGA.
 
 A PC mod goes in as it is: put its folder (with or without `PSX_DATA`,
 `Resource`, `nab`) in `mods`. Checked with the whole PC installation as
-one mod: every PC file the PS1 game has an equivalent of is used (1229,
+one mod: every PC file the PS1 game has an equivalent of is used (1384,
 rooms, doors, effects, items, enemies, bosses' models, textures, the
 mapped screens, voices, movies, 18 of the music tracks, 45 sound effects:
-the enemies' and the keys' that are the PS1's own recordings), in 2 seconds at
+the enemies' and the keys' that are the PS1's own recordings, 162 message
+pictures, shown in place of the PS1's text), in 3 seconds at
 start. A room or scenery block can now be bigger than on the PS1 (see
 Sizes). The log names each of the others and what to give instead:
 
 | PC files | Why not used | Instead |
 | --- | --- | --- |
 | `wav/door`, `wav/foot`, `wav/weap`, most of `wav/event`, some of `wav/enemy`... (847) | other recordings than the PS1's (the 45 that are the same go in by their PC names) | `NOISE/<bank>/<n>.wav`, the sound it stands for (`extract` writes them all, by bank) |
-| `Message/*.BMP`, `eventmsg/*.bmp` (512) | the PC draws messages as pictures; RESPeCt draws the PS1's text | `text/ROOMS.txt` and the other text files: plain UTF-8, any language |
+| the other `Message/*.BMP`, `eventmsg/*.bmp` (350) | not a room message of the PS1 (generic ones, other languages, 1x1 placeholders) | `text/ROOMS.txt` and the other text files: plain UTF-8, any language |
 | `menu/`, `Anm/*.FLC`, `map/` cursor and frames, `item/PIC` | the PC's own screens; the PS1 draws its own | the PS1's pictures (`extract`: `map/`, `RESULT/`, `RESOURCE/TITLE10.png`...) |
 | `DOORNEW/*1.HMD`, `item/ITEM_xx`, some `effect` and `people` models | models only the PC has | the PS1's `DOOR_xx.HMD`, `item/.../A.HMD`... |
 | 32 `BGM/*.WAV` | no PS1 music clearly matches them | `NOISE/<block>/music1.wav` for the room's music |
