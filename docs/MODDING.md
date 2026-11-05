@@ -75,6 +75,7 @@ mods/
 | Any texture in HD | a texture pack (see the README) | |
 | Weapons' fire rate and damage, damage per enemy type, every enemy's and boss's hit points, body-part damage | `data/COMBAT.txt` | `extract` |
 | A room's enemies (type, place, hit points) and pickups | `data/ROOMS.txt` (`@block`, as in `text/ROOMS.txt`) | `extract` |
+| A room's event scripts (scenes, messages, sounds, flags, camera, actors) | `data/SCRIPTS.txt` (`@block`, `script <n>`, an op a line) | `extract` |
 | The game's code: hooks on its functions, its memory | `plugins/name.dll` (native code, off unless switched on) | your own (below) |
 
 Paths aren't case-sensitive, and `/` or `\` both work. Pictures can be
@@ -405,6 +406,22 @@ with comments, and given back unchanged they leave the disc as it is.
   objects (enemies and pickups together) in a room loaded at once and 10
   in all, so a room can't have more than 7, or its own number where the
   original has more; the log says so. The room's block grows as needed.
+- `data/SCRIPTS.txt` (ROOMENV.DAT's script tables; `port/decomp/script_runner.c`,
+  `script_ops.c`): every room's event scripts, the ones that run its
+  scenes, messages, sounds, flags, doors, actors and camera. For each room
+  (`@block`), `script <n>` and its ops, one a line: the op's name (`OpNN`
+  for the ones whose code has no name yet; the file's header lists every
+  op with its number of operands) and its operands, 16-bit numbers (a
+  32-bit one as two, the low half first). `IfFlag` ... `Else` ... `EndIf`
+  are blocks, `StartThread` starts script n, `ThreadEnd` ends the thread.
+  A script you list replaces that one, the room's other scripts and data
+  stay where they are: it goes in its own place if it fits (a shorter one
+  must end with `ThreadEnd`), else after the room's data, the table
+  pointing there (it must end with `ThreadEnd`). The room's block grows
+  as needed, up to the 10 KB the game loads an event file into; the log
+  says when a script doesn't fit. Checked: given back as extracted the
+  file is unchanged; room 8/0's notice script made longer runs from its
+  new place.
 
 ## Plugins: changing the game's code
 

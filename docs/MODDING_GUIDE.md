@@ -39,6 +39,7 @@ mods/
     map/MAP00_1.png                      a map screen
     text/ROOMS.txt                       the rooms' messages
     data/COMBAT.txt                      weapons, damage, hit points
+    data/SCRIPTS.txt                     the rooms' event scripts
     NOISE/023/02.wav                     a sound effect
     wav/enemy/dog/snd-001.wav            the same sound by its PC name
     avi/Opening.avi                      the opening movie
@@ -82,6 +83,7 @@ mods/
 | A whole movie as a video | `avi/Opening.avi` (PC names) or `M/OPENING.STR/video.mp4` | Needs 64-bit FFmpeg DLLs next to `RESPeCt.exe` (`avformat-6x`, `avcodec-6x`, `avutil-5x/60`, `swscale-x`); Classic Rebirth's are 32-bit and don't work |
 | Weapons, damage, every enemy's hit points | `data/COMBAT.txt` | See *Game data* |
 | Where enemies and pickups are | `data/ROOMS.txt` | See *Game data* |
+| The rooms' events (scenes, messages, sounds, flags, camera) | `data/SCRIPTS.txt` | See *Game data* |
 | HD textures for everything | a texture pack (Beetle PSX HW format), see the README | F2 switches it on and off |
 | The game's code | `plugins/name.dll` | See *Plugins* |
 
@@ -142,6 +144,23 @@ item 5 120 1000 0 -2000 0 0 0 0          # item, flag, x, y, z, rotation x y z, 
 A room you list gets exactly those lines: move, add or remove enemies and
 pickups (at most 7 together in a room, or the original number if it had
 more, up to 10).
+
+`data/SCRIPTS.txt` has every room's event scripts, the game's own code for
+its scenes: one op a line, its name and its numbers (the file's header
+lists every op and how many numbers it takes):
+
+```
+@240    # stage 8, room 0
+script 0
+  CutsceneStart
+  Message 0 1        # message 1 of this room (text/ROOMS.txt @240.1)
+  Message 0 0
+  ThreadEnd
+```
+
+List only the scripts you change; the others stay as they are. A longer
+script than the original moves after the room's data by itself (end it
+with `ThreadEnd`); a room's event data can grow to 10 KB.
 
 ### Plugins
 

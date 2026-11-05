@@ -2939,12 +2939,12 @@ static int enemy_table(long type) {
     return -1;
 }
 
-typedef struct { int kind; uint8_t *d; long n; char what[600]; } DataFile;   /* kind: 0 combat, 1 rooms */
+typedef struct { int kind; uint8_t *d; long n; char what[600]; } DataFile;   /* kind: 0 combat, 1 rooms, 2 scripts */
 static DataFile *datafiles;
 static int ndatafiles;
 
 static int data_apply(const char *mod, const char *rel, const char *up, const char *path) {
-    int kind = !strcmp(up, "DATA/COMBAT.TXT") ? 0 : !strcmp(up, "DATA/ROOMS.TXT") ? 1 : -1;
+    int kind = !strcmp(up, "DATA/COMBAT.TXT") ? 0 : !strcmp(up, "DATA/ROOMS.TXT") ? 1 : !strcmp(up, "DATA/SCRIPTS.TXT") ? 2 : -1;
     if (kind < 0) return 0;
     long n = 0;
     uint8_t *d = load(path, &n);
@@ -2988,6 +2988,195 @@ static uint32_t list_count(const uint8_t *p, uint32_t len, int setup) {
         if (o + 0x18 > len) break;
     }
     return 0xFFFFFFFFu;                          /* (no end mark) */
+}
+
+/* The rooms' event scripts (data/SCRIPTS.txt): a ROOMENV.DAT block's part 5
+ * (+0x18) is the script table, a u32 count then a word per script whose
+ * low half is its offset from the table, and the scripts: s16 codes, an op
+ * and its operands (the lengths at 0x800A2FC8, the handlers at 0x800A2B8C;
+ * script_runner.c, script_ops.c). Names of the ops known from the game's
+ * code, the others OpNN (hex). */
+#define SCR_OPLEN 0x800A2FC8u
+#define SCR_NOPS  105
+static const char *const scr_names[SCR_NOPS] = {
+    [0x00] = "Nop0", [0x01] = "WhiteIn", [0x02] = "CutsceneStart", [0x03] = "ThreadEnd", [0x05] = "Message", [0x06] = "Sound",
+    [0x09] = "Fade", [0x0B] = "Wait", [0x0C] = "PickUp", [0x0E] = "FlagOp", [0x13] = "Door", [0x14] = "DoorState",
+    [0x17] = "IfFlag", [0x18] = "Else", [0x19] = "EndIf", [0x20] = "WhiteOut", [0x22] = "Music", [0x2A] = "SceneSeq",
+    [0x2B] = "ActorHold", [0x2C] = "ActorRelease", [0x2D] = "Nop", [0x2E] = "ActorAnim", [0x30] = "StartThread",
+    [0x31] = "ActorSetPos", [0x32] = "ActorSetRot", [0x33] = "ActorShow", [0x34] = "ActorMove", [0x35] = "ActorTurnTo",
+    [0x36] = "ActorWalk", [0x37] = "CameraDetach", [0x38] = "CameraRestore", [0x3B] = "CameraPlace", [0x3C] = "CameraMoveAim",
+    [0x3D] = "CameraPan", [0x3E] = "CameraMoveTurn", [0x42] = "Caption", [0x43] = "LoadImage", [0x46] = "SceneStart",
+    [0x47] = "SceneEnd", [0x48] = "LoadFontPage", [0x4A] = "DimHold", [0x4B] = "DimStart", [0x4C] = "ScreenFade",
+    [0x53] = "ActorRemove", [0x57] = "SoundNext", [0x58] = "ActorMoveTurn", [0x59] = "SkipOn", [0x5A] = "SkipOff",
+    [0x5B] = "Sparks", [0x5C] = "StreamPlay", [0x5E] = "SoundFade", [0x5F] = "CameraWalk", [0x63] = "MusicStart",
+    [0x64] = "MusicLoad", [0x65] = "MusicStop",
+};
+#define SCR_END 0x03                             /* ThreadEnd */
+static int scr_oplen(const uint8_t *test, int op) { return op >= 0 && op < SCR_NOPS ? test[SCR_OPLEN - TEST_BASE + (uint32_t)op] : 0; }
+static void scr_name(int op, char *out, size_t n) {
+    if (op >= 0 && op < SCR_NOPS && scr_names[op]) snprintf(out, n, "%s", scr_names[op]);
+    else snprintf(out, n, "Op%02X", (unsigned)op & 0xFF);
+}
+static int scr_op(const char *w) {               /* an op by its name, OpNN or a number; -1 if none */
+    for (int k = 0; k < SCR_NOPS; k++) if (scr_names[k] && !strcasecmp(w, scr_names[k])) return k;
+    unsigned v;
+    char rest[4];
+    if ((sscanf(w, "Op%x%3s", &v, rest) == 1 || sscanf(w, "op%x%3s", &v, rest) == 1) && v < SCR_NOPS) return (int)v;
+    return -1;
+}
+/* A block's script table: where in the block, how many scripts; 0 if it has none. */
+static int scr_part(const uint8_t *d, uint32_t at, uint32_t len, uint32_t *base, uint32_t *cnt) {
+    if (len < 28 || rd32(d + at) != 6) return 0;
+    uint32_t b = rd32(d + at + 0x18);
+    if (b < 28 || b + 4 > len) return 0;
+    uint32_t c = rd32(d + at + b);
+    if (c > 255 || b + 4 + 4 * c > len) return 0;
+    for (uint32_t k = 0; k < c; k++) if ((int16_t)rd16(d + at + b + 4 + 4 * k) < (int32_t)(4 + 4 * c)) return 0;
+    *base = b;
+    *cnt = c;
+    return 1;
+}
+/* Script n's place (from the table): to the next script's start, the last
+ * one as far as its ops decode (other data follows it). */
+static void scr_span(const uint8_t *test, const uint8_t *d, uint32_t at, uint32_t len, uint32_t base, uint32_t cnt, uint32_t n,
+                     uint32_t *s, uint32_t *e) {
+    *s = (uint32_t)(int16_t)rd16(d + at + base + 4 + 4 * n) & ~1u;
+    uint32_t end = len - base;
+    int last = 1;
+    for (uint32_t k = 0; k < cnt; k++) {
+        uint32_t o = (uint32_t)(int16_t)rd16(d + at + base + 4 + 4 * k) & ~1u;
+        if (o > *s && o < end) { end = o; last = 0; }
+    }
+    if (last) {
+        uint32_t p = *s;
+        for (;;) {
+            int l = p + 2 <= end ? scr_oplen(test, (int16_t)rd16(d + at + base + p)) : 0;
+            if (!l || p + 2 * (uint32_t)l > end) break;
+            p += 2 * (uint32_t)l;
+        }
+        end = p;
+    }
+    *e = end < *s ? *s : end;
+}
+
+/* data/SCRIPTS.txt: "@<block>", "script <n>", then its ops, a line each
+ * (the name and the operands; "raw" and words as they are). A script given
+ * goes in its own place when it fits (shorter: only if it ends with
+ * ThreadEnd, the rest never runs), else after the block's data (it must end
+ * with ThreadEnd), the table pointing there; the other scripts and data stay
+ * where they are. */
+static void scripts_apply(DataFile *f, Touched *test, char *s) {
+    int fi = disc_index("ROOMENV.DAT");
+    Touched *t = touch(fi);
+    static uint32_t v[1024];
+    uint32_t nb = roomenv_blocks(test, t, v);
+    if (!t || !nb) { note("mods: %s: ROOMENV.DAT's table of blocks wasn't found: not used", f->what); return; }
+    uint16_t *w = malloc(2 * 32768);
+    uint8_t *app = malloc(65536);
+    int cur = -1, sn = -1, nw = 0, bad = 0, last = -1, ln = 0, changed = 0, moved = 0, nmv = 0;
+    uint32_t at = 0, len = 0, base = 0, cnt = 0, tail = 0, napp = 0, mv[256][2];   /* moved: script, its new offset */
+    char *save = NULL;
+    for (char *line = strtok_r(s, "\n", &save);; line = strtok_r(NULL, "\n", &save)) {
+        char *h = line ? strchr(line, '#') : NULL;
+        if (h) *h = 0;
+        if (line) ln++;
+        unsigned b, n;
+        char word[32];
+        int head = line && sscanf(line, " @%u", &b) == 1, scr = line && sscanf(line, " script %u", &n) == 1;
+        if ((head || scr || !line) && cur >= 0 && sn >= 0 && !bad) {   /* the script before, in */
+            uint32_t s0, e0, bytes = 2 * (uint32_t)nw;
+            scr_span(test->data, t->data, at, len, base, cnt, (uint32_t)sn, &s0, &e0);
+            uint8_t *p = t->data + at + base + s0;
+            int same = bytes == e0 - s0;
+            for (int k = 0; same && k < nw; k++) same = rd16(p + 2 * k) == w[k];
+            if (same) {
+            } else if (bytes <= e0 - s0 && (bytes == e0 - s0 || last == SCR_END)) {
+                memset(p, 0, e0 - s0);           /* (op 0s after its end, never run) */
+                for (int k = 0; k < nw; k++) wr16(p + 2 * k, w[k]);
+                changed++;
+            } else if (last != SCR_END) {
+                note("mods: %s: @%d script %d: longer than its place, so it goes after the room's data, and must end with ThreadEnd there: not used", f->what, cur, sn);
+            } else if (tail - base + napp + bytes >= 0x8000 || napp + bytes > 65536) {
+                note("mods: %s: @%d script %d: past the 32 KB the script table reaches: not used", f->what, cur, sn);
+            } else {
+                int k = 0;
+                while (k < nmv && mv[k][0] != (uint32_t)sn) k++;
+                if (k == nmv) nmv++;
+                mv[k][0] = (uint32_t)sn;
+                mv[k][1] = tail - base + napp;
+                for (int j = 0; j < nw; j++) wr16(app + napp + 2 * (uint32_t)j, w[j]);
+                napp += bytes;
+            }
+        }
+        if ((head || !line) && cur >= 0 && napp) {   /* the block before: what goes after its data, and the table pointing there */
+            if (tail + napp <= len) {
+                memcpy(t->data + at + tail, app, napp);
+                for (int k = 0; k < nmv; k++) wr16(t->data + at + base + 4 + 4 * mv[k][0], (uint16_t)mv[k][1]);
+                changed += nmv;
+                moved += nmv;
+            } else if (ngrows < (int)(sizeof grows / sizeof grows[0])) {   /* (the table in the grown copy: as it was if it can't grow) */
+                uint8_t *np = malloc(tail - base + napp);
+                memcpy(np, t->data + at + base, tail - base);
+                memcpy(np + tail - base, app, napp);
+                for (int k = 0; k < nmv; k++) wr16(np + 4 + 4 * mv[k][0], (uint16_t)mv[k][1]);
+                Grow *g = &grows[ngrows++];
+                *g = (Grow){fi, at + base, tail - base + napp, len - base, 0, np, ""};
+                snprintf(g->what, sizeof g->what, "the scripts of ROOMENV.DAT block %d", cur);
+                changed += nmv;
+                moved += nmv;
+            } else note("mods: %s: @%d: too many files growing: its moved scripts not used", f->what, cur);
+            napp = 0;
+        }
+        if (head || !line) nmv = 0;
+        if (!line) break;
+        if (head) {
+            cur = sn = -1;
+            if (b >= nb || !scr_part(t->data, v[b] * 2048, (v[b + 1] - v[b]) * 2048, &base, &cnt)) {
+                note("mods: %s: @%u: no such room, or it has no scripts (ROOMENV.DAT block): not used", f->what, b);
+                continue;
+            }
+            cur = (int)b;
+            at = v[b] * 2048;
+            len = (v[b + 1] - v[b]) * 2048;
+            tail = len;
+            while (tail > base && !t->data[at + tail - 1]) tail--;
+            tail = ((tail + 3) & ~3u) + 4;   /* (past the last data, a word apart) */
+            continue;
+        }
+        if (scr) {
+            sn = -1;
+            if (cur < 0) continue;
+            if (n >= cnt) { note("mods: %s: @%d has %u scripts, not a script %u: not used", f->what, cur, cnt, n); continue; }
+            sn = (int)n;
+            if (nmv == 256) { note("mods: %s: @%d: too many scripts moved: script %u not used", f->what, cur, n); sn = -1; continue; }
+            nw = 0;
+            bad = 0;
+            last = -1;
+            continue;
+        }
+        if (sscanf(line, "%31s", word) != 1 || sn < 0 || bad) continue;
+        static long a[4096];
+        int na = 0;
+        char *q = strstr(line, word) + strlen(word), *e;
+        for (; na < 4096; q = e) {
+            a[na] = strtol(q, &e, 0);
+            if (e == q) break;
+            na++;
+        }
+        int raw = !strcasecmp(word, "raw"), op = raw ? -1 : scr_op(word), l = op >= 0 ? scr_oplen(test->data, op) : 0;
+        while (*q == ' ' || *q == '\t' || *q == '\r') q++;
+        if (*q || (!raw && (op < 0 || !l || na != l - 1)) || nw + 1 + na > 32768) {
+            note("mods: %s: line %d: not an op with its %d operand(s) (data/SCRIPTS.txt has them all): @%d script %d not used",
+                 f->what, ln, l ? l - 1 : 0, cur, sn);
+            bad = 1;
+            continue;
+        }
+        if (!raw) { w[nw++] = (uint16_t)op; last = op; }
+        for (int k = 0; k < na; k++) w[nw++] = (uint16_t)(int16_t)a[k];
+    }
+    free(w);
+    free(app);
+    note("mods: %s: %d scripts changed (%d after their room's data)", f->what, changed, moved);
 }
 
 static void data_done(void) {
@@ -3059,6 +3248,8 @@ static void data_done(void) {
             ram_fix(W_RATE, was, test->data + W_RATE - TEST_BASE, sizeof was);
             ram_fix(W_HP, washp, test->data + W_HP - TEST_BASE, sizeof washp);
             note("mods: %s: %d weapon and damage numbers%s", f->what, lines, bad ? ", some lines skipped (above)" : "");
+        } else if (f->kind == 2) {
+            scripts_apply(f, test, s);
         } else {                                 /* the rooms' enemies and pickups */
             int fi = disc_index("ROOMENV.DAT");
             Touched *t = touch(fi);
@@ -3230,6 +3421,43 @@ static int data_extract(void) {
         }
     }
     files += write_out("data/ROOMS.txt", (const uint8_t *)out, o);
+    o = 0;
+    ADD("# The rooms' event scripts (ROOMENV.DAT: @block, block = stage * 30 + room; script_runner.c, script_ops.c).\n"
+        "# An op a line: its name (OpNN when the game's code for it hasn't a name yet) and its operands, 16-bit\n"
+        "# numbers (a 32-bit one is two, the low half first). A script you list replaces that one; the others stay.\n"
+        "# Ops: a script thread runs them in order; IfFlag ... Else ... EndIf are blocks; StartThread starts script\n"
+        "# n; ThreadEnd ends the thread. A script longer than its place moves after the room's data and must end\n"
+        "# with ThreadEnd. Operand counts:");
+    for (int k = 0; k < SCR_NOPS; k++) {
+        scr_name(k, name, sizeof name);
+        ADD("%s %s %d", k % 8 ? "," : "\n#  ", name, scr_oplen(test->data, k) - 1);
+    }
+    ADD("\n");
+    for (uint32_t b = 0; b < nb; b++) {
+        uint32_t at = v[b] * 2048, len = (v[b + 1] - v[b]) * 2048, base, cnt;
+        if (v[b + 1] == v[b] || !scr_part(t->data, at, len, &base, &cnt) || !cnt) continue;
+        ADD("@%u    # stage %u, room %u\n", b, b / 30, b % 30);
+        for (uint32_t n = 0; n < cnt; n++) {
+            uint32_t s0, e0;
+            scr_span(test->data, t->data, at, len, base, cnt, n, &s0, &e0);
+            ADD("script %u\n", n);
+            for (uint32_t p = s0; p < e0;) {
+                int op = (int16_t)rd16(t->data + at + base + p), l = scr_oplen(test->data, op);
+                if (!l || p + 2 * (uint32_t)l > e0) {   /* (not ops: as they are) */
+                    ADD("  raw");
+                    for (; p < e0; p += 2) ADD(" %d", (int16_t)rd16(t->data + at + base + p));
+                    ADD("\n");
+                    break;
+                }
+                scr_name(op, name, sizeof name);
+                ADD("  %s", name);
+                for (int k = 1; k < l; k++) ADD(" %d", (int16_t)rd16(t->data + at + base + p + 2 * (uint32_t)k));
+                ADD("\n");
+                p += 2 * (uint32_t)l;
+            }
+        }
+    }
+    files += write_out("data/SCRIPTS.txt", (const uint8_t *)out, o);
 #undef ADD
     free(out);
     return files;

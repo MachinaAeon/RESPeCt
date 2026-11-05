@@ -260,6 +260,22 @@ int main(int argc,char **argv){
    }
    puts("PASS");return 0;
  }
+ if(!strcmp(argv[1],"scripts-parse")) {                       /* data/SCRIPTS.txt's names and a block's script spans */
+   check(scr_op("Message")==5 && scr_op("threadend")==3 && scr_op("Op2D")==0x2D && scr_op("op68")==0x68,"op names and OpNN");
+   check(scr_op("Op69")==-1 && scr_op("Nothing")==-1,"no op past the table, nor an unknown name");
+   static uint8_t test[SCR_OPLEN-TEST_BASE+SCR_NOPS],d[256];
+   test[SCR_OPLEN-TEST_BASE+2]=1;test[SCR_OPLEN-TEST_BASE+3]=1;test[SCR_OPLEN-TEST_BASE+5]=3;
+   wr32(d,6);for(int k=0;k<6;k++)wr32(d+4+4*k,28);wr32(d+0x18,64);              /* scripts at 64 */
+   wr32(d+64,2);wr16(d+68,12);wr16(d+72,22);                                     /* two scripts */
+   const uint16_t s0[]={2,5,0,7,3},s1[]={2,3,0x7777};                            /* the last one: then other data */
+   for(int k=0;k<5;k++)wr16(d+64+12+2*k,s0[k]);for(int k=0;k<3;k++)wr16(d+64+22+2*k,s1[k]);
+   uint32_t base,cnt,a,e;
+   check(scr_part(d,0,sizeof d,&base,&cnt) && base==64 && cnt==2,"script table found");
+   scr_span(test,d,0,sizeof d,base,cnt,0,&a,&e);check(a==12 && e==22,"a script runs to the next one");
+   scr_span(test,d,0,sizeof d,base,cnt,1,&a,&e);check(a==22 && e==26,"the last one as far as its ops decode");
+   wr16(d+68,2);check(!scr_part(d,0,sizeof d,&base,&cnt),"a script inside the table is refused");
+   puts("PASS");return 0;
+ }
  if(!strcmp(argv[1],"pc-audio-route")) {
    FILE *f=fopen("dog.wav","wb");check(f!=NULL,"audio route fixture");fwrite("RIFF",1,4,f);fclose(f);
    apply("test","PSX_DATA/WAV/ENEMY/DOG/SND-001.WAV","dog.wav");
