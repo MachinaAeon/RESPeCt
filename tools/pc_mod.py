@@ -84,6 +84,12 @@ class Catalog:
         for path,block,index,words,crc in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u, (\d+)u, 0x([0-9A-F]+)u\}',text):
             self.paths[path]={"kind":"pc-message","targets":[f"message:{block}:{index}"],"archives":["ROOMENV.DAT"],
                               "native_stream_words":int(words),"native_stream_crc32":crc,"canvas":[512,512]}
+        for table,target in (("modfs_pc_system","game-message"),("modfs_pc_used_keys","door-used")):
+            body=re.search(table+r'\[\] = \{(.*?)\n\};',text,re.S)
+            for path,ident,words,crc in re.findall(r'\{"([^"]+)", (0x[0-9A-F]+|\d+)u, (\d+)u, 0x([0-9A-F]+)u\}',body.group(1) if body else ""):
+                self.paths.setdefault(path,{"kind":"pc-message","targets":[],"archives":["TEST.BIN"],
+                                  "native_stream_words":int(words),"native_stream_crc32":crc,"canvas":[512,512]})
+                self.paths[path]["targets"].append(f"{target}:{int(ident,0)}")
 
         text=(source / "modfs_pc_pickups.h").read_text(encoding="utf-8")
         for path,item,words,crc in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u, 0x([0-9A-F]+)u\}',text):

@@ -33,6 +33,7 @@ void modfs_pc_caption(uint32_t index, uint32_t offset);
 int modfs_pc_caption_message(int x, int y, int w, int h);
 int modfs_pc_has_bitmaps(void);
 void modfs_pc_pickup(uint32_t item);
+void modfs_pc_used(uint32_t item);   /* room_change.c: a door's "You've used the <key>" */
 uint32_t modfs_pc_pickup_state(void);
 void modfs_pc_restore_pickup(uint32_t item);
 /* Logical screen coordinates: the central original 320 x 240 picture. */

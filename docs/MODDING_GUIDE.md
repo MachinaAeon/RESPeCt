@@ -71,7 +71,7 @@ mods/
 | **Any picture of the game**: HUD, menus, options, typewriter, results, effects, room and door textures | `PICTURES/<disc file>/<number>.png`, e.g. `PICTURES/CONPAU.BIN/011.png` (the HUD's condition box) | `extract/PICTURES` has all 2332, by file. See *Pictures* below |
 | Room messages, item names and descriptions | `text/ROOMS.txt`, `text/GAME.txt`, `text/ITEMS.txt`, `text/LIST.txt`, `text/UI.txt` | Plain UTF-8: any language. See *Texts* below |
 | New characters for a translation | `FONT/FONT186.png`..`188.png` + `text/CHARS.txt` | e.g. `ì 128` maps a character to a new glyph |
-| The PC's message pictures | `Message/0015-00.BMP`... | 162 of them are shown in place of the PS1's text automatically |
+| The PC's message pictures | `Message/0015-00.BMP`... | 173 of them are shown in place of the PS1's text automatically, the doors' too ("It's locked.", "You've used <key>") |
 | Diary pages | `diary/00/01.png` (document 0, page 1), or the PC's `diary/fileXX/...` | |
 | Sound effects | `NOISE/<bank>/<n>.wav` | `extract/NOISE` has every sound by bank. A longer sound than the bank has room for still plays whole |
 | The PC's sound effects by name | `wav/enemy/zombie0/snd-002.wav`... | The 45 that are the PS1's own recordings (enemies, keys) |
@@ -102,6 +102,10 @@ rooms' textures. Edit one and put it in your mod under the same name.
   (shown when the resolution is above 1x).
 
 ### Texts
+
+`text/UI.txt` also has the doors' messages: `@DOOR_LOCKED`,
+`@DOOR_LOCKED_OTHER_SIDE`, `@DOOR_UNLOCKED` and `@DOOR_USED` (the start of
+"You've used the <key>.").
 
 Each entry in a `text/*.txt` file starts with its `@` line (`@0.0` is room
 block 0, message 0); edit the lines after it. Give only the entries you

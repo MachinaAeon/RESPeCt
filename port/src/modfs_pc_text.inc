@@ -36,10 +36,14 @@ static PcBitmapSource *pc_bitmap_sources;
 static size_t npc_bitmap_sources;
 
 int modfs_pc_has_bitmaps(void) { return npc_bitmaps != 0 || modfs_pc_has_diaries(); }
-void modfs_pc_pickup(uint32_t item) { pc_pickup_id = item < 96 ? item : UINT32_MAX; pc_pickup_pending = pc_pickup_id != UINT32_MAX; }
+static uint32_t pc_used_id = UINT32_MAX;          /* the key a door's "You've used the ..." names (room_change.c) */
+static int pc_used_pending;
+void modfs_pc_pickup(uint32_t item) { pc_pickup_id = item < 96 ? item : UINT32_MAX; pc_pickup_pending = pc_pickup_id != UINT32_MAX; pc_used_id = UINT32_MAX; }
+void modfs_pc_used(uint32_t item) { pc_used_id = item < 96 ? item : UINT32_MAX; pc_used_pending = pc_used_id != UINT32_MAX; pc_pickup_id = UINT32_MAX; pc_pickup_pending = 0; }
 void modfs_pc_entry(uint32_t text) {
     if (!pc_pickup_pending || text != 0x800A88C8u) pc_pickup_id = UINT32_MAX;
-    pc_pickup_pending = 0;
+    if (!pc_used_pending || text != 0x800A88C8u) pc_used_id = UINT32_MAX;
+    pc_pickup_pending = pc_used_pending = 0;
 }
 uint32_t modfs_pc_pickup_state(void) { return pc_pickup_id; }
 void modfs_pc_restore_pickup(uint32_t item) { modfs_pc_pickup(item); pc_pickup_pending = 0; }
@@ -145,13 +149,19 @@ static int diary_apply_picture(const char *mod, const char *rel, unsigned doc, u
 static void pc_bitmaps_automatic(const char *mod, const char *root) {
     static const char *const ext[] = {"BMP", "PNG", "JPG", "JPEG", "TGA"};
     const size_t rooms=sizeof modfs_pc_messages/sizeof modfs_pc_messages[0];
+    const size_t pickups=sizeof modfs_pc_pickups/sizeof modfs_pc_pickups[0];
+    const size_t systems=sizeof modfs_pc_system/sizeof modfs_pc_system[0];
     char last_path[1024] = "";                   /* one picture's rows follow each other: decoded once, shared */
     uint8_t *last_img = NULL;
-    for (size_t i=0;i<rooms+sizeof modfs_pc_pickups/sizeof modfs_pc_pickups[0];i++) {
-        unsigned kind=i>=rooms;PcMessageProfile route;
-        if(kind){const PcPickupProfile *q=&modfs_pc_pickups[i-rooms];route=(PcMessageProfile){q->pc,0,q->id,q->words,q->crc};}
+    for (size_t i=0;i<rooms+pickups+systems+sizeof modfs_pc_used_keys/sizeof modfs_pc_used_keys[0];i++) {
+        /* kinds: 0 a room's message, 1 a pickup's, 3 one of the game's own (by its address), 4 a door's "used" by its key */
+        unsigned kind=i<rooms?0:i<rooms+pickups?1:i<rooms+pickups+systems?3:4;PcMessageProfile route;
+        if(kind==1){const PcPickupProfile *q=&modfs_pc_pickups[i-rooms];route=(PcMessageProfile){q->pc,0,q->id,q->words,q->crc};}
+        else if(kind==3){const PcPickupProfile *q=&modfs_pc_system[i-rooms-pickups];route=(PcMessageProfile){q->pc,0,q->id,q->words,q->crc};}
+        else if(kind==4){const PcPickupProfile *q=&modfs_pc_used_keys[i-rooms-pickups-systems];route=(PcMessageProfile){q->pc,0,q->id,q->words,q->crc};}
         else route=modfs_pc_messages[i];
         const PcMessageProfile *p=&route;
+        if (!p->pc) continue;                    /* (an empty table's placeholder) */
         for (unsigned wrapper = 0; wrapper < 2; wrapper++) for (unsigned e = 0; e < sizeof ext / sizeof ext[0]; e++) {
             char rel[512], path[1024];
             snprintf(rel, sizeof rel, "%s%.*s.%s", wrapper ? "PSX_DATA/" : "", (int)(strlen(p->pc) - 4), p->pc, ext[e]);
@@ -163,7 +173,7 @@ static void pc_bitmaps_automatic(const char *mod, const char *root) {
                 b[npc_bitmaps++] = (PcBitmap){.kind=kind, .block=p->block, .id=p->id, .begin=0, .end=p->words,
                     .x=0, .y=0, .w=320, .h=240, .iw=512, .ih=512, .cx=b[npc_bitmaps-1].cx, .cy=b[npc_bitmaps-1].cy,
                     .cw=b[npc_bitmaps-1].cw, .ch=b[npc_bitmaps-1].ch, .rgba=last_img, .native_words=p->words, .native_crc=p->crc};
-                note("mods: %s/%s: automatic %s %u.%u bitmap (the same picture), original-stream guard enabled", mod, rel, kind?"PICKUP":"ROOM",p->block,p->id);
+                note("mods: %s/%s: automatic %s %u.%u bitmap (the same picture), original-stream guard enabled", mod, rel, kind==1?"PICKUP":kind==3?"GAME":kind==4?"USED":"ROOM",p->block,p->id);
                 continue;
             }
             pc_bitmap_source_add(mod, rel); mod_hash_file(rel, path);
@@ -208,7 +218,7 @@ static void pc_bitmaps_automatic(const char *mod, const char *root) {
                 .rgba=img, .native_words=p->words, .native_crc=p->crc};
             pc_bitmap_bytes += bytes; nused++;
             snprintf(last_path, sizeof last_path, "%s", path); last_img = img;
-            note("mods: %s/%s: automatic %s %u.%u bitmap, original-stream guard enabled", mod, rel, kind?"PICKUP":"ROOM",p->block,p->id);
+            note("mods: %s/%s: automatic %s %u.%u bitmap, original-stream guard enabled", mod, rel, kind==1?"PICKUP":kind==3?"GAME":kind==4?"USED":"ROOM",p->block,p->id);
         }
     }
 }
@@ -329,7 +339,13 @@ static const PcBitmap *pc_bitmap_find(uint32_t text) {
     if (!npc_bitmaps || !pc_bitmap_unoccluded() || pc_ram32(0x800BA9C4)) return NULL; /* native choices/highlights */
     unsigned kind = 99, block = 0, id = 0, offset = 0;
     uint32_t stream = 0;
-    if (text >= 0x800A88C8u && text < 0x800A8AC8u && !(text & 1) && pc_pickup_id < 96) {
+    int game = 0;
+    for (size_t i = 0; i < npc_bitmaps && !game; i++) game = pc_bitmaps[i].kind == 3 && pc_bitmaps[i].id == text;
+    if (game) {                                  /* one of the game's own strings (not replaced by text/UI.txt) */
+        kind = 3; id = text; offset = 0; stream = text;
+    } else if (text >= 0x800A88C8u && text < 0x800A8AC8u && !(text & 1) && pc_used_id < 96) {
+        kind = 4; id = pc_used_id; offset = (text - 0x800A88C8u) / 2; stream=0x800A88C8u;
+    } else if (text >= 0x800A88C8u && text < 0x800A8AC8u && !(text & 1) && pc_pickup_id < 96) {
         kind = 1; id = pc_pickup_id; offset = (text - 0x800A88C8u) / 2; stream=0x800A88C8u;
     } else {
         uint32_t tab = pc_ram32(0x800BBB7C), stage = pc_ram32(0x800B4BA0), room = pc_ram32(0x800B3E20);

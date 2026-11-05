@@ -21,6 +21,15 @@ import collections, difflib, glob, os, re, struct, subprocess, sys, tempfile, zl
 ROOMENV_TABLE, TEST_BASE = 0x800A32F0, 0x8006C118
 SCORE, CLOSE = 0.85, 0.08
 VERIFIED = [("EVENTMSG/RE-005.BMP", 210, 8)]     # measured before (no English text to read on the others)
+CONTEXT, CONTEXT_CLOSE = 0.70, 0.15              # inside the room the rest of its PC group is surely in
+# The game's own door messages (TEST.BIN, room_change.c n_op_Door), and the PC's
+# wording where it differs: room 240's PC group (0015) has "It's now open." where
+# the PS1 says "You've unlocked the door." when that door opens from this side.
+GAME_STRINGS = [(0x800A2ECC, None), (0x800A2E84, None), (0x800A2F14, "it s now open")]
+USED_PREFIX, MSG_TAIL = 0x800A2EF4, [0x79, 0xFC00, 0xFE3C, 0xFE00, 0xFE20, 0xFF01, 0xFE00]
+ITEM_NAMES = 0x800A6D5C
+GLYPHS = ([" "] + [""] * 11 + list("0123456789:;,") + ['"', "!", "?", "!?"]
+          + [chr(c) for c in range(65, 91)] + ["(", "/", ")", "'", "-", "."] + [chr(c) for c in range(97, 123)])
 
 
 def norm(s):
@@ -53,6 +62,26 @@ def room_messages(test, roomenv):
         w = hw.index(0xFFFF) + 1
         return w, zlib.crc32(p[o:o + 2 * w])
     return message
+
+
+def test_codes(t, addr):                       # TEST.BIN's codes at addr, to the end mark (excluded)
+    out = []
+    o = addr - TEST_BASE
+    while o + 2 <= len(t):
+        c = struct.unpack_from('<H', t, o)[0]
+        if c == 0xFFFF:
+            return out
+        out.append(c)
+        o += 2
+    return out
+
+
+def codes_text(codes):
+    return norm(''.join(GLYPHS[c] if c < len(GLYPHS) else (' ' if c in (0xFFFE, 0) else '.' if c == 0x79 else '') for c in codes))
+
+
+def crc(codes):
+    return zlib.crc32(b''.join(struct.pack('<H', c) for c in codes))
 
 
 def ocr(pc_root):
@@ -98,13 +127,37 @@ def main():
     pc = {k: t for k, t in ocr(pc_root).items() if t}
     score = lambda a, b: difflib.SequenceMatcher(None, a, b).ratio()
     picks, claims = [], collections.defaultdict(set)
+    group_rooms = collections.defaultdict(collections.Counter)
     for name in sorted(pc):
         scored = sorted(((score(pc[name], t), k) for k, t in ps1.items()), reverse=True)
         best, k = scored[0]
-        if best < SCORE or any(ps1[kk] != ps1[k] for s, kk in scored if s >= best - CLOSE):
+        exact = best == 1.0 and all(s < 1.0 or ps1[kk] == ps1[k] for s, kk in scored)
+        if not exact and (best < SCORE or any(ps1[kk] != ps1[k] for s, kk in scored if s >= best - CLOSE)):
             continue
         claims[ps1[k]].add(pc[name])
         picks.append((name, ps1[k], best))
+        blocks = {kk[0] for s, kk in scored if ps1[kk] == ps1[k]}
+        if len(blocks) == 1:                     # only one room has this text: the PC group's room
+            group_rooms[name.split('/')[-1][:4]][k[0]] += 1
+    picked = {p[0] for p in picks}
+    for name in sorted(pc):                      # the PC's rewordings, inside the room their group is in
+        g = name.split('/')[-1][:4]
+        if name in picked or len(group_rooms[g]) != 1:
+            continue
+        room = next(iter(group_rooms[g]))
+        scored = sorted(((score(pc[name], t), k) for k, t in ps1.items() if k[0] == room), reverse=True)
+        if not scored:
+            continue
+        best, k = scored[0]
+        second = next((x for x, kk in scored[1:] if ps1[kk] != ps1[k]), 0)
+        if best >= CONTEXT and best - second >= CONTEXT_CLOSE:
+            claims[ps1[k]].add(pc[name])
+            picks.append((name, ps1[k], best))
+    room_of = {g: next(iter(c)) for g, c in group_rooms.items() if len(c) == 1}
+    blocks_of = collections.defaultdict(set)
+    for k, tt in ps1.items(): blocks_of[tt].add(k[0])
+    # for a text several pictures show: the one from that room's PC group first, then the closest
+    picks.sort(key=lambda p: (room_of.get(p[0].split('/')[-1][:4]) not in blocks_of[p[1]], -p[2], p[0]))
     extra = lambda x, t: frozenset(set(x.split()) - set(t.split()))
     bad = {t for t, v in claims.items() if len({extra(x, t) for x in v}) > 1 and any(extra(x, t) for x in v)}
     rows, seen = [], set()
@@ -117,6 +170,31 @@ def main():
                 continue
             seen.add(k)
             rows.append((name, k[0], k[1], m[0], m[1], best))
+    t = open(test, 'rb').read()
+    game_rows = []                               # the game's own door messages
+    for addr, pc_words in GAME_STRINGS:
+        codes = test_codes(t, addr)
+        want = pc_words or codes_text(codes)
+        name = next((n for n in sorted(pc) if pc[n] == want), None)
+        if name:
+            game_rows.append((name, addr, len(codes) + 1, crc(codes + [0xFFFF])))
+    used_rows = []                               # "You've used the <key>.", by the key's item number
+    prefix = test_codes(t, USED_PREFIX)
+    names = {}
+    for item in range(64):
+        ptr = struct.unpack_from('<I', t, ITEM_NAMES - TEST_BASE + 4 * item)[0]
+        if TEST_BASE <= ptr < TEST_BASE + len(t):
+            names[item] = test_codes(t, ptr)
+    for n in sorted(pc):
+        m = re.match(r'you ve used (.+)$', pc[n])
+        if not m:
+            continue
+        cands = sorted(((score(m[1], codes_text(c)), i) for i, c in names.items() if codes_text(c)), reverse=True)
+        if cands and cands[0][0] >= SCORE and (len(cands) < 2 or cands[0][0] - cands[1][0] >= CLOSE) \
+                and all(r[1] != cands[0][1] for r in used_rows):
+            item = cands[0][1]
+            stream = prefix + [0xFFFE, 0xFC01] + names[item] + MSG_TAIL
+            used_rows.append((n, item, len(stream), crc(stream)))
     for name, b, x in VERIFIED:
         m = message(b, x)
         if m and (b, x) not in seen:
@@ -133,11 +211,20 @@ def main():
         o.write('#ifndef MODFS_PC_MESSAGES_H\n#define MODFS_PC_MESSAGES_H\n#define MODFS_PC_AUTOMATIC 1\n'
                 'typedef struct { const char *pc; uint32_t block, id, words, crc; } PcMessageProfile;\n'
                 'static const PcMessageProfile modfs_pc_messages[] = {\n')
-        for name, b, x, w, crc, best in rows:
-            o.write('    {"%s", %du, %du, %du, 0x%08Xu},   /* %.3f */\n' % (name, b, x, w, crc, best))
+        for name, b, x, w, c, best in rows:
+            o.write('    {"%s", %du, %du, %du, 0x%08Xu},   /* %.3f */\n' % (name, b, x, w, c, best))
+        o.write('};\n/* The game\'s own messages (TEST.BIN strings, by address: the doors\'), and the\n'
+                ' * doors\' "You\'ve used the <key>." by the key\'s item number (its stream in\n'
+                ' * 0x800A88C8 as n_op_Door builds it): picture, id, halfwords, CRC32. */\n'
+                'static const PcPickupProfile modfs_pc_system[] = {\n')
+        for name, addr, w, c in game_rows or [(None, 0, 0, 0)]:
+            o.write('    {%s, 0x%08Xu, %du, 0x%08Xu},\n' % ('"%s"' % name if name else 'NULL', addr, w, c))
+        o.write('};\nstatic const PcPickupProfile modfs_pc_used_keys[] = {\n')
+        for name, item, w, c in used_rows or [(None, 0, 0, 0)]:
+            o.write('    {%s, %du, %du, 0x%08Xu},\n' % ('"%s"' % name if name else 'NULL', item, w, c))
         o.write('};\n#endif\n')
-    print('%d PC pictures read as text, %d PS1 messages get one (%d pictures), %s written'
-          % (len(pc), len(rows), len({r[0] for r in rows}), out))
+    print('%d PC pictures read as text, %d PS1 messages get one (%d pictures), %d game strings, %d keys used; %s written'
+          % (len(pc), len(rows), len({r[0] for r in rows}), len(game_rows), len(used_rows), out))
 
 
 if __name__ == '__main__':

@@ -12,8 +12,19 @@ nothing different comes within 0.08, and no other PC picture with other extra
 words ("card key blue" / "red") claims the same PS1 text. It reproduces the
 seven profiles measured before. Pictures in other languages (some of the PC's
 are Chinese), the 1x1 `eventmsg` placeholders and the PC's generic messages
-that aren't room messages ("It's locked.") stay out. A picture is decoded once
-for all its rows and only its visible part is kept (same frames).
+that aren't room messages stay out. A picture is decoded once for all its
+rows and only its visible part is kept (same frames).
+
+Since then the tool also: takes an exact text even when the PS1 has a near
+one ("books on biology" / "on bacteriology"); places a PC group in its room
+by its texts only that room has, and inside that room takes the PC's
+rewordings ("cable car" for "rope way") at 0.70 with 0.15 over the next;
+maps the doors' own messages (TEST.BIN: "It's locked.", "It's locked from
+the other side.", and "You've unlocked the door.", which the PC words "It's
+now open!" in the same room's group) by their address; and the doors'
+"You've used the <key>." by the key's item number (14 keys), guarded by the
+CRC of the message as n_op_Door builds it. Now 234 room messages from 173
+pictures, 3 game messages and 14 keys; the seven measured profiles kept.
 It contains identities, halfword counts and CRCs, never message text or artwork.
 The verified paths below require a 512x512 canvas. BMP/PNG/JPG/JPEG/TGA alternate
 encodings share the identity; final decoding/dimensions remain runtime checks.

@@ -2433,8 +2433,11 @@ static uint32_t ext_alloc(uint32_t n) {
 /* These inline status labels have no pointer table to relocate. Only
  * the native display consumers use this optional resource lookup; no
  * instructions, state transitions or original strings are overwritten. */
-static struct { const char *name; uint32_t original, replacement; } ui_texts[] = {
-    {"RETURN", 0x800CF2ECu, 0}, {"NO_ITEM", 0x800CF300u, 0}, {"FULLY_LOADED", 0x800CF310u, 0},
+static struct { const char *name; uint32_t original, replacement; int max; } ui_texts[] = {
+    {"RETURN", 0x800CF2ECu, 0, 28}, {"NO_ITEM", 0x800CF300u, 0, 28}, {"FULLY_LOADED", 0x800CF310u, 0, 28},
+    /* the doors' messages (TEST.BIN, room_change.c n_op_Door) */
+    {"DOOR_LOCKED", 0x800A2ECCu, 0, 120}, {"DOOR_LOCKED_OTHER_SIDE", 0x800A2E84u, 0, 120},
+    {"DOOR_USED", 0x800A2EF4u, 0, 60}, {"DOOR_UNLOCKED", 0x800A2F14u, 0, 120},
 };
 uint32_t modfs_ui_text(uint32_t original) {
     for (size_t i = 0; i < sizeof ui_texts / sizeof ui_texts[0]; i++)
@@ -2451,9 +2454,10 @@ static void texts_ui_done(void) {
             size_t u = 0;
             for (; u < sizeof ui_texts / sizeof ui_texts[0]; u++) if (!strcmp(entries[k].name, ui_texts[u].name)) break;
             if (u == sizeof ui_texts / sizeof ui_texts[0]) { note("mods: %s: @%s: unknown UI label: not used", textfiles[i].what, entries[k].name); continue; }
-            uint16_t codes[64];
-            int n = text_encode(entries[k].text, codes, 64, why, sizeof why);
-            if (n >= 0 && (n < 1 || n > 28 || codes[n - 1] != 0xFFFF)) { snprintf(why, sizeof why, "UI labels need an end tag and at most 27 codes"); n = -1; }
+            uint16_t codes[128];
+            int n = text_encode(entries[k].text, codes, 128, why, sizeof why);
+            if (n >= 0 && (n < 1 || n > ui_texts[u].max || codes[n - 1] != 0xFFFF))
+                { snprintf(why, sizeof why, "this label needs an end tag and at most %d codes", ui_texts[u].max - 1); n = -1; }
             if (n < 0) { note("mods: %s: @%s: %s: not used", textfiles[i].what, entries[k].name, why); continue; }
             uint32_t addr = ext_alloc((uint32_t)n * 2);
             if (!addr) { note("mods: %s: @%s: no free mod RAM: not used", textfiles[i].what, entries[k].name); continue; }
@@ -3728,9 +3732,12 @@ static int ui_extract(void) {
     if (!diary_info(&t, &tab, &pages)) return 0;
     char output[4096] = "", text[512];
     size_t n = 0;
+    Touched *test = touch(disc_index("TEST.BIN"));
     for (size_t i = 0; i < sizeof ui_texts / sizeof ui_texts[0]; i++) {
         int ended;
-        text_decode(diary_meta + ui_texts[i].original - 0x800C3E48u, 56, text, sizeof text, &ended);
+        if (ui_texts[i].original >= 0x800C3E48u) text_decode(diary_meta + ui_texts[i].original - 0x800C3E48u, 56, text, sizeof text, &ended);
+        else if (test) text_decode(test->data + ui_texts[i].original - TEST_BASE, 240, text, sizeof text, &ended);   /* (the doors') */
+        else continue;
         if (!ended) return 0;
         n += (size_t)snprintf(output + n, sizeof output - n, "@%s\n%s\n", ui_texts[i].name, text);
     }
