@@ -46,11 +46,14 @@ def canonical_resource(name):
 class Catalog:
     """Read, rather than duplicate, the existing production alias tables."""
     def __init__(self, source):
+        """source: port/src (its mods/tables), or a folder with the tables and disc_ids.h side by side."""
+        source = Path(source)
+        tables = source / "mods" / "tables" if (source / "mods" / "tables").is_dir() else source
         self.paths = {}
         self.disc = {}
-        self.noise_profile = pc_noise.read_profile(source / "modfs_pc_noise.h")
+        self.noise_profile = pc_noise.read_profile(tables / "modfs_pc_noise.h")
         self.pc_bgm, self.pc_bgm_alt = {}, set()  # a PC music WAV -> each set's sequence it is
-        for n, b, m, alt in re.findall(r'\{"([^"]+)", (\d+), (\d+), (\d)\}', (source / "modfs_pc_bgm.h").read_text(encoding="utf-8")):
+        for n, b, m, alt in re.findall(r'\{"([^"]+)", (\d+), (\d+), (\d)\}', (tables / "modfs_pc_bgm.h").read_text(encoding="utf-8")):
             self.pc_bgm.setdefault(n, []).append((int(b), int(m)))
             if alt == "1":                       # another room's WAV of a sequence a better match has
                 self.pc_bgm_alt.add(n)
@@ -63,7 +66,7 @@ class Catalog:
             ("modfs_bmp.h", "picture", r'\{"([^"]+)", "([^"]+)", (\d+)u, (\d+)u,'),
             ("modfs_pack.h", "packed", r'\{"([^"]+)", "([^"]+)", (\d+)u, (-?\d+), (\d+)u, (\d+)u,'),
             ("modfs_wav.h", "stream-audio", r'\{"([^"]+)", "([^"]+)", (\d+)\}')]:
-            text = (source / header).read_text(encoding="utf-8")
+            text = (tables / header).read_text(encoding="utf-8")
             rows = re.findall(pattern, text)
             if not rows:
                 raise PackageError("missing or unrecognized production table: " + header)
@@ -79,17 +82,17 @@ class Catalog:
                 if kind in {"loose", "packed"}:
                     entry["size_limits"].append(int(numbers[-1]))
 
-        text = (source / "modfs_pc_sfx.h").read_text(encoding="utf-8")
+        text = (tables / "modfs_pc_sfx.h").read_text(encoding="utf-8")
         for path, block, vag in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u\}', text):
             self.paths[path] = {"kind": "sound", "targets": [f"sound:{int(block)}:sfx:{int(vag)}"], "archives": ["NOISE.BIN"]}
-        # the PC's other recordings, by the event they play for (tools/mod_sfxevents.py); rank > 0: another PC
+        # the PC's other recordings, by the event they play for (tools/mod_tables/mod_sfxevents.py); rank > 0: another PC
         # file of the same PS1 waveform wins when both are given
-        text = (source / "modfs_pc_sfx_events.h").read_text(encoding="utf-8")
+        text = (tables / "modfs_pc_sfx_events.h").read_text(encoding="utf-8")
         for path, block, vag, rank in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u, (\d+)u\}', text):
             self.paths.setdefault(path, {"kind": "sound", "targets": [f"sound:{int(block)}:sfx:{int(vag)}"], "archives": ["NOISE.BIN"],
                                          "sfx_rank": int(rank)})
 
-        text=(source / "modfs_pc_messages.h").read_text(encoding="utf-8")
+        text=(tables / "modfs_pc_messages.h").read_text(encoding="utf-8")
         for path,block,index,words,crc in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u, (\d+)u, 0x([0-9A-F]+)u\}',text):
             self.paths[path]={"kind":"pc-message","targets":[f"message:{block}:{index}"],"archives":["ROOMENV.DAT"],
                               "native_stream_words":int(words),"native_stream_crc32":crc,"canvas":[512,512]}
@@ -100,12 +103,12 @@ class Catalog:
                                   "native_stream_words":int(words),"native_stream_crc32":crc,"canvas":[512,512]})
                 self.paths[path]["targets"].append(f"{target}:{int(ident,0)}")
 
-        text=(source / "modfs_pc_pickups.h").read_text(encoding="utf-8")
+        text=(tables / "modfs_pc_pickups.h").read_text(encoding="utf-8")
         for path,item,words,crc in re.findall(r'\{"([^"]+)", (\d+)u, (\d+)u, 0x([0-9A-F]+)u\}',text):
             self.paths[path]={"kind":"pc-pickup","targets":[f"pickup:{item}"],"archives":[],
                               "native_stream_words":int(words),"native_stream_crc32":crc,"canvas":[512,512]}
 
-        text=(source / "modfs_pc_diaries.h").read_text(encoding="utf-8")
+        text=(tables / "modfs_pc_diaries.h").read_text(encoding="utf-8")
         self.diaries={int(pc): (int(native),int(fg),int(bg)) for pc,native,fg,bg in
                       re.findall(r'\{(\d+)u, (\d+)u, (\d+)u, (\d+)u\}',text)}
 

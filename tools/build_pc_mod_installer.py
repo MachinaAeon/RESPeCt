@@ -38,7 +38,8 @@ def build(output, python_root, compiler):
     (output/'tools').mkdir();(output/'port/src').mkdir(parents=True)
     for name in ['pc_mod.py','pc_noise.py','pc_mod_gui.py','pc_mod_launcher.c','build_pc_mod_installer.py']:
         shutil.copy2(root/'tools'/name,output/'tools'/name)
-    for name in TABLES:shutil.copy2(root/'port/src'/name,output/'port/src'/name)
+    for name in TABLES:   # (flat in the bundle: pc_mod.Catalog reads them side by side)
+        shutil.copy2(root/'port/src'/name if name=='disc_ids.h' else root/'port/src/mods/tables'/name,output/'port/src'/name)
     shutil.copy2(root/'LICENSE',output/'LICENSE')
     (output/'README.txt').write_text('''RESPeCt Mod Installer
 

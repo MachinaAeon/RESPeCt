@@ -1,0 +1,272 @@
+/* The PC's message pictures that show the PS1's room messages, with the
+ * message's halfword count to its end mark and CRC32 (checked before a
+ * picture is drawn). Written by tools/mod_tables/mod_msgnames.py: Windows' OCR of each
+ * picture against text/ROOMS.txt, at least 0.85, nothing different within
+ * 0.08, no two PC texts with other extra words on one PS1 text. Identities
+ * only: no message text or image data. PC canvas is 512 x 512.
+ * See docs/mods/PC_COMPATIBILITY.md#pc-message-pictures. */
+#ifndef MODFS_PC_MESSAGES_H
+#define MODFS_PC_MESSAGES_H
+#define MODFS_PC_AUTOMATIC 1
+typedef struct { const char *pc; uint32_t block, id, words, crc; } PcMessageProfile;
+static const PcMessageProfile modfs_pc_messages[] = {
+    {"MESSAGE/0000-00.BMP", 214u, 3u, 31u, 0xE3717E92u},   /* 1.000 */
+    {"MESSAGE/0000-00.BMP", 214u, 4u, 31u, 0xE3717E92u},   /* 1.000 */
+    {"MESSAGE/0000-00.BMP", 214u, 5u, 31u, 0xE3717E92u},   /* 1.000 */
+    {"MESSAGE/0000-00.BMP", 214u, 6u, 31u, 0xE3717E92u},   /* 1.000 */
+    {"MESSAGE/0000-00.BMP", 214u, 7u, 31u, 0xE3717E92u},   /* 1.000 */
+    {"MESSAGE/0000-00.BMP", 214u, 8u, 31u, 0xE3717E92u},   /* 1.000 */
+    {"MESSAGE/0001-00.BMP", 210u, 0u, 75u, 0xE86B77C1u},   /* 1.000 */
+    {"MESSAGE/0001-03.BMP", 210u, 2u, 18u, 0x4E4661A1u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 0u, 1u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 30u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 121u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 150u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 241u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 270u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 300u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 301u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 360u, 3u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 390u, 2u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 420u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 453u, 0u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0002-00.BMP", 489u, 1u, 28u, 0x49D85AE6u},   /* 1.000 */
+    {"MESSAGE/0003-00.BMP", 4u, 2u, 68u, 0x40A88FCDu},   /* 1.000 */
+    {"MESSAGE/0003-02.BMP", 2u, 0u, 31u, 0x5748FB91u},   /* 1.000 */
+    {"MESSAGE/0003-02.BMP", 4u, 3u, 31u, 0x5748FB91u},   /* 1.000 */
+    {"MESSAGE/0007-00.BMP", 6u, 0u, 41u, 0x0F2B0EE3u},   /* 1.000 */
+    {"MESSAGE/0008-02.BMP", 270u, 1u, 44u, 0x6F5AD50Fu},   /* 1.000 */
+    {"MESSAGE/0008-02.BMP", 270u, 2u, 44u, 0x6F5AD50Fu},   /* 1.000 */
+    {"MESSAGE/0009-00.BMP", 271u, 0u, 34u, 0x61F169D8u},   /* 1.000 */
+    {"MESSAGE/0009-01.BMP", 271u, 1u, 50u, 0x310378F8u},   /* 1.000 */
+    {"MESSAGE/0010-00.BMP", 272u, 1u, 44u, 0xE0961956u},   /* 1.000 */
+    {"MESSAGE/0010-01.BMP", 272u, 0u, 27u, 0x246B0507u},   /* 1.000 */
+    {"MESSAGE/0011-00.BMP", 273u, 0u, 50u, 0xFB1C952Au},   /* 1.000 */
+    {"MESSAGE/0011-04.BMP", 273u, 1u, 31u, 0x65EAB409u},   /* 1.000 */
+    {"MESSAGE/0011-05.BMP", 273u, 4u, 41u, 0x16AEDF85u},   /* 1.000 */
+    {"MESSAGE/0011-06.BMP", 273u, 5u, 34u, 0x1886DBCEu},   /* 1.000 */
+    {"MESSAGE/0011-08.BMP", 273u, 7u, 39u, 0x0258631Au},   /* 1.000 */
+    {"MESSAGE/0011-10.BMP", 273u, 3u, 21u, 0x8C52D707u},   /* 1.000 */
+    {"MESSAGE/0012-02.BMP", 241u, 1u, 47u, 0x2C3E44CDu},   /* 1.000 */
+    {"MESSAGE/0012-06.BMP", 241u, 2u, 38u, 0x9C4D2945u},   /* 1.000 */
+    {"MESSAGE/0013-00.BMP", 242u, 0u, 41u, 0xDA57907Cu},   /* 1.000 */
+    {"MESSAGE/0014-02.BMP", 243u, 1u, 26u, 0x751751D8u},   /* 1.000 */
+    {"MESSAGE/0015-00.BMP", 240u, 0u, 53u, 0x3083D389u},   /* 1.000 */
+    {"MESSAGE/0015-00.BMP", 420u, 3u, 53u, 0x3083D389u},   /* 1.000 */
+    {"MESSAGE/0015-02.BMP", 240u, 1u, 74u, 0x6B1D7067u},   /* 1.000 */
+    {"MESSAGE/0016-00.BMP", 211u, 1u, 22u, 0xFC62B31Eu},   /* 1.000 */
+    {"MESSAGE/0016-01.BMP", 211u, 0u, 73u, 0x807C252Cu},   /* 1.000 */
+    {"MESSAGE/0016-01.BMP", 213u, 0u, 73u, 0x807C252Cu},   /* 1.000 */
+    {"MESSAGE/0018-02.BMP", 75u, 5u, 19u, 0x77475C05u},   /* 1.000 */
+    {"MESSAGE/0018-02.BMP", 125u, 3u, 19u, 0x77475C05u},   /* 1.000 */
+    {"MESSAGE/0018-02.BMP", 213u, 5u, 19u, 0x77475C05u},   /* 1.000 */
+    {"MESSAGE/0018-02.BMP", 213u, 6u, 19u, 0x77475C05u},   /* 1.000 */
+    {"MESSAGE/0018-02.BMP", 361u, 1u, 19u, 0x77475C05u},   /* 1.000 */
+    {"MESSAGE/0018-02.BMP", 390u, 12u, 19u, 0x77475C05u},   /* 1.000 */
+    {"MESSAGE/0018-02.BMP", 395u, 5u, 19u, 0x77475C05u},   /* 1.000 */
+    {"MESSAGE/0018-02.BMP", 420u, 6u, 19u, 0x77475C05u},   /* 1.000 */
+    {"MESSAGE/0019-03.BMP", 420u, 1u, 35u, 0x4CECB4E7u},   /* 1.000 */
+    {"MESSAGE/0021-01.BMP", 421u, 0u, 45u, 0x51364C1Cu},   /* 1.000 */
+    {"MESSAGE/0022-01.BMP", 423u, 0u, 41u, 0x775023C1u},   /* 1.000 */
+    {"MESSAGE/0022-02.BMP", 423u, 2u, 23u, 0xC2C5FF77u},   /* 1.000 */
+    {"MESSAGE/0022-03.BMP", 423u, 1u, 26u, 0x845121F1u},   /* 1.000 */
+    {"MESSAGE/0023-00.BMP", 424u, 0u, 48u, 0x841355F7u},   /* 1.000 */
+    {"MESSAGE/0024-00.BMP", 390u, 1u, 39u, 0x61719495u},   /* 1.000 */
+    {"MESSAGE/0024-01.BMP", 390u, 3u, 31u, 0xCE54771Fu},   /* 1.000 */
+    {"MESSAGE/0024-04.BMP", 390u, 0u, 84u, 0x9249D4D5u},   /* 1.000 */
+    {"MESSAGE/0025-00.BMP", 392u, 2u, 47u, 0x06D01200u},   /* 1.000 */
+    {"MESSAGE/0025-01.BMP", 392u, 0u, 51u, 0x53ACD12Fu},   /* 1.000 */
+    {"MESSAGE/0025-04.BMP", 392u, 3u, 49u, 0xF52C8A27u},   /* 1.000 */
+    {"MESSAGE/0025-05.BMP", 392u, 4u, 44u, 0x625E4841u},   /* 1.000 */
+    {"MESSAGE/0025-06.BMP", 392u, 1u, 43u, 0x15ADEC17u},   /* 1.000 */
+    {"MESSAGE/0026-00.BMP", 393u, 1u, 36u, 0x07546134u},   /* 1.000 */
+    {"MESSAGE/0026-02.BMP", 393u, 0u, 38u, 0x19AF1D30u},   /* 1.000 */
+    {"MESSAGE/0029-02.BMP", 94u, 0u, 45u, 0x2C9BC9F5u},   /* 1.000 */
+    {"MESSAGE/0029-02.BMP", 395u, 0u, 45u, 0x2C9BC9F5u},   /* 1.000 */
+    {"MESSAGE/0029-02.BMP", 485u, 0u, 45u, 0x2C9BC9F5u},   /* 1.000 */
+    {"MESSAGE/0029-03.BMP", 395u, 2u, 42u, 0x53B7FE68u},   /* 1.000 */
+    {"MESSAGE/0030-00.BMP", 360u, 1u, 54u, 0x13D933FBu},   /* 1.000 */
+    {"MESSAGE/0030-01.BMP", 360u, 0u, 33u, 0xB9D1FB5Du},   /* 1.000 */
+    {"MESSAGE/0031-02.BMP", 366u, 0u, 48u, 0x1D625324u},   /* 1.000 */
+    {"MESSAGE/0032-00.BMP", 363u, 0u, 47u, 0x5F5BF1DFu},   /* 1.000 */
+    {"MESSAGE/0032-01.BMP", 363u, 2u, 58u, 0xBFB59BE8u},   /* 1.000 */
+    {"MESSAGE/0032-03.BMP", 363u, 1u, 52u, 0xA312DB29u},   /* 1.000 */
+    {"MESSAGE/0033-05.BMP", 362u, 0u, 35u, 0xEF24E2E5u},   /* 1.000 */
+    {"MESSAGE/0034-02.BMP", 364u, 0u, 25u, 0xC85FABE6u},   /* 1.000 */
+    {"MESSAGE/0035-00.BMP", 361u, 0u, 38u, 0x06E72485u},   /* 1.000 */
+    {"MESSAGE/0035-01.BMP", 361u, 2u, 32u, 0xD168C259u},   /* 1.000 */
+    {"MESSAGE/0036-00.BMP", 365u, 0u, 27u, 0x071A5709u},   /* 1.000 */
+    {"MESSAGE/0038-02.BMP", 370u, 2u, 24u, 0xA2C15A65u},   /* 1.000 */
+    {"MESSAGE/0038-03.BMP", 370u, 3u, 45u, 0xCE4C0B58u},   /* 1.000 */
+    {"MESSAGE/0038-04.BMP", 370u, 4u, 35u, 0x5F530D13u},   /* 1.000 */
+    {"MESSAGE/0039-00.BMP", 367u, 0u, 31u, 0x40A3593Au},   /* 1.000 */
+    {"MESSAGE/0042-00.BMP", 372u, 0u, 49u, 0x86144120u},   /* 1.000 */
+    {"MESSAGE/0046-00.BMP", 105u, 0u, 41u, 0xAD187AC9u},   /* 1.000 */
+    {"MESSAGE/0046-03.BMP", 105u, 7u, 64u, 0xAB1116CBu},   /* 1.000 */
+    {"MESSAGE/0050-00.BMP", 93u, 1u, 50u, 0xFAB84A07u},   /* 1.000 */
+    {"MESSAGE/0050-01.BMP", 93u, 0u, 54u, 0xB3C4FA09u},   /* 1.000 */
+    {"MESSAGE/0051-00.BMP", 95u, 0u, 46u, 0x495518AFu},   /* 1.000 */
+    {"MESSAGE/0055-00.BMP", 97u, 0u, 37u, 0x13CDB629u},   /* 1.000 */
+    {"MESSAGE/0057-00.BMP", 100u, 0u, 28u, 0x3DDA51C1u},   /* 1.000 */
+    {"MESSAGE/0059-01.BMP", 102u, 0u, 80u, 0x18063AF3u},   /* 1.000 */
+    {"MESSAGE/0064-00.BMP", 124u, 0u, 29u, 0x15BC4886u},   /* 1.000 */
+    {"MESSAGE/0065-00.BMP", 337u, 2u, 75u, 0x08AF9522u},   /* 1.000 */
+    {"MESSAGE/0069-00.BMP", 303u, 0u, 39u, 0x87FD1E4Fu},   /* 1.000 */
+    {"MESSAGE/0071-00.BMP", 453u, 3u, 33u, 0x2C4E3011u},   /* 1.000 */
+    {"MESSAGE/0071-01.BMP", 453u, 4u, 52u, 0x3F8BBC1Fu},   /* 1.000 */
+    {"MESSAGE/0072-00.BMP", 452u, 0u, 27u, 0x368EBF8Bu},   /* 1.000 */
+    {"MESSAGE/0073-06.BMP", 451u, 4u, 60u, 0x0080F9C9u},   /* 1.000 */
+    {"MESSAGE/0077-02.BMP", 334u, 0u, 75u, 0xB952FADAu},   /* 1.000 */
+    {"MESSAGE/0077-06.BMP", 334u, 1u, 52u, 0xEADCF15Eu},   /* 1.000 */
+    {"MESSAGE/0077-06.BMP", 334u, 2u, 52u, 0xEADCF15Eu},   /* 1.000 */
+    {"MESSAGE/0078-01.BMP", 335u, 1u, 43u, 0x826734CEu},   /* 1.000 */
+    {"MESSAGE/0079-02.BMP", 336u, 0u, 38u, 0x6CBF16A7u},   /* 1.000 */
+    {"MESSAGE/0079-03.BMP", 336u, 1u, 35u, 0x687CAA91u},   /* 1.000 */
+    {"MESSAGE/0079-04.BMP", 336u, 2u, 45u, 0x3A26F0DEu},   /* 1.000 */
+    {"MESSAGE/0080-02.BMP", 337u, 0u, 46u, 0x56DD1229u},   /* 1.000 */
+    {"MESSAGE/0080-03.BMP", 331u, 0u, 28u, 0xD20B2BFAu},   /* 1.000 */
+    {"MESSAGE/0080-03.BMP", 337u, 1u, 28u, 0xD20B2BFAu},   /* 1.000 */
+    {"MESSAGE/0086-03.BMP", 483u, 0u, 47u, 0xB66FC828u},   /* 1.000 */
+    {"MESSAGE/0087-00.BMP", 484u, 0u, 51u, 0xD3593B9Fu},   /* 1.000 */
+    {"MESSAGE/0087-01.BMP", 484u, 1u, 54u, 0xED8DB164u},   /* 1.000 */
+    {"MESSAGE/0089-02.BMP", 486u, 1u, 34u, 0x331835CFu},   /* 1.000 */
+    {"MESSAGE/0089-03.BMP", 486u, 0u, 32u, 0xE2E6F98Du},   /* 1.000 */
+    {"MESSAGE/0092-01.BMP", 489u, 2u, 36u, 0xFACB3892u},   /* 1.000 */
+    {"MESSAGE/0097-00.BMP", 32u, 0u, 34u, 0xD914F93Du},   /* 1.000 */
+    {"MESSAGE/0097-03.BMP", 32u, 2u, 36u, 0x860E2CE4u},   /* 1.000 */
+    {"MESSAGE/0097-04.BMP", 32u, 1u, 33u, 0x090EEC36u},   /* 1.000 */
+    {"MESSAGE/0104-01.BMP", 62u, 0u, 51u, 0xF50A9AD3u},   /* 1.000 */
+    {"MESSAGE/0106-00.BMP", 64u, 2u, 16u, 0xB9442CFAu},   /* 1.000 */
+    {"MESSAGE/0106-06.BMP", 64u, 1u, 26u, 0xEC3C3221u},   /* 1.000 */
+    {"MESSAGE/0106-07.BMP", 64u, 4u, 49u, 0x7EB1D408u},   /* 1.000 */
+    {"MESSAGE/0107-00.BMP", 65u, 0u, 54u, 0x95F521F0u},   /* 1.000 */
+    {"MESSAGE/0108-00.BMP", 66u, 2u, 60u, 0x1B4A82ECu},   /* 1.000 */
+    {"MESSAGE/0108-01.BMP", 66u, 3u, 20u, 0x77723C3Fu},   /* 1.000 */
+    {"MESSAGE/0108-01.BMP", 76u, 0u, 20u, 0x77723C3Fu},   /* 1.000 */
+    {"MESSAGE/0108-01.BMP", 76u, 1u, 20u, 0x77723C3Fu},   /* 1.000 */
+    {"MESSAGE/0108-01.BMP", 333u, 0u, 20u, 0x77723C3Fu},   /* 1.000 */
+    {"MESSAGE/0108-01.BMP", 451u, 3u, 20u, 0x77723C3Fu},   /* 1.000 */
+    {"MESSAGE/0108-02.BMP", 66u, 6u, 60u, 0xACA3D2D2u},   /* 1.000 */
+    {"MESSAGE/0108-02.BMP", 76u, 2u, 60u, 0x35A0D100u},   /* 1.000 */
+    {"MESSAGE/0108-03.BMP", 66u, 4u, 60u, 0xBA97EBCDu},   /* 1.000 */
+    {"MESSAGE/0108-06.BMP", 66u, 0u, 26u, 0x73F3AA44u},   /* 1.000 */
+    {"MESSAGE/0108-06.BMP", 70u, 0u, 26u, 0x73F3AA44u},   /* 1.000 */
+    {"MESSAGE/0108-06.BMP", 73u, 0u, 26u, 0x73F3AA44u},   /* 1.000 */
+    {"MESSAGE/0108-06.BMP", 103u, 1u, 26u, 0x73F3AA44u},   /* 1.000 */
+    {"MESSAGE/0108-06.BMP", 510u, 0u, 26u, 0x73F3AA44u},   /* 1.000 */
+    {"MESSAGE/0108-07.BMP", 66u, 7u, 17u, 0x0962889Bu},   /* 1.000 */
+    {"MESSAGE/0108-08.BMP", 66u, 5u, 34u, 0x8E71D6C0u},   /* 1.000 */
+    {"MESSAGE/0109-01.BMP", 67u, 1u, 77u, 0xEA66FF76u},   /* 1.000 */
+    {"MESSAGE/0109-04.BMP", 67u, 4u, 21u, 0x726429A1u},   /* 1.000 */
+    {"MESSAGE/0109-05.BMP", 67u, 2u, 69u, 0xFB270AD3u},   /* 1.000 */
+    {"MESSAGE/0110-00.BMP", 68u, 0u, 45u, 0x8F85CFD8u},   /* 1.000 */
+    {"MESSAGE/0110-03.BMP", 68u, 3u, 59u, 0x05DAA755u},   /* 1.000 */
+    {"MESSAGE/0110-05.BMP", 68u, 2u, 58u, 0xB7E9AC0Du},   /* 1.000 */
+    {"MESSAGE/0111-03.BMP", 69u, 2u, 58u, 0xA248B85Bu},   /* 1.000 */
+    {"MESSAGE/0113-01.BMP", 70u, 1u, 21u, 0x5F80BE73u},   /* 1.000 */
+    {"MESSAGE/0113-01.BMP", 71u, 3u, 21u, 0x5F80BE73u},   /* 1.000 */
+    {"MESSAGE/0113-02.BMP", 71u, 2u, 27u, 0xBC63D03Fu},   /* 1.000 */
+    {"MESSAGE/0115-00.BMP", 73u, 1u, 58u, 0x8B859B73u},   /* 1.000 */
+    {"MESSAGE/0115-04.BMP", 73u, 2u, 26u, 0x3C60BA50u},   /* 1.000 */
+    {"MESSAGE/0115-04.BMP", 73u, 3u, 26u, 0x3C60BA50u},   /* 1.000 */
+    {"MESSAGE/0115-05.BMP", 73u, 24u, 21u, 0x15DFB36Du},   /* 1.000 */
+    {"MESSAGE/0116-00.BMP", 74u, 1u, 70u, 0x942FBCDAu},   /* 1.000 */
+    {"MESSAGE/0116-03.BMP", 74u, 2u, 65u, 0xD7A3A92Cu},   /* 1.000 */
+    {"MESSAGE/0116-04.BMP", 74u, 10u, 66u, 0xDF21B19Au},   /* 1.000 */
+    {"MESSAGE/0116-06.BMP", 74u, 3u, 76u, 0x4A7668C1u},   /* 1.000 */
+    {"MESSAGE/0116-07.BMP", 74u, 0u, 65u, 0x58B8B2F3u},   /* 1.000 */
+    {"MESSAGE/0116-08.BMP", 74u, 4u, 53u, 0x621C1182u},   /* 1.000 */
+    {"MESSAGE/0116-08.BMP", 74u, 5u, 53u, 0x621C1182u},   /* 1.000 */
+    {"MESSAGE/0116-08.BMP", 74u, 6u, 53u, 0x621C1182u},   /* 1.000 */
+    {"MESSAGE/0116-08.BMP", 74u, 7u, 53u, 0x621C1182u},   /* 1.000 */
+    {"MESSAGE/0116-08.BMP", 74u, 8u, 53u, 0x621C1182u},   /* 1.000 */
+    {"MESSAGE/0116-08.BMP", 74u, 9u, 53u, 0x621C1182u},   /* 1.000 */
+    {"MESSAGE/0117-02.BMP", 75u, 0u, 46u, 0xDE4700FFu},   /* 1.000 */
+    {"MESSAGE/0117-03.BMP", 75u, 3u, 62u, 0xC0BA04FFu},   /* 1.000 */
+    {"MESSAGE/0117-04.BMP", 75u, 4u, 43u, 0xBB4CC477u},   /* 1.000 */
+    {"MESSAGE/0119-02.BMP", 510u, 1u, 90u, 0xE6DEB3B5u},   /* 1.000 */
+    {"MESSAGE/0119-03.BMP", 510u, 5u, 29u, 0x79782E07u},   /* 1.000 */
+    {"MESSAGE/0120-00.BMP", 511u, 1u, 41u, 0xCB1E3D3Eu},   /* 1.000 */
+    {"MESSAGE/0120-01.BMP", 511u, 0u, 21u, 0xC2662AAFu},   /* 1.000 */
+    {"MESSAGE/0120-01.BMP", 512u, 0u, 21u, 0xC2662AAFu},   /* 1.000 */
+    {"MESSAGE/0121-00.BMP", 512u, 1u, 28u, 0xB7A15C32u},   /* 1.000 */
+    {"MESSAGE/0014-01.BMP", 243u, 0u, 70u, 0x08D34929u},   /* 0.992 */
+    {"MESSAGE/0109-00.BMP", 67u, 3u, 70u, 0x6B77ECEDu},   /* 0.992 */
+    {"MESSAGE/0092-00.BMP", 489u, 0u, 56u, 0x6E5EEE9Bu},   /* 0.991 */
+    {"MESSAGE/0003-04.BMP", 4u, 0u, 46u, 0x4562B35Eu},   /* 0.989 */
+    {"MESSAGE/0029-01.BMP", 395u, 1u, 47u, 0x0992F796u},   /* 0.989 */
+    {"MESSAGE/0071-04.BMP", 453u, 2u, 70u, 0xA7930138u},   /* 0.985 */
+    {"MESSAGE/0053-00.BMP", 91u, 0u, 45u, 0xDB549BB4u},   /* 0.976 */
+    {"MESSAGE/0078-00.BMP", 335u, 0u, 86u, 0x21EC4F75u},   /* 0.975 */
+    {"MESSAGE/0043-00.BMP", 373u, 1u, 58u, 0x5854DE7Fu},   /* 0.974 */
+    {"MESSAGE/0033-01.BMP", 362u, 2u, 41u, 0xC15E5770u},   /* 0.974 */
+    {"EVENTMSG/RE-005.BMP", 210u, 8u, 41u, 0xBC0F3D9Fu},   /* 0.973 */
+    {"MESSAGE/0038-01.BMP", 370u, 1u, 36u, 0x80662497u},   /* 0.971 */
+    {"MESSAGE/0071-03.BMP", 453u, 1u, 49u, 0x924C53E4u},   /* 0.935 */
+    {"MESSAGE/0023-01.BMP", 373u, 3u, 36u, 0x5D8730D5u},   /* 0.929 */
+    {"MESSAGE/0023-01.BMP", 373u, 4u, 36u, 0x5D8730D5u},   /* 0.929 */
+    {"MESSAGE/0023-01.BMP", 396u, 1u, 36u, 0xF96A465Cu},   /* 0.929 */
+    {"MESSAGE/0023-01.BMP", 424u, 1u, 36u, 0x5D8730D5u},   /* 0.929 */
+    {"MESSAGE/0081-01.BMP", 332u, 2u, 63u, 0xA6A00824u},   /* 0.923 */
+    {"MESSAGE/0087-02.BMP", 484u, 2u, 64u, 0x3AF300FFu},   /* 0.920 */
+    {"MESSAGE/0003-03.BMP", 4u, 1u, 29u, 0x4C3E0EEAu},   /* 0.920 */
+    {"MESSAGE/0018-01.BMP", 213u, 7u, 42u, 0xF1D556CFu},   /* 0.920 */
+    {"MESSAGE/0019-02.BMP", 420u, 5u, 38u, 0x70EE1D46u},   /* 0.917 */
+    {"MESSAGE/0073-07.BMP", 451u, 5u, 36u, 0xADE2A4E1u},   /* 0.912 */
+    {"MESSAGE/0002-01.BMP", 0u, 0u, 65u, 0xB96BD672u},   /* 0.909 */
+    {"MESSAGE/0043-04.BMP", 373u, 0u, 29u, 0x407B40C7u},   /* 0.909 */
+    {"MESSAGE/0091-00.BMP", 488u, 1u, 46u, 0x19EC5AC3u},   /* 0.876 */
+    {"MESSAGE/0043-01.BMP", 373u, 2u, 76u, 0xA2546BC7u},   /* 0.841 */
+    {"MESSAGE/0011-07.BMP", 273u, 2u, 29u, 0x40A5F3B0u},   /* 0.826 */
+    {"MESSAGE/0106-02.BMP", 64u, 3u, 112u, 0xA9A8DABEu},   /* 0.807 */
+    {"MESSAGE/0033-02.BMP", 362u, 1u, 85u, 0xD1AEB555u},   /* 0.791 */
+    {"MESSAGE/0115-02.BMP", 73u, 25u, 59u, 0x66E214CDu},   /* 0.762 */
+    {"MESSAGE/0086-02.BMP", 483u, 1u, 26u, 0x76D794B7u},   /* 0.756 */
+    {"MESSAGE/0106-04.BMP", 64u, 0u, 74u, 0x7F3D3B1Bu},   /* 0.750 */
+    {"MESSAGE/0091-01.BMP", 488u, 0u, 83u, 0x972E1AACu},   /* 0.727 */
+    {"MESSAGE/0005-00.BMP", 1u, 2u, 51u, 0xCF7CB0D4u},   /* 1.000 */
+    {"MESSAGE/0005-04.BMP", 1u, 1u, 48u, 0xDA2F34FBu},   /* 1.000 */
+    {"MESSAGE/0037-01.BMP", 366u, 1u, 42u, 0x4EC2EE70u},   /* 1.000 */
+    {"MESSAGE/0040-02.BMP", 368u, 1u, 36u, 0xA9CBC9A7u},   /* 1.000 */
+    {"MESSAGE/0040-02.BMP", 369u, 0u, 36u, 0xA9CBC9A7u},   /* 1.000 */
+    {"MESSAGE/0044-01.BMP", 103u, 0u, 27u, 0x91934222u},   /* 1.000 */
+    {"MESSAGE/0044-01.BMP", 104u, 0u, 27u, 0x91934222u},   /* 1.000 */
+    {"MESSAGE/0044-01.BMP", 304u, 0u, 27u, 0x91934222u},   /* 1.000 */
+    {"MESSAGE/0076-01.BMP", 332u, 1u, 45u, 0x56DD5B49u},   /* 1.000 */
+    {"MESSAGE/0076-01.BMP", 333u, 1u, 45u, 0x56DD5B49u},   /* 1.000 */
+    {"MESSAGE/0093-01.BMP", 60u, 0u, 44u, 0xB0CE7EA3u},   /* 1.000 */
+    {"MESSAGE/0093-01.BMP", 490u, 0u, 44u, 0xB0CE7EA3u},   /* 1.000 */
+    {"MESSAGE/0093-01.BMP", 491u, 0u, 44u, 0xB0CE7EA3u},   /* 1.000 */
+    {"MESSAGE/0094-01.BMP", 60u, 1u, 24u, 0x36F47615u},   /* 1.000 */
+    {"MESSAGE/0094-01.BMP", 491u, 1u, 24u, 0xE7BF9450u},   /* 1.000 */
+    {"MESSAGE/0094-02.BMP", 60u, 2u, 90u, 0xAB4A01C8u},   /* 1.000 */
+    {"MESSAGE/0094-02.BMP", 491u, 2u, 90u, 0xAB4A01C8u},   /* 1.000 */
+    {"MESSAGE/0102-02.BMP", 60u, 3u, 34u, 0x22A6FD98u},   /* 1.000 */
+    {"MESSAGE/0102-02.BMP", 491u, 3u, 34u, 0x22A6FD98u},   /* 1.000 */
+    {"MESSAGE/0004-00.BMP", 2u, 2u, 34u, 0xD2B3E39Du},   /* 0.923 */
+};
+/* The game's own messages (TEST.BIN strings, by address: the doors'), and the
+ * doors' "You've used the <key>." by the key's item number (its stream in
+ * 0x800A88C8 as n_op_Door builds it): picture, id, halfwords, CRC32. */
+static const PcPickupProfile modfs_pc_system[] = {
+    {"MESSAGE/0001-05.BMP", 0x800A2ECCu, 19u, 0x8D660BF1u},
+    {"MESSAGE/0051-01.BMP", 0x800A2E84u, 35u, 0xE13F41A5u},
+    {"MESSAGE/0015-01.BMP", 0x800A2F14u, 28u, 0x0ED22D48u},
+};
+static const PcPickupProfile modfs_pc_used_keys[] = {
+    {"MESSAGE/0001-02.BMP", 36u, 34u, 0x0DA02080u},
+    {"MESSAGE/0002-02.BMP", 33u, 34u, 0xE9EFAF97u},
+    {"MESSAGE/0004-00.BMP", 32u, 36u, 0x41076EE5u},
+    {"MESSAGE/0004-04.BMP", 34u, 41u, 0x8FE6F313u},
+    {"MESSAGE/0008-03.BMP", 39u, 35u, 0x5293EC52u},
+    {"MESSAGE/0011-07.BMP", 38u, 33u, 0xA2891C6Au},
+    {"MESSAGE/0012-04.BMP", 37u, 37u, 0x47AF222Fu},
+    {"MESSAGE/0018-01.BMP", 44u, 35u, 0x14A03DEDu},
+    {"MESSAGE/0019-02.BMP", 45u, 34u, 0xF6E4C589u},
+    {"MESSAGE/0023-01.BMP", 48u, 38u, 0x2809196Eu},
+    {"MESSAGE/0031-01.BMP", 55u, 41u, 0xB8ADE7C8u},
+    {"MESSAGE/0049-01.BMP", 41u, 39u, 0xDF985008u},
+    {"MESSAGE/0057-01.BMP", 43u, 28u, 0xEF14F30Au},
+    {"MESSAGE/0117-06.BMP", 53u, 34u, 0x4D56B1E4u},
+};
+#endif

@@ -1,5 +1,5 @@
 /* The game's functions RESPeCt runs as C, by name, for plugins (hook them
- * with api->hook, call them with api->call). Written by tools/mod_symbols.py
+ * with api->hook, call them with api->call). Written by tools/mod_tables/mod_symbols.py
  * from port/meta/meta.c; what each does is in its port/decomp file (named
  * in the comment). Arguments come in A0-A3, the result in V0.
  * Overlays share addresses: enemy programs load at slot A (0x800F8000) or
