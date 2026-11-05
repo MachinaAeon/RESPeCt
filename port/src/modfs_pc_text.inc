@@ -173,7 +173,8 @@ static void pc_bitmaps_automatic(const char *mod, const char *root) {
                 b[npc_bitmaps++] = (PcBitmap){.kind=kind, .block=p->block, .id=p->id, .begin=0, .end=p->words,
                     .x=0, .y=0, .w=320, .h=240, .iw=512, .ih=512, .cx=b[npc_bitmaps-1].cx, .cy=b[npc_bitmaps-1].cy,
                     .cw=b[npc_bitmaps-1].cw, .ch=b[npc_bitmaps-1].ch, .rgba=last_img, .native_words=p->words, .native_crc=p->crc};
-                note("mods: %s/%s: automatic %s %u.%u bitmap (the same picture), original-stream guard enabled", mod, rel, kind==1?"PICKUP":kind==3?"GAME":kind==4?"USED":"ROOM",p->block,p->id);
+                if (kind == 3) note("mods: %s/%s: automatic GAME %08X bitmap%s, original-stream guard enabled", mod, rel, p->id, " (the same picture)");
+                else note("mods: %s/%s: automatic %s %u.%u bitmap (the same picture), original-stream guard enabled", mod, rel, kind==1?"PICKUP":kind==3?"GAME":kind==4?"USED":"ROOM",p->block,p->id);
                 continue;
             }
             pc_bitmap_source_add(mod, rel); mod_hash_file(rel, path);
@@ -218,7 +219,8 @@ static void pc_bitmaps_automatic(const char *mod, const char *root) {
                 .rgba=img, .native_words=p->words, .native_crc=p->crc};
             pc_bitmap_bytes += bytes; nused++;
             snprintf(last_path, sizeof last_path, "%s", path); last_img = img;
-            note("mods: %s/%s: automatic %s %u.%u bitmap, original-stream guard enabled", mod, rel, kind==1?"PICKUP":kind==3?"GAME":kind==4?"USED":"ROOM",p->block,p->id);
+            if (kind == 3) note("mods: %s/%s: automatic GAME %08X bitmap%s, original-stream guard enabled", mod, rel, p->id, "");
+            else note("mods: %s/%s: automatic %s %u.%u bitmap, original-stream guard enabled", mod, rel, kind==1?"PICKUP":kind==3?"GAME":kind==4?"USED":"ROOM",p->block,p->id);
         }
     }
 }
