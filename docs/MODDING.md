@@ -1,5 +1,7 @@
 # Modding RESPeCt
 
+New to it? Start with the short [modding guide](MODDING_GUIDE.md); this is the full reference.
+
 RESPeCt plays the game straight from your PS1 disc image. Mods change it
 without touching the disc: files in a `mods` folder next to `RESPeCt.exe`
 take the place of the game's while it plays. The PC version's files
