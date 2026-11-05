@@ -261,6 +261,47 @@ static void mod_hash_file(const char *up, const char *path) {
 }
 uint64_t modfs_signature(void) { return nused ? (mod_signature ? mod_signature : 1) : 0; }
 
+/* A PC version file with nothing like it in the PS1 game (checked against
+ * the disc: those are other resources, the PC's own screens and sounds),
+ * or one of its developers' leftovers: say what it is, and what a mod
+ * gives instead. 1 if it was one. */
+static int pc_only_note(const char *mod, const char *rel, const char *up) {
+    static const char *const sources[] = {".RSD", ".PLY", ".MAT", ".GRP", ".COD", ".BAT", ".ORG", ".TXT", ".CFG", ".EXE", ".LA", ".HM"};
+    const char *dot = strrchr(up, '.'), *slash = strrchr(up, '/');
+    if (dot && (!slash || dot > slash))
+        for (size_t i = 0; i < sizeof sources / sizeof sources[0]; i++)
+            if (!strcmp(dot, sources[i])) {
+                note("mods: %s/%s: ignored (a source file of the PC version's makers: no game reads it)", mod, rel);
+                return 1;
+            }
+    static const struct { const char *prefix, *what; } kinds[] = {
+        {"MESSAGE/", "the PC's picture of a message; RESPeCt shows the PS1's messages as text: change them in text/ (written by extract)"},
+        {"EVENTMSG/", "the PC's picture of a message; RESPeCt shows the PS1's messages as text: change them in text/ (written by extract)"},
+        {"WAV/", "a PC sound effect; the PS1's sounds are in its banks: give the one it stands for as NOISE/<bank>/<n>.wav (written by extract)"},
+        {"ITEM/WAV/", "a PC sound effect; the PS1's sounds are in its banks: give the one it stands for as NOISE/<bank>/<n>.wav (written by extract)"},
+        {"MENU/", "a picture of the PC's own menus, which the PS1 draws its own way"},
+        {"ANM/", "an animation of the PC's own screens (the PS1 draws them its own way)"},
+        {"ITEM/ITEM_", "the PC's own 3D model of an item (the PS1 shows its pictures, in BIGTIM)"},
+        {"ITEM/PIC/", "a picture of the PC's own screens"},
+        {"PEOPLE/", "a PC-only model (nothing like it on the PS1's disc)"},
+        {"DOORNEW/", "a PC-only door model (the PS1's door files are DOOR_xx.HMD and DOOR_xx.BIN)"},
+        {"EFFECT/", "a PC-only effect model (nothing like it on the PS1's disc)"},
+        {"MAP/", "a picture of the PC's own map screen"},
+        {"RESULT/", "a picture of the PC's own results screen"},
+        {"AVI/", "a picture of the PC's own movie screens"},
+        {"RESOURCE/DEMO_", "the PC's own recording of the attract demo"},
+        {"RESOURCE/", "a PC-only file (the PS1's files are different: an older build's, or the PC's own)"},
+        {"ITEM/", "a PC-only item file (nothing like it on the PS1's disc)"},
+        {"STAGE/", "a file of a room's folder that the PS1's rooms don't have (the PC version's leftovers)"},
+    };
+    for (size_t i = 0; i < sizeof kinds / sizeof kinds[0]; i++)
+        if (!strncmp(up, kinds[i].prefix, strlen(kinds[i].prefix))) {
+            note("mods: %s/%s: %s: not used", mod, rel, kinds[i].what);
+            return 1;
+        }
+    return 0;
+}
+
 static void apply(const char *mod, const char *rel, const char *path) {
     char up[512];
     size_t len = strlen(rel), component = 0;
@@ -294,6 +335,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
     }
     if (pc_bitmaps_source(mod, up)) return;
     if (!strncmp(up, "PSX_DATA/", 9)) memmove(up, up + 9, strlen(up + 9) + 1);
+    if (!strcmp(up, "STAGE/STAGE02/020E/RELOAD/TARAN20E.BIN")) strcpy(up, "TARAN20E.BIN");   /* (the PC keeps it there; the same file) */
     long n = 0;
     int fi = disc_index(up);
     if (fi >= 0) {                                /* a disc file, whole */
@@ -388,7 +430,8 @@ static void apply(const char *mod, const char *rel, const char *path) {
              " give it as NOISE/<block>/music1.wav (the log says which plays in a room): not used", mod, rel);
         return;
     }
-    note("mods: %s/%s: not a file of the disc or of the PC version's PSX_DATA: not used", mod, rel);
+    if (pc_only_note(mod, rel, up)) return;
+    note("mods: %s/%s: not a file RESPeCt knows (neither the disc's nor the PC version's): not used", mod, rel);
 }
 
 static uint32_t rd32(const uint8_t *p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }

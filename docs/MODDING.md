@@ -23,8 +23,9 @@ that all PC WAV filenames or enlarged banks are supported.
 
 ## Quick start
 
-1. **Get the originals.** Make an empty folder called `extract` next to
-   `RESPeCt.exe` and start the game once (it takes about a minute). Every
+1. **Get the originals.** In the settings (F1), page Mods, choose *Write
+   the originals* (or make an empty folder called `extract` next to
+   `RESPeCt.exe`) and start the game again (it takes about a minute). Every
    file a mod can replace is written there, already named the way a mod
    names it.
 2. **Make your mod.** Make a folder in `mods` (the game makes `mods` on its
@@ -66,13 +67,35 @@ mods/
 | Sound effects (and the instruments of the rooms' music) | `NOISE/012/03.wav`: sound 3 of the bank in block 12 | `extract` |
 | A room's music | `NOISE/236/music1.seq` (the PS1's sequence), or `NOISE/236/music1.wav` (a recording, as the PC has its music) | `extract` |
 | A movie's pictures | `M/OPENING.STR/0042.png`: frame 42 | `movie_dump` (below) |
+| A whole movie as a video file | `avi/Opening.avi` (the PC's names) or `M/OPENING.STR/video.mp4`; needs the 64-bit FFmpeg DLLs next to the exe | the PC's `PSX_DATA/avi`, your own |
+| The PC's music by its name | `BGM/012-BGM.WAV` (the ones matched to the PS1's music: the log says) | the PC's `PSX_DATA/BGM` |
 | Any texture in HD | a texture pack (see the README) | |
-| Weapons' fire rate and damage, damage per enemy type, the small enemies' hit points | `data/COMBAT.txt` | `extract` |
+| Weapons' fire rate and damage, damage per enemy type, every enemy's and boss's hit points, body-part damage | `data/COMBAT.txt` | `extract` |
 | A room's enemies (type, place, hit points) and pickups | `data/ROOMS.txt` (`@block`, as in `text/ROOMS.txt`) | `extract` |
 | The game's code: hooks on its functions, its memory | `plugins/name.dll` (native code, off unless switched on) | your own (below) |
 
 Paths aren't case-sensitive, and `/` or `\` both work. Pictures can be
 PNG, BMP, JPG or TGA.
+
+## Coming from the PC version
+
+A PC mod goes in as it is: put its folder (with or without `PSX_DATA`,
+`Resource`, `nab`) in `mods`. Checked with the whole PC installation as
+one mod: every PC file the PS1 game has an equivalent of is used (1185,
+rooms, doors, effects, items, enemies, bosses' models, textures, the
+mapped screens, voices, movies, 18 of the music tracks), in 2 seconds at
+start. A room or scenery block can now be bigger than on the PS1 (see
+Sizes). The log names each of the others and what to give instead:
+
+| PC files | Why not used | Instead |
+| --- | --- | --- |
+| `wav/door`, `wav/foot`, `wav/enemy`, `wav/event`, `wav/weap`... (891) | the PC's own recordings; the PS1 plays its sounds from banks | `NOISE/<bank>/<n>.wav`, the sound it stands for (`extract` writes them all, by bank) |
+| `Message/*.BMP`, `eventmsg/*.bmp` (512) | the PC draws messages as pictures; RESPeCt draws the PS1's text | `text/ROOMS.txt` and the other text files: plain UTF-8, any language |
+| `menu/`, `Anm/*.FLC`, `map/` cursor and frames, `item/PIC` | the PC's own screens; the PS1 draws its own | the PS1's pictures (`extract`: `map/`, `RESULT/`, `RESOURCE/TITLE10.png`...) |
+| `DOORNEW/*1.HMD`, `item/ITEM_xx`, some `effect` and `people` models | models only the PC has | the PS1's `DOOR_xx.HMD`, `item/.../A.HMD`... |
+| 32 `BGM/*.WAV` | no PS1 music clearly matches them | `NOISE/<block>/music1.wav` for the room's music |
+| `.RSD`, `.PLY`, `.MAT`, `.GRP`, `.BAT`... | the makers' sources, no game reads them | (ignored) |
+| a DLL mod | PC code for `gun_bio.exe` | a plugin (below), written against RESPeCt's API |
 
 ## The mods folder
 
