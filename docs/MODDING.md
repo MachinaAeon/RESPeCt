@@ -71,6 +71,7 @@ mods/
 | A movie's pictures | `M/OPENING.STR/0042.png`: frame 42 | `movie_dump` (below) |
 | A whole movie as a video file | `avi/Opening.avi` (the PC's names) or `M/OPENING.STR/video.mp4`; needs the 64-bit FFmpeg DLLs next to the exe | the PC's `PSX_DATA/avi`, your own |
 | The PC's music by its name | `BGM/012-BGM.WAV` (the ones matched to the PS1's music: the log says) | the PC's `PSX_DATA/BGM` |
+| Any picture of the disc (HUD, menus, typewriter, effects, textures) | `PICTURES/<file>/<n>.png`; 2x or more is also its HD version | `extract/PICTURES` |
 | Any texture in HD | a texture pack (see the README) | |
 | Weapons' fire rate and damage, damage per enemy type, every enemy's and boss's hit points, body-part damage | `data/COMBAT.txt` | `extract` |
 | A room's enemies (type, place, hit points) and pickups | `data/ROOMS.txt` (`@block`, as in `text/ROOMS.txt`) | `extract` |

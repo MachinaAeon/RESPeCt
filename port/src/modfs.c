@@ -170,6 +170,7 @@ static int write_out(const char *rel, const uint8_t *d, size_t n);
 static void sfx_done(void);
 static int movie_apply(const char *mod, const char *rel, const char *up, const char *path);
 static int bmp_apply(const char *mod, const char *rel, const char *up, const char *path);
+static int picture_apply(const char *mod, const char *rel, const char *up, const char *path);
 static int enemy_apply(const char *mod, const char *rel, const char *up, const char *path);
 static void enemies_done(void);
 static int pack_apply(const char *mod, const char *rel, const char *up, const char *path);
@@ -419,6 +420,7 @@ static void apply(const char *mod, const char *rel, const char *path) {
     if (text_apply(mod, rel, up, path)) return;
     if (diary_apply(mod, rel, up, path)) return;
     if (own_picture_apply(mod, rel, up, path)) return;
+    if (picture_apply(mod, rel, up, path)) return;
     if (bmp_apply(mod, rel, up, path)) return;
     if (enemy_apply(mod, rel, up, path)) return;
     if (pack_apply(mod, rel, up, path)) return;
@@ -1840,6 +1842,7 @@ static void tim_size(const uint8_t *tim, uint32_t *w, uint32_t *h) {
     *h = rd16(pix + 10);
 }
 
+static int tim_keep_palette;                    /* (picture_apply: the palette's place is another picture's too) */
 static const char *tim_from_picture(uint8_t *tim, const uint8_t *img, uint32_t w, uint32_t h, const char **how) {
     /* the TIM: its palette (if any), then its pixels */
     uint32_t flag = rd32(tim + 4), bpp = (uint32_t[]){4, 8, 16, 24}[flag & 3];
@@ -1912,7 +1915,7 @@ static const char *tim_from_picture(uint8_t *tim, const uint8_t *img, uint32_t w
     } else {
         int ncol = 1 << bpp;
         uint16_t pal[256];
-        if (chs == 1) {                          /* a palette for this picture: entry 0 see-through */
+        if (chs == 1 && !tim_keep_palette) {     /* a palette for this picture: entry 0 see-through */
             uint16_t *list = malloc((opaque ? opaque : 1) * 2);
             size_t m = 0;
             for (uint32_t k = 0; k < tw * th; k++) if (col[k]) list[m++] = col[k];
@@ -2009,6 +2012,85 @@ static int bmp_apply(const char *mod, const char *rel, const char *up, const cha
     tim_size(tim, &tw, &th);
     note("mods: %s/%s: into %s's picture at %u (%ux%u, %s%s)", mod, rel, modfs_bmp[i].disc, modfs_bmp[i].offset, tw, th, how,
            hd ? ", with an HD replacement" : (uint32_t)w != tw || (uint32_t)h != th ? ", scaled to the PS1's size" : "");
+    nused++;
+    return 1;
+}
+
+/* Every picture of a disc file (TIMs as the game loads them: 4 or 8 bits
+ * with a palette, or 16 bits), in order: PICTURES/<file>/<n>.png names
+ * the n-th (extract writes them all). A picture in a packed block isn't
+ * one of these (its block has its own names). */
+static uint32_t tim_at(const uint8_t *d, uint32_t n, uint32_t o) {   /* its length, 0 if none there */
+    if ((uint64_t)o + 20 > n || rd32(d + o) != 0x10) return 0;
+    uint32_t flag = rd32(d + o + 4), p = o + 8;
+    if (flag != 8 && flag != 9 && flag != 2) return 0;
+    for (int part = flag & 8 ? 0 : 1; part < 2; part++) {
+        if ((uint64_t)p + 12 > n) return 0;
+        uint32_t len = rd32(d + p), x = rd16(d + p + 4), y = rd16(d + p + 6), w = rd16(d + p + 8), h = rd16(d + p + 10);
+        if (!w || !h || x >= 1024 || y >= 512 || len != 12 + w * h * 2 || len > (part ? 0x100000u : 0x20000u) || (uint64_t)p + len > n) return 0;
+        p += len;
+    }
+    return p - o;
+}
+static int file_pictures(const uint8_t *d, uint32_t n, uint32_t *off, int max) {
+    int k = 0;
+    for (uint32_t o = 0; o + 20 <= n && k < max;) {
+        uint32_t len = tim_at(d, n, o);
+        if (len) { off[k++] = o; o += (len + 3) & ~3u; }
+        else o += 4;
+    }
+    return k;
+}
+static int picture_apply(const char *mod, const char *rel, const char *up, const char *path) {
+    if (strncmp(up, "PICTURES/", 9)) return 0;
+    const char *slash = strrchr(up, '/'), *dot = strrchr(up, '.');
+    char file[256];
+    unsigned idx;
+    char rest[8] = "";
+    if (!dot || !is_picture(dot) || slash - (up + 9) <= 0 || slash - (up + 9) >= (int)sizeof file ||
+        sscanf(slash + 1, "%u%7s", &idx, rest) != 2 || strcasecmp(rest, dot)) {
+        note("mods: %s/%s: name it PICTURES/<disc file>/<number>.png, as extract does: not used", mod, rel);
+        return 1;
+    }
+    memcpy(file, up + 9, (size_t)(slash - (up + 9)));
+    file[slash - (up + 9)] = 0;
+    int fi = disc_index(file);
+    Touched *t = fi >= 0 ? touch(fi) : NULL;
+    static uint32_t off[4096];
+    int count = t ? file_pictures(t->data, t->nsec * 2048, off, 4096) : 0;
+    if (!t || (int)idx >= count) {
+        note("mods: %s/%s: %s has no picture %u (extract shows its pictures): not used", mod, rel, file, idx);
+        return 1;
+    }
+    uint8_t *tim = t->data + off[idx];
+    int shared = -1;                             /* another picture whose palette goes to the same place */
+    if (rd32(tim + 4) & 8)
+        for (int k = 0; k < count && shared < 0; k++)
+            if (k != (int)idx && (rd32(t->data + off[k] + 4) & 8) && rd32(t->data + off[k] + 12) == rd32(tim + 12)) shared = k;
+    long n = 0;
+    uint8_t *d = load(path, &n);
+    int w, h, c;
+    uint8_t *img = d ? stbi_load_from_memory(d, (int)n, &w, &h, &c, 4) : NULL;
+    free(d);
+    if (!img) { note("mods: %s/%s: couldn't read it as a picture: not used", mod, rel); return 1; }
+    uint32_t tl = tim_len(tim);
+    uint8_t *before = malloc(tl);
+    if (before) memcpy(before, tim, tl);
+    tim_keep_palette = shared >= 0;
+    const char *how = "", *why = tim_from_picture(tim, img, (uint32_t)w, (uint32_t)h, &how);
+    tim_keep_palette = 0;
+    if (!why && before) vram_fix_add(before, tim);
+    free(before);
+    int hd = !why && modfs_hd_add(tim, img, (uint32_t)w, (uint32_t)h);
+    stbi_image_free(img);
+    if (why) { note("mods: %s/%s: %s: not used", mod, rel, why); return 1; }
+    uint32_t tw = 0, th = 0;
+    tim_size(tim, &tw, &th);
+    char shares[160] = "";
+    if (shared >= 0 && !hd)
+        snprintf(shares, sizeof shares, "; its palette is picture %d's too, so its colours stay: give it at 2x or more for any colour", shared);
+    note("mods: %s/%s: into %s's picture %u (%ux%u, %s%s%s)", mod, rel, file, idx, tw, th, how,
+         hd ? ", with an HD replacement" : (uint32_t)w != tw || (uint32_t)h != th ? ", scaled to the PS1's size" : "", shares);
     nused++;
     return 1;
 }
@@ -5910,6 +5992,18 @@ int modfs_extract(void) {
         if (dot) strcpy(dot, ".png");
         if (d && (uint32_t)mz_crc32(0, d + modfs_bmp[i].offset, modfs_bmp[i].size) == modfs_bmp[i].crc)
             files += tim_png(rel, d + modfs_bmp[i].offset);
+    }
+    for (size_t fi = 0; fi < sizeof disc_files / sizeof disc_files[0]; fi++) {   /* every picture, by file and number */
+        const char *nm = disc_files[fi].name, *ext = strrchr(nm, '.');
+        if (!ext || !strcasecmp(ext, ".STR") || !strcasecmp(ext, ".XA") || disc_files[fi].size < 32) continue;
+        uint8_t *d = disc_read((int)fi);
+        static uint32_t off[4096];
+        int count = d ? file_pictures(d, (disc_files[fi].size + 2047) / 2048 * 2048, off, 4096) : 0;
+        for (int k = 0; k < count; k++) {
+            snprintf(rel, sizeof rel, "PICTURES/%s/%03d.png", nm, k);
+            files += tim_png(rel, d + off[k]);
+        }
+        free(d);
     }
     for (int type = 0; type <= 30; type++) {
         Packed *p = packed_get(disc_index(type == 30 ? "EV_OBJ.DAT" : "OBJ.DAT"), type == 30 ? 0x196 : (uint32_t)type);
