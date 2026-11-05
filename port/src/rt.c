@@ -111,6 +111,23 @@ int rt_is_function(uint32_t addr) {
     return 0;
 }
 
+/* modplug.c: the native C functions of the game at addr, in every module
+ * (overlays share addresses: an enemy program's slot has 15); how many. */
+int rt_natives_at(uint32_t addr, RtFn *out, int max) {
+    int n = 0;
+    for (int i = 0; i < rt_module_count && n < max; i++) {
+        const RtModule *m = &rt_modules[i];
+        uint32_t p = addr & 0x1FFFFFFF;
+        const RtFunc *f;
+        if (p >= (m->code_lo & 0x1FFFFFFF) && p < (m->code_hi & 0x1FFFFFFF) && (f = find_func(m, addr)) && f->fn) {
+            int dup = 0;
+            for (int k = 0; k < n; k++) dup |= out[k] == f->fn;
+            if (!dup) out[n++] = f->fn;
+        }
+    }
+    return n;
+}
+
 /* Functions that may contain pc, nearest first (for resuming a save). */
 int rt_resume_candidates(uint32_t pc, const RtModule **mod, const RtFunc **out, int max) {
     const RtModule *m = find_module(pc);

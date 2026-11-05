@@ -141,15 +141,16 @@ more, up to 10).
 
 ### Plugins
 
-A plugin is a 64-bit Windows DLL in `mods/<mod>/plugins/`, exporting
-`int respect_plugin_init(const RespectApi *api)`. Through `api` it reads and
-writes the game's memory, calls the game's functions, hooks any of them
-(before: may skip it; after) by its PS1 address, and runs code every
-frame. The API is `port/include/respect_plugin.h`; `port/plugins/example.c`
-logs rooms and messages and regenerates health. Plugins run only when the
+A plugin is a 64-bit Windows DLL in `mods/<mod>/plugins/`, the way DLL mods
+work on PC: it hooks any of the game's functions by name (before: may skip
+it; after), calls them, reads and writes the game's memory and runs code
+every frame, to change anything, from a weapon to how a zombie behaves.
+[PLUGINS.md](PLUGINS.md) is the guide: a working plugin in five minutes,
+the 1138 named functions (`port/include/respect_game.h`), the useful memory
+and where the PC's functions are in the PS1 game. Plugins run only when the
 player switches them on (F1 > Mods > Plugins), because they are programs.
-A DLL made for the PC's `gun_bio.exe` doesn't run here: write it against
-this API instead.
+A DLL made for the PC's `gun_bio.exe` doesn't run here (it patches that
+program's code); the same mod is written against RESPeCt's API.
 
 ## 3. Coming from the PC version
 

@@ -1,6 +1,7 @@
 # PC port build (Linux, headless runner). Generated code: tools/recomp/recomp.py
 CC ?= clang
 GEN_CFLAGS = -O1 -w -Iinclude -fno-strict-aliasing
+HOOK_CFLAGS = -fpatchable-function-entry=16 -fno-inline-functions
 SRC_CFLAGS = -O2 -g -Wall -Wextra -Wno-unused-parameter -Iinclude -Isrc -Ithird_party -Ithird_party/libchdr/include -fno-strict-aliasing
 # libchdr (CHD disc images; BSD) with its zlib (miniz, also used for .zip), LZMA, zstd and FLAC
 CHDR = third_party/libchdr
@@ -26,7 +27,7 @@ $(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/d
 
 $(BUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) src/modmem.h src/modio.h src/modfs_pc_text.h include/recomp.h
 	@mkdir -p $(dir $@)
-	$(CC) $(SRC_CFLAGS) -Idecomp -c $< -o $@
+	$(CC) $(SRC_CFLAGS) $(HOOK_CFLAGS) -Idecomp -c $< -o $@
 
 $(BUILD)/chdr.o: $(wildcard $(CHDR)/src/*.c) third_party/chdr_all.c
 	@mkdir -p $(dir $@)
@@ -59,7 +60,7 @@ $(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/
 
 $(WBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) src/modmem.h src/modio.h src/modfs_pc_text.h include/recomp.h
 	@mkdir -p $(dir $@)
-	$(WIN_CC) $(SRC_CFLAGS) -Idecomp -c $< -o $@
+	$(WIN_CC) $(SRC_CFLAGS) $(HOOK_CFLAGS) -Idecomp -c $< -o $@
 
 $(WBUILD)/chdr.o: $(wildcard $(CHDR)/src/*.c) third_party/chdr_all.c
 	@mkdir -p $(dir $@)
@@ -86,7 +87,7 @@ $(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h 
 
 $(DBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) src/modmem.h src/modio.h src/modfs_pc_text.h include/recomp.h
 	@mkdir -p $(dir $@)
-	$(CC) $(SRC_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
+	$(CC) $(SRC_CFLAGS) $(HOOK_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
 
 $(DBUILD)/meta/%.o: meta/%.c include/recomp.h
 	@mkdir -p $(dir $@)
@@ -114,7 +115,7 @@ $(WDBUILD)/src/render_gpu.o: src/render_gpu.hlsl   # built in (.incbin)
 
 $(WDBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) src/modmem.h src/modio.h src/modfs_pc_text.h include/recomp.h
 	@mkdir -p $(dir $@)
-	$(WIN_CC) $(SRC_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
+	$(WIN_CC) $(SRC_CFLAGS) $(HOOK_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
 
 $(WDBUILD)/meta/%.o: meta/%.c include/recomp.h
 	@mkdir -p $(dir $@)
