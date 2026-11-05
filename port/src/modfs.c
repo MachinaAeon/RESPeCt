@@ -175,6 +175,10 @@ static int picture_apply(const char *mod, const char *rel, const char *up, const
 static int enemy_apply(const char *mod, const char *rel, const char *up, const char *path);
 static void enemies_done(void);
 static int pack_apply(const char *mod, const char *rel, const char *up, const char *path);
+typedef struct Packed Packed;
+static Packed *packed_get(int fi, uint32_t block);
+static uint8_t *packed_part(Packed *p, int k, uint32_t *n);
+static void packed_note(Packed *p, int k, const char *what);
 static void packs_done(void);
 
 static uint8_t *load(const char *path, long *n) {
@@ -2092,6 +2096,7 @@ static int file_pictures(const uint8_t *d, uint32_t n, uint32_t *off, int max) {
     }
     return k;
 }
+static int packed_archive(int fi);
 static int picture_apply(const char *mod, const char *rel, const char *up, const char *path) {
     if (strncmp(up, "PICTURES/", 9)) return 0;
     const char *slash = strrchr(up, '/'), *dot = strrchr(up, '.');
@@ -2105,19 +2110,33 @@ static int picture_apply(const char *mod, const char *rel, const char *up, const
     }
     memcpy(file, up + 9, (size_t)(slash - (up + 9)));
     file[slash - (up + 9)] = 0;
+    char *sub = strrchr(file, '/');              /* PICTURES/<file>/<block>-<part>/<n>.png: inside a packed block */
+    unsigned pb = 0, pk = 0;
+    char prest[4];
+    Packed *pp = NULL;
+    if (sub && sscanf(sub + 1, "%u-%u%3s", &pb, &pk, prest) == 2) *sub = 0;
+    else sub = NULL;
     int fi = disc_index(file);
     Touched *t = fi >= 0 ? touch(fi) : NULL;
+    uint8_t *data = t ? t->data : NULL;
+    uint32_t dn = t ? t->nsec * 2048 : 0;
+    if (sub) {
+        pp = t && packed_archive(fi) ? packed_get(fi, pb) : NULL;
+        data = pp ? packed_part(pp, (int)pk, &dn) : NULL;
+        if (!data) dn = 0;
+        snprintf(file + strlen(file), sizeof file - strlen(file), " block %u part %u", pb, pk);
+    }
     static uint32_t off[4096];
-    int count = t ? file_pictures(t->data, t->nsec * 2048, off, 4096) : 0;
-    if (!t || (int)idx >= count) {
+    int count = data ? file_pictures(data, dn, off, 4096) : 0;
+    if (!data || (int)idx >= count) {
         note("mods: %s/%s: %s has no picture %u (extract shows its pictures): not used", mod, rel, file, idx);
         return 1;
     }
-    uint8_t *tim = t->data + off[idx];
+    uint8_t *tim = data + off[idx];
     int shared = -1;                             /* another picture whose palette goes to the same place */
     if (rd32(tim + 4) & 8)
         for (int k = 0; k < count && shared < 0; k++)
-            if (k != (int)idx && (rd32(t->data + off[k] + 4) & 8) && rd32(t->data + off[k] + 12) == rd32(tim + 12)) shared = k;
+            if (k != (int)idx && (rd32(data + off[k] + 4) & 8) && rd32(data + off[k] + 12) == rd32(tim + 12)) shared = k;
     long n = 0;
     uint8_t *d = load(path, &n);
     int w, h, c;
@@ -2135,6 +2154,11 @@ static int picture_apply(const char *mod, const char *rel, const char *up, const
     int hd = !why && modfs_hd_add(tim, img, (uint32_t)w, (uint32_t)h);
     stbi_image_free(img);
     if (why) { note("mods: %s/%s: %s: not used", mod, rel, why); return 1; }
+    if (pp) {                                    /* packed again at the end (packs_done) */
+        char what[400];
+        snprintf(what, sizeof what, "%s/%s", mod, rel);
+        packed_note(pp, (int)pk, what);
+    }
     uint32_t tw = 0, th = 0;
     tim_size(tim, &tw, &th);
     char shares[160] = "";
@@ -4028,14 +4052,14 @@ static int ui_extract(void) {
  * for them, packed again at the end (a part nothing changed keeps the
  * disc's packing). A block is either a header (3, then where each part
  * starts) and three packed parts, or packed whole (part 0 here). */
-typedef struct {
+struct Packed {
     int fi;
     uint32_t block, start, len, off[4];
     int split, changed;                          /* changed: a bit per part */
     uint8_t *part[3], *was[3];
     uint32_t plen[3], was_len[3];
     char what[400];
-} Packed;
+};
 static Packed packs[64];
 static int npacks;
 
@@ -4043,6 +4067,12 @@ static uint32_t archive_table(int fi) {          /* its block table's address in
     for (size_t k = 0; k < sizeof archives / sizeof archives[0]; k++)
         if (fi >= 0 && !strcasecmp(disc_files[fi].name, archives[k].name)) return archives[k].tab;
     return 0;
+}
+
+/* The archives whose blocks are packed (the game unpacks them as it loads them). */
+static int packed_archive(int fi) {
+    return fi >= 0 && (!strcasecmp(disc_files[fi].name, "OBJ.DAT") || !strcasecmp(disc_files[fi].name, "EV_OBJ.DAT") ||
+                       !strcasecmp(disc_files[fi].name, "ITEMDAT.DAT"));
 }
 
 static Packed *packed_get(int fi, uint32_t block) {
@@ -6290,6 +6320,34 @@ int modfs_extract(void) {
             files += tim_png(rel, d + off[k]);
         }
         free(d);
+    }
+    static const char *const packed_files[] = {"OBJ.DAT", "EV_OBJ.DAT", "ITEMDAT.DAT"};   /* the pictures inside packed blocks */
+    for (int a = 0; a < 3; a++) {
+        int fi = disc_index(packed_files[a]);
+        Touched *test = touch(disc_index("TEST.BIN")), *t = touch(fi);
+        uint32_t tab = archive_table(fi);
+        if (!test || !t || !tab) continue;
+        for (uint32_t b = 0; b < 4096; b++) {
+            uint32_t s0 = rd32(test->data + tab - TEST_BASE + 4 * b), s1 = rd32(test->data + tab - TEST_BASE + 4 * b + 4);
+            if (s1 < s0 || s1 > t->nsec) break;
+            if (s1 == s0) continue;
+            int keep = npacks;
+            Packed *p = packed_get(fi, b);
+            for (int k = 0; p && k < (p->split ? 3 : 1); k++) {
+                uint32_t n = 0;
+                uint8_t *u = packed_part(p, k, &n);
+                static uint32_t off[4096];
+                int count = u ? file_pictures(u, n, off, 4096) : 0;
+                for (int j = 0; j < count; j++) {
+                    snprintf(rel, sizeof rel, "PICTURES/%s/%u-%d/%03d.png", packed_files[a], b, k, j);
+                    files += tim_png(rel, u + off[j]);
+                }
+            }
+            if (p && p == &packs[keep]) {        /* (one of its own: let it go) */
+                for (int k = 0; k < 3; k++) { free(p->part[k]); free(p->was[k]); }
+                npacks = keep;
+            }
+        }
     }
     for (int type = 0; type <= 30; type++) {
         Packed *p = packed_get(disc_index(type == 30 ? "EV_OBJ.DAT" : "OBJ.DAT"), type == 30 ? 0x196 : (uint32_t)type);

@@ -69,7 +69,7 @@ mods/
 | Enemies: shape, textures, animations | `nab/ENEMnn.NAB`, `nab/ENEMnn.NAC` (the PC's format) | nn is the enemy type. Bigger than the original: switch on *Bigger enemy models* |
 | An enemy's skin only | `nab/ENEMnn.png` | Drawn on the original model |
 | 2D screens: maps, results, title, menus, fonts | `map/MAP00_1.png`, `RESULT/RANK_A.png`, `RESOURCE/TITLE10.png`... | A bigger picture is used as an HD version |
-| **Any picture of the game**: HUD, menus, options, typewriter, results, effects, room and door textures | `PICTURES/<disc file>/<number>.png`, e.g. `PICTURES/CONPAU.BIN/011.png` (the HUD's condition box) | `extract/PICTURES` has all 2332, by file. See *Pictures* below |
+| **Any picture of the game**: HUD, menus, options, typewriter, results, effects, room and door textures | `PICTURES/<disc file>/<number>.png`, e.g. `PICTURES/CONPAU.BIN/011.png` (the HUD's condition box) | `extract/PICTURES` has all 2414, by file. See *Pictures* below |
 | Room messages, item names and descriptions | `text/ROOMS.txt`, `text/GAME.txt`, `text/ITEMS.txt`, `text/LIST.txt`, `text/UI.txt` | Plain UTF-8: any language. See *Texts* below |
 | New characters for a translation | `FONT/FONT186.png`..`188.png` + `text/CHARS.txt` | e.g. `ì 128` maps a character to a new glyph |
 | The PC's message pictures | `Message/0015-00.BMP`... | 173 of them are shown in place of the PS1's text automatically, the doors' too ("It's locked.", "You've used <key>") |
@@ -96,6 +96,10 @@ disc file, numbered in the order they are in it: `CONPAU.BIN` is the HUD
 `TYPE_TIM.BIN` the typewriter's letters and texts, `SCR_BG.BIN` the results
 backgrounds, `EFFECT.BIN` and `EFFECTX.BIN` the effects, `B/STGBGn.BIN` the
 rooms' textures. Edit one and put it in your mod under the same name.
+The pictures inside the packed blocks (the enemies' and objects' textures
+in `OBJ.DAT` and `EV_OBJ.DAT`, the items' in `ITEMDAT.DAT`) are in a folder
+per block and part, `PICTURES/ITEMDAT.DAT/12-0/000.png`; the block is
+packed again with yours.
 
 - At the original size, the picture goes into the game's own picture,
   in its colours. Where several pictures share one palette (much of the
