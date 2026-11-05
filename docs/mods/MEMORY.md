@@ -92,9 +92,9 @@ room normally, or resume a matching arena state.
 Asset-free production-code checks:
 
 ```
-python tools/tests/modmem_test.py
-python tools/tests/modfs_memory_test.py
-python tools/tests/modfs_test.py
+python tools/tests/c_tests.py modmem_test
+python tools/tests/c_tests.py modfs_memory_test
+python tools/tests/c_tests.py modfs_test
 ```
 
 An earlier bounded runtime check used a real door transition from 07/04 to

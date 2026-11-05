@@ -12,7 +12,7 @@ message and diary BMPs have different representations and pagination.
 ## PC asset packages
 
 For a PC mod that retains `PSX_DATA`, `Resource` and `nab`, see
-[Automatic PC asset-mod compatibility](PC_RESOURCE_COMPATIBILITY.md).
+[Automatic PC asset-mod compatibility](mods/PC_COMPATIBILITY.md).
 The candidate accepts the PSX_DATA wrapper. `tools/pc_mod.py check` accounts
 for every supplied file; `import` refuses unknown resources and conflicts
 instead of copying a silently partial mod. A recognized route still needs
@@ -20,7 +20,7 @@ runtime and gameplay verification. Full PC asset compatibility remains open.
 
 The candidate also accepts the verified PC `noise/noise.bin` layout through
 an ordered delta adapter, and the event-verified `WAV/ENEMY/DOG/SND-001.WAV`.
-See [PC audio compatibility](PC_AUDIO_COMPATIBILITY.md); this does not mean
+See [PC audio compatibility](mods/PC_COMPATIBILITY.md#pc-audio); this does not mean
 that all PC WAV filenames or enlarged banks are supported.
 
 ## Quick start
@@ -255,7 +255,7 @@ not provide automatic wrapping or establish complete translation coverage.
 Menu labels drawn as pictures must be edited as pictures; other unmapped
 strings still need identification. PC `Message`/`eventmsg` BMPs are not
 converted into PS1 glyph data automatically. The opt-in
-[PC bitmap manifest](PC_BITMAPS.md) can instead map authored raster
+[PC bitmap manifest](mods/PC_COMPATIBILITY.md#pc-message-pictures) can instead map authored raster
 messages, pickup images and adapted diary crops to original identities,
 while preserving native control streams. It does not infer missing text
 or ambiguous page correspondence.
@@ -362,7 +362,7 @@ take all of it too, with these differences:
 
 ## Experimental dynamic model buffers
 
-[Dynamic model and animation buffers](DYNAMIC_MOD_BUFFERS.md) extend the
+[Dynamic model and animation buffers](mods/MEMORY.md) extend the
 room-owned decoded heap when explicitly enabled in `[mods]` with
 `dynamic_mod_buffers = 1`. The option defaults to 0. Instance work stays
 contiguous; capacity and saved arena metadata are checked. Compressed
@@ -499,7 +499,7 @@ by their PC names. The PC version is a port of the PS1 code and names its WAVs b
 same numbers: an enemy's `snd-NNN.wav` is sound NNN of that enemy's bank,
 a door's `XY-n.wav` sound n of the bank the PS1 loads for door scene XY,
 a room's `foot/NNN-fL.wav` the footstep f of that room's bank (the PC's
-room NNN is a PS1 stage and room: `tools/mod_sfxevents.py` has the table),
+room NNN is a PS1 stage and room: `tools/mod_tables/mod_sfxevents.py` has the table),
 `key1/key-NNN.wav` sound NNN of the menu bank, `weap/<weapon>-<action>.wav`
 the weapon's bank: ATTACK the shot, BACK the spent casing's clink, RELOAD
 the reload (the handguns' magazine going in), NO the dry fire. 45 of them are the PS1's own
@@ -538,7 +538,7 @@ The PC version's music WAVs (`PSX_DATA/BGM/012-BGM.WAV`...) are recordings
 of these sequences. 36 of the 38 were matched to their sequence by their
 sound (every sequence of every set recorded in RESPeCt, 45 s each, with
 `tools/plugins/seqrec.c`, and the WAVs' 5 s pieces looked for in the
-recordings, `tools/mod_bgmnames.py`), and go there by their PC name. Some
+recordings, `tools/mod_tables/mod_bgmnames.py`), and go there by their PC name. Some
 sequences are on the disc in more than one set (the same bytes: set 14's
 second is also set 0's and 23's): a PC WAV of one goes to each. Two PC
 rooms can have their own WAV of one sequence (`017-BGM` and `044-BGM`):
@@ -605,10 +605,10 @@ changing mods. Older executables do not enforce the new identity.
   RESPeCt runs it translated, not from the disc. Change the code with a
   plugin (above) instead.
 - **Automatic mapping of every PC translation BMP.** An explicit
-  [bitmap manifest](PC_BITMAPS.md) supports authored mappings; use the PS1 UTF-8 text,
+  [bitmap manifest](mods/PC_COMPATIBILITY.md#pc-message-pictures) supports authored mappings; use the PS1 UTF-8 text,
   font and diary interfaces above; not all PC paths have a mapping.
   `item/PIC` contains pickup-message bitmaps, not BIGTIM item pictures.
-  See [MODDING_LIMITS.md](MODDING_LIMITS.md) for verified correspondences
+  See [mods/STATUS.md#limits-and-memory-gates](mods/STATUS.md#limits-and-memory-gates) for verified correspondences
   and the information still needed for a complete importer.
 - **The PC's room event and item sounds** (`wav/event`, `item/wav`): one
   WAV per whole event on the PC; give the PS1's sounds instead (above).
@@ -624,17 +624,17 @@ changing mods. Older executables do not enforce the new identity.
 For developers, to make the tables RESPeCt uses from a PC version and the
 disc image:
 
-- `tools/mod_pcnames.py` (`port/src/modfs_pc.h`): where each loose PC
+- `tools/mod_tables/mod_pcnames.py` (`port/src/mods/tables/modfs_pc.h`): where each loose PC
   file is on the disc;
-- `tools/mod_packnames.py` (`port/src/modfs_pack.h`): PC files inside the
+- `tools/mod_tables/mod_packnames.py` (`port/src/mods/tables/modfs_pack.h`): PC files inside the
   packed archives;
-- `tools/mod_bmpnames.py` (`port/src/modfs_bmp.h`): which BMP is which of
+- `tools/mod_tables/mod_bmpnames.py` (`port/src/mods/tables/modfs_bmp.h`): which BMP is which of
   the disc's pictures (needs numpy);
-- `tools/mod_bossnames.py` (`port/src/modfs_boss.h`): where the
+- `tools/mod_tables/mod_bossnames.py` (`port/src/mods/tables/modfs_boss.h`): where the
   bosses' textures are on the disc (needs numpy and the PC's `nab`);
-- `tools/mod_wavnames.py` (`port/src/modfs_wav.h`): which stream channel
+- `tools/mod_tables/mod_wavnames.py` (`port/src/mods/tables/modfs_wav.h`): which stream channel
   each of the PC's `wav` files is (needs numpy);
-- `tools/xa_dump.py`: every sound channel as WAV (as `extract` does).
+- `tools/mod_tables/xa_dump.py`: every sound channel as WAV (as `extract` does).
 
 The headless runner (`port/build/.../resurv_headless`) takes `RT_MODS=dir`
 for a mods folder, `RT_EXTRACT=dir` and `RT_MOVIE_DUMP=dir` for the
@@ -643,14 +643,14 @@ game reads it, mods applied (lba and size from `disc_ids.h`).
 
 ## Validation and remaining work
 
-See [MODDING_STATUS.md](MODDING_STATUS.md) for verified capabilities,
+See [mods/STATUS.md](mods/STATUS.md) for verified capabilities,
 remaining limits and the acceptance checks that have not been performed.
-Asset-free loader regressions run with `python tools/tests/modfs_test.py`
+Asset-free loader regressions run with `python tools/tests/c_tests.py modfs_test`
 from the repository root (`CC` can select clang/GCC and target options).
 
 
 Complete PC diary content can also load automatically from its original
 `diary/fileXX/fileXX_N.bmp` paths, without a page manifest. Include every
 foreground/background companion for that document, or layer over an installed
-complete set. See [PC_DIARIES.md](PC_DIARIES.md) for exact paths, counts, priority,
+complete set. See [mods/PC_COMPATIBILITY.md#pc-diaries](mods/PC_COMPATIBILITY.md#pc-diaries) for exact paths, counts, priority,
 state compatibility and the separate unsupported PC UI resources.

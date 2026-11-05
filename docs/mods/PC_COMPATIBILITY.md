@@ -46,7 +46,7 @@ folder to undo this installation. States made with changed mods still require
 the matching resources; use the established state compatibility rules.
 
 An offline portable graphical importer is also available; see
-[PC_MOD_INSTALLER.md](PC_MOD_INSTALLER.md). It uses the same catalog and bundled
+[PC_COMPATIBILITY.md#the-portable-pc-mod-importer](PC_COMPATIBILITY.md#the-portable-pc-mod-importer). It uses the same catalog and bundled
 interpreter without an external Python installation. It does not automatically
 enable experimental memory relocation.
 
@@ -98,7 +98,7 @@ No full-game, interactive-controls, audio or video acceptance is implied.
 
 1. **Message and pickup BMP identities.** Seven measured ROOM profiles now load
    without a manifest, guarded against changed streams and native pagination
-   (see [PC_BITMAPS.md](PC_BITMAPS.md)). Forty-five ITEM/PIC pickup profiles also have complete native stream guards.
+   (see [PC_COMPATIBILITY.md#pc-message-pictures](PC_COMPATIBILITY.md#pc-message-pictures)). Forty-five ITEM/PIC pickup profiles also have complete native stream guards.
    The remaining Message, eventmsg and item/PIC datasets are not an automatic
    PS1 message map. Most eventmsg files
    are placeholders. Identify actual Windows resource consumers and their
@@ -107,7 +107,7 @@ No full-game, interactive-controls, audio or video acceptance is implied.
 2. **Diary content and UI.** Complete contents of all 13 measured PC documents
    now load automatically, including covers, backgrounds and their own verified
    pagination while native controls/acquisition remain in use. See
-   [PC_DIARIES.md](PC_DIARIES.md). The13 title labels also have independent automatic loading; the KEY-AB atlas and BOOK.FLC also load independently. The93 measured
+   [PC_COMPATIBILITY.md#pc-diaries](PC_COMPATIBILITY.md#pc-diaries). The13 title labels also have independent automatic loading; the KEY-AB atlas and BOOK.FLC also load independently. The93 measured
    diary resources now have recognized routes;
    arbitrary partial packages without a complete baseline, natural acquisition
    and full interactive acceptance remain open; document content support does
@@ -116,7 +116,7 @@ No full-game, interactive-controls, audio or video acceptance is implied.
    ordered delta adapter, and DOG/SND-001.WAV has an independently verified event route.
    Ten former DOG/CROW/RICKER aliases were withdrawn after audit; numeric action
    IDs did not prove event identity. Explicit native NOISE paths remain available.
-   See [PC_AUDIO_COMPATIBILITY.md](PC_AUDIO_COMPATIBILITY.md) for exact limits.
+   See [PC_COMPATIBILITY.md#pc-audio](PC_COMPATIBILITY.md#pc-audio) for exact limits.
    Most wav/door, wav/enemy, wav/foot and BGM filenames still lack verified
    bank/event identities. Complete playback, start/stop, loops and state-cycle
    acceptance remain open; these are not supplied by a filename converter.
@@ -144,7 +144,7 @@ The optional source-built Windows bundle now includes its own isolated Python/Tk
 runtime and the same compatibility tables. It offers a folder-based check/import
 window, requires neither an installed Python nor a checkout on the author's PC,
 and preserves original files and existing priority settings. See
-[PC_MOD_INSTALLER.md](PC_MOD_INSTALLER.md) for the build/use recipe, actual GUI
+[PC_COMPATIBILITY.md#the-portable-pc-mod-importer](PC_COMPATIBILITY.md#the-portable-pc-mod-importer) for the build/use recipe, actual GUI
 acceptance and the observed intermittent Windows rename limitation. This closes
 the basic portable-import workflow; it does not supply missing resource routes,
 automatic priority management or gameplay acceptance.
@@ -164,7 +164,7 @@ mods/my-mod/PSX_DATA/WAV/ENEMY/DOG/SND-001.WAV
 The existing flat paths also work. No sound assets are shipped. The feature
 runs only when a mod supplies one of these files; without these files, the original PS1
 path remains in use. Use `tools/pc_mod.py check` before import as documented in
-[PC_RESOURCE_COMPATIBILITY.md](PC_RESOURCE_COMPATIBILITY.md).
+[PC_COMPATIBILITY.md](PC_COMPATIBILITY.md).
 
 #### The PC noise archive
 
@@ -518,7 +518,7 @@ semantic match. Supply explicit verified IDs in decimal.
 
 136 of the 137 available eventmsg images are 1x1 placeholders. Their
 missing translated text cannot be recovered by this importer. The diary
-mapping in [MODDING_LIMITS.md](MODDING_LIMITS.md) establishes document
+mapping in [STATUS.md#limits-and-memory-gates](STATUS.md#limits-and-memory-gates) establishes document
 identity, not equal page identities. Every output page needs a reviewed
 adaptation, including titles. The importer is usable for authored mappings;
 **automatic compatibility with the entire PC dataset is not claimed**.
@@ -526,8 +526,8 @@ adaptation, including titles. The importer is usable for authored mappings;
 ### Asset-free validation
 
 ```
-python tools/tests/pc_bitmap_test.py
-python tools/tests/modfs_test.py
+python tools/tests/c_tests.py pc_bitmap_test
+python tools/tests/c_tests.py modfs_test
 ```
 
 The bitmap suite decodes synthetic BMPs through the real decoder, invokes
@@ -571,10 +571,10 @@ shown naturally in its room. No full-game acceptance is claimed.
 
 The subsequent complete-document adapter handles the contents of all 13 measured
 PC diaries automatically, without asserting equal PC/PS1 page identities.
-[PC_DIARIES.md](PC_DIARIES.md) documents its exact companion sets, presentation,
+[PC_COMPATIBILITY.md#pc-diaries](PC_COMPATIBILITY.md#pc-diaries) documents its exact companion sets, presentation,
 priority and state rules. Explicit native page/crop adaptations remain supported.
 The PC labels, key atlas and book animation now have their own adapters;
-see PC_DIARIES.md. Full-game and desktop-control acceptance remain open.
+see PC_COMPATIBILITY.md#pc-diaries. Full-game and desktop-control acceptance remain open.
 Historical per-page audit limits above do not describe current content coverage.
 
 ### Automatic pickup pictures
@@ -729,7 +729,7 @@ Changing/removing mod assets retains the existing mod-identity rejection.
 ### Verification
 
 ```
-python tools/tests/pc_diary_test.py
+python tools/tests/c_tests.py pc_diary_test
 python tools/tests/pc_diary_package_test.py
 ```
 
@@ -1012,4 +1012,4 @@ partial-copy workaround was introduced. The GUI reports OS failures so the autho
 can inspect the target and retry explicitly.
 
 Successful recognition/import is not runtime decoding, memory-fit or gameplay
-acceptance. Remaining asset coverage is tracked in PC_RESOURCE_COMPATIBILITY.md.
+acceptance. Remaining asset coverage is tracked in PC_COMPATIBILITY.md.

@@ -14,14 +14,14 @@ The current increment accepts PSX_DATA-wrapped paths and adds an all-or-nothing
 package inspection/import tool using the production mapping tables. Unknown
 resources, unsafe paths and conflicting aliases block installation. Recognition
 is explicitly distinct from runtime verification. See
-[PC_RESOURCE_COMPATIBILITY.md](PC_RESOURCE_COMPATIBILITY.md) for workflow,
+[PC_COMPATIBILITY.md](PC_COMPATIBILITY.md) for workflow,
 evidence and the remaining message/diary/audio/memory gates. Existing local
 changes and the installed runtime are preserved; no commit/push/PR was made.
 
 The audio continuation adds a metadata-only ordered PC noise adapter and one
 verified loose-WAV event alias, with atomic rejection and original SPU bounds.
 The WAV reader/importer also reject malformed PCM chunks. See
-[PC_AUDIO_COMPATIBILITY.md](PC_AUDIO_COMPATIBILITY.md) for measured results
+[PC_COMPATIBILITY.md#pc-audio](PC_COMPATIBILITY.md#pc-audio) for measured results
 and remaining listening/gameplay acceptance. Complete PC compatibility is
 still open; this is not an automatic mapping of every loose sound file.
 
@@ -53,11 +53,11 @@ Automatic content loading now covers all 13 measured PC diary sets (65
 foregrounds including covers, 13 backgrounds) with whole-document validation,
 shared metadata in the importer, native input/slides and versioned loaded-page
 state. Controlled real opens of all 13, CPU/GPU presentation, complete-book
-navigation/closing, in-flight state replay and native fallback passed. The13 title labels are now also supported; KEY-AB is now supported; BOOK.FLC is supported with native-phase presentation. See [PC_DIARIES.md](PC_DIARIES.md)
+navigation/closing, in-flight state replay and native fallback passed. The13 title labels are now also supported; KEY-AB is now supported; BOOK.FLC is supported with native-phase presentation. See [PC_COMPATIBILITY.md#pc-diaries](PC_COMPATIBILITY.md#pc-diaries)
 for source layout, old-reader-state restrictions and the acceptance boundary.
 
 The current loose-WAV catalog has one independently evidenced event alias.
-See PC_AUDIO_COMPATIBILITY.md for the withdrawn candidates and the stronger
+See PC_COMPATIBILITY.md#pc-audio for the withdrawn candidates and the stronger
 evidence needed before reintroducing them. Natural playback/listening and
 complete automatic PC resource compatibility remain open.
 
@@ -82,8 +82,8 @@ The fixed scratch buffers that only borrow the old window stay as they are.
 | M13 | Invalid LZ self-references read an uninitialized byte | Reject zero-distance references | Asset-free decoder regression; original diary round trip remains exact |
 | M15a | HD font colours reuse one image for all palettes | One HD image per distinct CLUT; include banks shared by FONT186/187/188; retain native indices, transparency and STP black | Actual CPU/GPU inventory captures use two palette variants. Asset-free cases also cover nonzero transparent index, opaque black and duplicate colours. Final build also rendered correctly in CPU/GPU captures; see acceptance limits below |
 | M18 | Grown packed parts compare beyond the original backup | Keep `was_len` and compare lengths before bytes in `packs_done` | Production-code guard reproduced a 32-byte read from a 16-byte backup before correction; the grown payload now repacks correctly |
-| M11a | PC raster-message and diary import path absent | `pc-bitmaps.txt` explicitly maps ROOM/captions, PICKUP and DIARY crops; original control streams continue; native fallback for ambiguous pointers, choices, missing images and screen overlays | 15 bitmap scenarios; actual unique native message and diary BMP shown with CPU/GPU; missing-source pixels match native; bitmap state resumes. See PC_BITMAPS.md |
-| M12a | Model/animation growth restricted to guessed per-asset allowances | Experimental default-off `dynamic_mod_buffers` manages a bounded decoded room heap, shared/instance ownership, scratch, guards and versioned state; final archive sizes indexed at boot | 23 loader groups + 13 state groups, 14 metadata assertions; actual 07/04 -> 07/00 door loaded a +400,000-byte animation payload and 616,448-byte packed block into owned memory; CPU/GPU resume, real in-flight continuation and synchronous fresh boot verified. See DYNAMIC_MOD_BUFFERS.md |
+| M11a | PC raster-message and diary import path absent | `pc-bitmaps.txt` explicitly maps ROOM/captions, PICKUP and DIARY crops; original control streams continue; native fallback for ambiguous pointers, choices, missing images and screen overlays | 15 bitmap scenarios; actual unique native message and diary BMP shown with CPU/GPU; missing-source pixels match native; bitmap state resumes. See PC_COMPATIBILITY.md#pc-message-pictures |
+| M12a | Model/animation growth restricted to guessed per-asset allowances | Experimental default-off `dynamic_mod_buffers` manages a bounded decoded room heap, shared/instance ownership, scratch, guards and versioned state; final archive sizes indexed at boot | 23 loader groups + 13 state groups, 14 metadata assertions; actual 07/04 -> 07/00 door loaded a +400,000-byte animation payload and 616,448-byte packed block into owned memory; CPU/GPU resume, real in-flight continuation and synchronous fresh boot verified. See MEMORY.md |
 | M19 | No way to change the game's code without rebuilding RESPeCt (the PC's DLL mods) | Plugins: `mods/<mod>/plugins/*.dll` with `respect_plugin_init` (`port/include/respect_plugin.h`, `modplug.c`): hooks before/after any game function (skip, arguments, result) through `interp_call`, RAM/register access, game calls, frame callbacks. Off unless `mod_plugins = 1` | Example plugin (`port/plugins/example.c`) in real headless runs from a save: message text read, room load logged, health regen measured in RAM; off by default reported in the log. No plugin: frames and audio identical to the previous build from boot and from a save. Not yet: plugin state in quick saves, a non-Windows build |
 | M21 | A room's block capped at the PS1's 290816 bytes | Over that (up to 1 MB), the room window 0x80108000-0x80150000 moves to extended RAM: native readers (`room_load.c`, `sound.c`) use `g_room_win_base/end`; the 16 TEST.BIN instructions that build the window's start or end in interpreted code (scenery slots, script block reads, the allocations past 0x800B3D54) are rewritten in the served file. Fixed scratch users (enemy files, sound banks, door model, title, typewriter, story text) stay at the old addresses. Quick saves from the other layout are refused | Headless, a 415744-byte stage 7 room 4: new game, game loads in stages 1, 5, 6, 7, 8, 14, four doors (one into the big room), quick saves in the room and mid-door: frames identical to no mod (forced move without mods: identical too). No-mod runs identical to the reference exe. Not yet: natural play, death/continue in a big room |
 | M22 | Stages 1, 5, 6 scenery blocks capped at their slots (20, 12, 23 sectors) | The four area records (STAGPROG.BIN 0x800F3060/68, 0x800F3668, 0x800F328C: byte 6 slots, byte 7 sectors, read only by TEST's scenery readers) get the biggest block's size, up to 255 sectors; the room window moves, bigger by (slots + 2) x the growth | Headless: the slots 6 sectors bigger (RT_SCENERY_SLOTS), walking in stage 1 (both areas), 5 and 6: frames identical; padded stage 5 blocks (12 -> 18 sectors) render the same, only later by their longer reads. Not yet: natural play through those stages |
@@ -120,10 +120,10 @@ parity proof.
 Asset-free checks:
 
 ```
-python tools/tests/modfs_test.py
-python tools/tests/pc_bitmap_test.py
-python tools/tests/modfs_memory_test.py
-python tools/tests/modmem_test.py
+python tools/tests/c_tests.py modfs_test
+python tools/tests/c_tests.py pc_bitmap_test
+python tools/tests/c_tests.py modfs_memory_test
+python tools/tests/c_tests.py modmem_test
 ```
 
 `CC` selects an existing compiler and target options. There are 48
@@ -173,7 +173,7 @@ No-mod CPU, original RAM, cycles, native VRAM and display pixels again
 match the preserved baseline at the controlled frame. Audio/video
 regression freedom across the whole game has not been established.
 
-[PC_BITMAPS.md](PC_BITMAPS.md) and [DYNAMIC_MOD_BUFFERS.md](DYNAMIC_MOD_BUFFERS.md)
+[PC_COMPATIBILITY.md#pc-message-pictures](PC_COMPATIBILITY.md#pc-message-pictures) and [MEMORY.md](MEMORY.md)
 document the implemented manifest adapter and default-off model arena.
 The final wave-3 runtime checks show native-trigger BMP display and diary
 BMP import on CPU/GPU, missing-source fallback identical to native pixels,
@@ -183,7 +183,7 @@ Missing arena metadata and disabling the option reject its saved state
 before application. No-mod controlled CPU/RAM/cycles/VRAM/pixels again
 match the preserved baseline. No complete interactive acceptance is claimed.
 
-[MODDING_LIMITS.md](MODDING_LIMITS.md) retains the original mapping and
+[STATUS.md#limits-and-memory-gates](STATUS.md#limits-and-memory-gates) retains the original mapping and
 ownership evidence. Importing every PC file automatically and making every
 fixed buffer unlimited remain outside the implemented contracts.
 
@@ -256,7 +256,7 @@ native selector outputs match their owned BMPs; actual CPU/GPU0/12, original
 fallback and real state-resume checks passed. At that stage the diary package had92 recognised files and1 blocker
 (BOOK.FLC); the subsequent book increment below closes that resource blocker.
 The then-current25 diary,14 package and9 key scenarios passed. These figures refer to resource coverage and controlled native
-execution, not a complete playthrough or desktop acceptance. See PC_DIARIES.md.
+execution, not a complete playthrough or desktop acceptance. See PC_COMPATIBILITY.md#pc-diaries.
 
 ## KEY-AB and corrected audio contract
 
@@ -265,7 +265,7 @@ selector arrows/EXIT panels. Original HUD callbacks, panel allocation, blink,
 selection, acquisition, page count, slides and input remain in use. Reader
 panel-mode0x800 and selector panel-mode0x40 are distinct, verified by actual
 menu entry; invalid/ambiguous owners fall back as a group. No renderer or
-enemy/gameplay changes are introduced. See PC_DIARIES.md for acceptance.
+enemy/gameplay changes are introduced. See PC_COMPATIBILITY.md#pc-diaries for acceptance.
 
 All11 mod-related regression suites pass. Actual runtime comparisons cover
 native no-mod identity, CPU/GPU keys, seven page changes and EXIT, matching
@@ -288,7 +288,7 @@ updates. CPU/GPU menu comparisons match the native file/model state and track
 countdowns across opening/open/page-turn/closing. The measured diary folder
 has93 recognized resources; that coverage figure refers only to that folder.
 The automatic ITEM/PIC adapter now has45 explicitly verified mappings and
-the original confirmation-mutation CRC guard. See PC_DIARIES.md and PC_BITMAPS.md.
+the original confirmation-mutation CRC guard. See PC_COMPATIBILITY.md#pc-diaries and PC_COMPATIBILITY.md#pc-message-pictures.
 Sparse D-NAME composition now skips transparent margins without changing art.
 
 Audio remains limited to proven mappings; the audit found that the PC plays
@@ -335,10 +335,10 @@ these picture results do not close full automatic PC-mod compatibility.
 ## Limits and memory gates
 
 Status updated 2026-11-04. This preserves the audit's direct source/disc
-evidence. The subsequent [explicit bitmap importer](PC_BITMAPS.md) and
-[experimental model arena](DYNAMIC_MOD_BUFFERS.md) are now implemented.
+evidence. The subsequent [explicit bitmap importer](PC_COMPATIBILITY.md#pc-message-pictures) and
+[experimental model arena](MEMORY.md) are now implemented.
 The model continuation also implements selective split compressed staging
-with ABI2 ownership; see DYNAMIC_MOD_BUFFERS.md for current behavior. Historical
+with ABI2 ownership; see MEMORY.md for current behavior. Historical
 fixed-staging limits below remain applicable to other consumers. These changes
 do not provide missing semantic mappings, unlimited fixed buffers
 or full-game acceptance. Historical line references below belong to the
@@ -360,7 +360,7 @@ wrong screen.
 `port/decomp/item_pickup.c` constructs the original pickup
 message at lines 259-300. The item-name pointer is read from
 `0x800A6D5C + item_id * 4` at line 276; wait/more/end codes are added at
-292-294. `port/src/modfs.c:own_picture` identifies BIGTIM separately
+292-294. `port/src/mods/modfs_data.inc:own_picture` identifies BIGTIM separately
 (lines 2352-2357). The existing UTF-8 interfaces preserve the native
 message path.
 
@@ -378,7 +378,7 @@ Fourteen files are the same placeholder. PIC43 and PIC46 are identical
 Andy diary messages, but original item0x46 is Young Man's Diary. The later
 consumer/content audit establishes45 explicit matching pictures, including
 PIC43; PIC46 and the14 placeholders remain excluded. Matching numeric names
-alone do not establish an identity. See PC_BITMAPS.md for current coverage.
+alone do not establish an identity. See PC_COMPATIBILITY.md#pc-message-pictures for current coverage.
 
 The implemented pickup raster adapter is keyed by the original
 item ID and suppresses only the corresponding visible glyphs, while still
@@ -415,7 +415,7 @@ is required; automatic aliases must not be invented.
 Document identity was checked from PC covers, PS1 title pages and the
 original FILE_NAMES table at `0x800CF420` in the status-screen module.
 The supported-disc page table and resource decoder are implemented in
-`port/src/modfs_diary.inc:diary_info`, `diary_slot` and `diary_apply`.
+`port/src/mods/modfs_diary.inc:diary_info`, `diary_slot` and `diary_apply`.
 
 | PC fileNN (hex) | PS1 document (decimal) | PS1 pages | Available numbered PC images |
 | --- | ---: | ---: | ---: |
@@ -449,7 +449,7 @@ does not reconstruct glyph data, timing or pagination.
 2 MiB separately identified. `port/src/rt.h:ram_ptr` permits extended
 addresses. This is an addressing capability, not an expanded game heap.
 
-`port/src/modfs.c:ext_alloc` (line 1949) consumes a static prefix after
+`port/src/mods/modfs_texts.inc:ext_alloc` consumes a static prefix after
 2 MiB. Only the used bytes are snapshotted in `ext_image_n` at boot.
 `modfs_state_loaded` (line 411) reapplies that prefix after state load.
 Mutable model, pose or animation state must never be placed in this
@@ -528,7 +528,7 @@ extended RAM.
 The model arena now follows these ownership boundaries, with conservative
 enemy preflight plus per-operation guards for later pickups/extras. It
 does not claim a complete budget for every future event or live fallback
-on exhaustion. See DYNAMIC_MOD_BUFFERS.md for the actual contract.
+on exhaustion. See MEMORY.md for the actual contract.
 
 A prerequisite defect was fixed independently: `Packed.was_len` now
 retains the original backup lengths, and `packs_done` checks them before
@@ -563,10 +563,10 @@ text pages cannot be fabricated. Automatic full-document conversion remains open
 
 The subsequent complete-document adapter handles the contents of all 13 measured
 PC diaries automatically, without asserting equal PC/PS1 page identities.
-[PC_DIARIES.md](PC_DIARIES.md) documents its exact companion sets, presentation,
+[PC_COMPATIBILITY.md#pc-diaries](PC_COMPATIBILITY.md#pc-diaries) documents its exact companion sets, presentation,
 priority and state rules. Explicit native page/crop adaptations remain supported.
 The PC labels, key atlas and book animation now have their own adapters;
-see PC_DIARIES.md. Full-game and desktop-control acceptance remain open.
+see PC_COMPATIBILITY.md#pc-diaries. Full-game and desktop-control acceptance remain open.
 Historical per-page audit limits above do not describe current content coverage.
 
 ### Resident scenery bound correction (2026-11-03)
@@ -575,6 +575,6 @@ The earlier 142-sector STGBG figure is not sufficient for resident scenery.
 Verified STGBG1 blocks0Ã¢â‚¬â€œ16, STGBG5 blocks2Ã¢â‚¬â€œ55 and STGBG6 blocks0Ã¢â‚¬â€œ13 have smaller
 original slots; `grow_all` now enforces those bounds for nested/whole growth,
 including explicit capacities. Oversized input falls back instead of being
-accepted into overlapping memory. See DYNAMIC_MOD_BUFFERS.md for exact sizes,
+accepted into overlapping memory. See MEMORY.md for exact sizes,
 original readers, tests and the unresolved ownership work. No general dynamic
 scenery buffer support is claimed.
