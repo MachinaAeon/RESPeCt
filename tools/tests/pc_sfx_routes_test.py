@@ -17,12 +17,13 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 import pc_mod
 
-# Cross-version numeric action IDs are not event identity evidence.
-ROUTES = (("DOG/SND-001.WAV", 23, 2),)
-UNPROVEN = ("DOG/SND-003.WAV", "DOG/SND-005.WAV", "DOG/SND-006.WAV",
-            "DOG/SND-008.WAV", "DOG/SND-009.WAV", "CROW/SND-002.WAV",
-            "CROW/SND-003.WAV", "CROW/SND-004.WAV", "RICKER/SND-004.WAV",
-            "RICKER/SND-007.WAV")
+# Routes are the PS1's own recordings (tools/mod_sfxnames.py: the same sound
+# by cross-correlation); numeric action IDs alone are not evidence. These
+# stay out: two equal candidates (DOG006) or below the threshold.
+ROUTES = (("DOG/SND-001.WAV", 23, 2), ("DOG/SND-003.WAV", 23, 4), ("CROW/SND-004.WAV", 22, 5),
+          ("ZOMBIE1/SND-002.WAV", 33, 3))
+UNPROVEN = ("DOG/SND-006.WAV", "CROW/SND-002.WAV", "CROW/SND-003.WAV",
+            "RICKER/SND-004.WAV", "RICKER/SND-007.WAV")
 
 
 def pcm(value=0):
@@ -75,7 +76,7 @@ class PcSfxRoutesTests(unittest.TestCase):
             self.assertEqual((root / "NOISE/023/02.WAV").read_bytes(), pcm())
 
     def test_unproven_and_cross_family_cues_stay_unsupported(self):
-        for path in UNPROVEN + ("RICKER/SND-005.WAV", "RICKER/SND-006.WAV", "RICKER/SND-008.WAV", "HUNTER/SND-004.WAV", "DOG/SND-004.WAV"):
+        for path in UNPROVEN + ("RICKER/SND-005.WAV", "RICKER/SND-006.WAV", "RICKER/SND-008.WAV", "HUNTER/SND-004.WAV"):
             with self.subTest(path=path):
                 self.assertIsNone(self.catalog.lookup("WAV/ENEMY/" + path))
         self.assertEqual(self.catalog.lookup("WAV/ENEMY/DOG/SND-001.WAV")["targets"], ["sound:23:sfx:2"])
@@ -90,7 +91,7 @@ class PcSfxRoutesTests(unittest.TestCase):
 int main(void) {
     FILE *f=fopen("cue.wav","wb"); check(f!=NULL,"audio fixture");
     fwrite("RIFF",1,4,f); fclose(f);
-    const char *names[]={"DOG/SND-003", "DOG/SND-005", "DOG/SND-006", "DOG/SND-008", "DOG/SND-009", "CROW/SND-002", "CROW/SND-003", "CROW/SND-004", "RICKER/SND-004", "RICKER/SND-007"};
+    const char *names[]={"DOG/SND-006", "CROW/SND-002", "CROW/SND-003", "RICKER/SND-004", "RICKER/SND-007"};
     for(unsigned i=0;i<sizeof names/sizeof names[0];i++) {
         char rel[256];snprintf(rel,sizeof rel,"PSX_DATA/WAV/ENEMY/%s.WAV",names[i]);
         apply("route-test",rel,"cue.wav");

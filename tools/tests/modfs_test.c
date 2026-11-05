@@ -250,14 +250,16 @@ int main(int argc,char **argv){
  }
  if(!strcmp(argv[1],"pc-audio-families")) {
    FILE *f=fopen("cue.wav","wb");check(f!=NULL,"audio fixture");fwrite("RIFF",1,4,f);fclose(f);
-   const struct {const char *name;unsigned block,vag;} rows[]={
-     {"DOG/SND-003",23,4},{"DOG/SND-005",23,12},{"DOG/SND-006",23,7},{"DOG/SND-008",23,9},{"DOG/SND-009",23,10},
-     {"CROW/SND-002",22,4},{"CROW/SND-003",22,3},{"CROW/SND-004",22,5}};
-   for(unsigned i=0;i<sizeof rows/sizeof rows[0];i++){
-     char rel[256];snprintf(rel,sizeof rel,"PSX_DATA/WAV/ENEMY/%s.WAV",rows[i].name);apply("test",rel,"cue.wav");
+   const char *unmatched[]={"DOG/SND-006","CROW/SND-002","CROW/SND-003","CROW/SND-006"};   /* (no same recording) */
+   for(unsigned i=0;i<sizeof unmatched/sizeof unmatched[0];i++){
+     char rel[256];snprintf(rel,sizeof rel,"PSX_DATA/WAV/ENEMY/%s.WAV",unmatched[i]);apply("test",rel,"cue.wav");
      check(nsfx==0,"numeric action identity is insufficient for automatic sound routing");
    }
-   apply("test","PSX_DATA/WAV/ENEMY/CROW/SND-006.WAV","cue.wav");check(nsfx==0,"unproven cue not inferred");
+   const struct {const char *name;unsigned block,vag;} rows[]={{"DOG/SND-005",23,6},{"CROW/SND-004",22,5}};   /* the same recordings */
+   for(unsigned i=0;i<sizeof rows/sizeof rows[0];i++){
+     char rel[256];snprintf(rel,sizeof rel,"PSX_DATA/WAV/ENEMY/%s.WAV",rows[i].name);apply("test",rel,"cue.wav");
+     check(nsfx==(int)i+1 && sfxs[i].block==rows[i].block && sfxs[i].vag==rows[i].vag,"a PC recording reaches the bank sound it is");
+   }
    puts("PASS");return 0;
  }
  if(!strcmp(argv[1],"pc-audio-route")) {

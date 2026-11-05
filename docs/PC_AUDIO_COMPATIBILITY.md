@@ -86,6 +86,26 @@ A longer sound can still be cut by the established bank budget; existing
 runtime diagnostics report that limit. General unlimited sound assets remain
 open.
 
+### PC sounds that are the PS1's recordings
+
+`modfs_pc_sfx.h` is written by `tools/mod_sfxnames.py` from the PC's
+`PSX_DATA` and an `extract` folder: each PC loose WAV is compared with every
+bank sound (both at 11025 Hz mono, full normalized cross-correlation at the
+best lag). A pair goes in only when it is the same recording: at least 0.94,
+no other bank sound within 0.08, lengths within 0.8-1.25. 45 PC files
+qualify: the zombies', dog's, crows', spider's, crocodile's, Ivy's and a
+licker's sounds, eight key sounds and one event; the PC's door, footstep and
+weapon sounds are other recordings. The method gives the event-verified
+DOG/SND-001 -> block 23 sound 2 independently (0.959). A replacement goes to
+that sound and its copies in the other banks. Checked in the headless
+runner: in stage 2 room 1, 328 of 416 notes played were the mod's sounds
+given by the PC's names (wav/enemy/dog).
+
+This replaces the numbering guesses below: DOG003/005/008/009 and CROW004
+are now routed by their recordings (DOG005 to bank 23's sound 6, not the 12
+its action number suggested); DOG006 (two equal candidates), CROW002/003
+and RICKER004/007 (below the threshold) stay out.
+
 ### Withdrawn loose-WAV candidates
 
 Ten previously listed aliases have been removed from automatic routing:

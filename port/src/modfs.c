@@ -277,8 +277,8 @@ static int pc_only_note(const char *mod, const char *rel, const char *up) {
     static const struct { const char *prefix, *what; } kinds[] = {
         {"MESSAGE/", "the PC's picture of a message; RESPeCt shows the PS1's messages as text: change them in text/ (written by extract)"},
         {"EVENTMSG/", "the PC's picture of a message; RESPeCt shows the PS1's messages as text: change them in text/ (written by extract)"},
-        {"WAV/", "a PC sound effect; the PS1's sounds are in its banks: give the one it stands for as NOISE/<bank>/<n>.wav (written by extract)"},
-        {"ITEM/WAV/", "a PC sound effect; the PS1's sounds are in its banks: give the one it stands for as NOISE/<bank>/<n>.wav (written by extract)"},
+        {"WAV/", "a PC sound effect that isn't one of the PS1's recordings (modfs_pc_sfx.h has those): give the PS1's sound it stands for as NOISE/<bank>/<n>.wav (written by extract)"},
+        {"ITEM/WAV/", "a PC sound effect that isn't one of the PS1's recordings (modfs_pc_sfx.h has those): give the PS1's sound it stands for as NOISE/<bank>/<n>.wav (written by extract)"},
         {"MENU/", "a picture of the PC's own menus, which the PS1 draws its own way"},
         {"ANM/", "an animation of the PC's own screens (the PS1 draws them its own way)"},
         {"ITEM/ITEM_", "the PC's own 3D model of an item (the PS1 shows its pictures, in BIGTIM)"},

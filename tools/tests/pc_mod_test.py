@@ -218,7 +218,7 @@ class PcModTests(unittest.TestCase):
         pc = self.catalog.lookup("WAV/ENEMY/DOG/SND-001.WAV")
         self.assertIsNotNone(pc)
         self.assertEqual(pc["targets"], self.catalog.lookup("NOISE/23/2.WAV")["targets"])
-        self.assertIsNone(self.catalog.lookup("WAV/ENEMY/DOG/SND-000.WAV"))
+        self.assertIsNone(self.catalog.lookup("WAV/ENEMY/DOG/SND-006.WAV"))   # (two equal candidates: not routed)
 
     def test_pc_noise_preflight_accepts_only_valid_atomic_package(self):
         import pc_noise
@@ -259,13 +259,16 @@ class PcModTests(unittest.TestCase):
             self.put("NOISE/23/2.wav",data)
             with self.subTest(kind=kind):self.assertEqual(self.scan()["summary"]["blocked"],1)
 
-    def test_unproven_dog_crow_events_are_not_automatically_assigned(self):
-        for family,cue,block,vag in [("DOG",3,23,4),("DOG",5,23,12),("DOG",6,23,7),("DOG",8,23,9),("DOG",9,23,10),("CROW",2,22,4),("CROW",3,22,3),("CROW",4,22,5)]:
+    def test_dog_crow_sounds_go_by_recording_not_by_number(self):
+        # The same recording (tools/mod_sfxnames.py) routes; a numbering guess doesn't:
+        # DOG005 is bank 23's sound 6, not the 12 its action number suggested.
+        for family,cue,block,vag in [("DOG",3,23,4),("DOG",5,23,6),("DOG",8,23,9),("DOG",9,23,10),("CROW",4,22,5)]:
             with self.subTest(family=family,cue=cue):
                 row=self.catalog.lookup(f"WAV/ENEMY/{family}/SND-{cue:03}.WAV")
-                self.assertIsNone(row)
-                self.assertIsNotNone(self.catalog.lookup(f"NOISE/{block}/{vag}.WAV"))
-        self.assertIsNone(self.catalog.lookup("WAV/ENEMY/CROW/SND-006.WAV"))
+                self.assertEqual(row["targets"],self.catalog.lookup(f"NOISE/{block}/{vag}.WAV")["targets"])
+        for family,cue in [("DOG",6),("CROW",2),("CROW",3),("CROW",6)]:
+            with self.subTest(family=family,cue=cue):
+                self.assertIsNone(self.catalog.lookup(f"WAV/ENEMY/{family}/SND-{cue:03}.WAV"))
 
     def test_verified_pickup_profiles_are_canvas_and_stream_guarded(self):
         for item,words,crc in [(1,31,'6702FD76'),(20,37,'B967BFF9'),(32,34,'BB38C67C'),(41,37,'9645E781'),(64,44,'C88BE6A5')]:
