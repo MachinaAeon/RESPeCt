@@ -11,6 +11,7 @@
 #endif
 
 #include "render.h"
+#include "render_gpu.h"
 #include "rt.h"
 
 #include <math.h>
@@ -32,6 +33,11 @@ static uint16_t *hires;                      /* (1024*S) x (512*S) */
  * which the PS1's whole pixels shut). The picture shown fills them from
  * the neighbouring pixels (Close model gaps). */
 static uint8_t *bare;
+/* 24-bit colour: the 3 bits of each 8-bit channel that the 15-bit picture
+ * drops (red in bits 0-2, green 3-5, blue 6-8), bit 15 set while they
+ * belong to the pixel there. The PS1's VRAM keeps its 15 bits; this only
+ * makes the picture shown finer. */
+static uint16_t *low;
 static size_t hires_n;
 /* Depth buffer for the high-resolution picture (1/z per pixel, 0 = far).
  * The PS1 has none: it draws a frame's polygons back to front in buckets
@@ -45,14 +51,31 @@ unsigned g_margin_hist[7];
 static float g_margin_depth = 64;
 static double g_margin_area = 8;                /* PS1 pixels (RT_MARGIN_AREA) */               /* GTE depth units behind (RT_MARGIN_DEPTH) */
 static double g_overlap = 0.75;                 /* PS1 pixels (RT_OVERLAP) */
-static float g_depth_tol = 24;                  /* touching surfaces keep the PS1's order (RT_DEPTH_TOL) */
+/* A model's own surfaces keep the PS1's order this close (RT_DEPTH_TOL,
+ * GTE depth units). 2 now, was 24 (or 0.4% of the distance): with the
+ * models' corners and depths in full precision (gte.c) a head and the
+ * shirt it pokes out of are told apart a few units apart, and with 24 the
+ * shirt, drawn later, came over the top of the head in some frames and not
+ * in others as the camera turned. */
+static float g_depth_tol = 2;
+static float g_depth_rel = 0;               /* ... or this share of the distance, if more (RT_DEPTH_REL) */
 static int g_fill_mark, g_sliver_mark;                          /* testing: RT_FILL_MARK fills the screen magenta (gaps show) */
 static int g_depth_any;                          /* testing: RT_DEPTH_ANY hides any model behind any */
 static int g_far_page = 1;                       /* RT_FAR_PAGE=0: off */
-static float g_cross_tol = 128;                  /* another object: hidden this far behind (RT_CROSS_TOL; 0 = never) */
+/* Another object: hidden this far behind (RT_CROSS_TOL; 0 = never). Never
+ * now (was 128): the PS1's order between objects stands, so a model
+ * reaching into another (a dead zombie's hand through the floor, the lab
+ * tyrant into its tank's frame) is drawn as on the PS1. Measured along the
+ * view, how far a hand is behind the floor grows with the distance and the
+ * slant, so with 128 hands sank into the floor more or less as you walked.
+ * A model's own parts are one object (same_object); a room's surfaces far
+ * behind its own walls still go (g_far_page). */
+static float g_cross_tol = 0;
 static double g_margin_len = 6;                  /* longest edge (PS1 pixels) of a triangle given the gap margin; RT_MARGIN_LEN */
 int g_gap_fill = 1; 
 int g_persp = 1;                                /* Perspective-correct textures (setting) */
+int g_smooth_tex = 1;                           /* Smooth textures (setting) */
+int g_true_color = 1;                           /* 24-bit colour (setting) */
                             /* Close model gaps (setting) */                                 /* testing: RT_TEX_EDGE samples the far texel edge too */
 static float *zbuf;
 /* What wrote each depth: the texture page and CLUT (a model part and its
@@ -106,11 +129,70 @@ static inline void put(uint16_t *d, uint16_t c, int semi, const RPrim *p) {
         c = (uint16_t)((c & 0x8000) | r | (g << 5) | (b << 10));
     }
     *d = c | (p->mask_set ? 0x8000 : 0);
-    if (bare && !semi) { size_t i = (size_t)(d - hires); if (i < hires_n) bare[i] = 0; }
+    if (hires) {
+        size_t i = (size_t)(d - hires);
+        if (i < hires_n) {
+            if (!semi) bare[i] = 0;
+            low[i] = 0;
+            if (!p->zt) zbuf[i] = -1;            /* 2D over it (see render_depth) */
+        }
+    }
 }
+
+/* The 24-bit colour plane's entry for a pixel of the high-resolution
+ * picture with 24-bit colour on; NULL otherwise (the PS1's VRAM). */
+static inline uint16_t *low_of(uint16_t *d) {
+    if (!g_true_color || !hires) return NULL;
+    size_t i = (size_t)(d - hires);
+    return i < hires_n ? &low[i] : NULL;
+}
+
+static inline int clamp8(int v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+/* put for 24-bit colour: 8-bit channels, blended in 8 bits (with the pixel
+ * there at its full precision), the top 5 bits to the picture and the rest
+ * to the low plane. */
+static inline void put8(uint16_t *d, uint16_t *lp, int r, int g, int b, int stp, int semi, const RPrim *p) {
+    if (p->mask_check && (*d & 0x8000)) return;
+    r = clamp8(r); g = clamp8(g); b = clamp8(b);
+    if (semi) {
+        int c5[3] = {*d & 31, (*d >> 5) & 31, (*d >> 10) & 31}, bk[3];
+        for (int k = 0; k < 3; k++)
+            bk[k] = (*lp & 0x8000) ? (c5[k] << 3) | ((*lp >> (3 * k)) & 7) : (c5[k] << 3) | (c5[k] >> 2);
+        switch (p->abr) {
+        case 0: r = (bk[0] + r) >> 1; g = (bk[1] + g) >> 1; b = (bk[2] + b) >> 1; break;
+        case 1: r = bk[0] + r; g = bk[1] + g; b = bk[2] + b; break;
+        case 2: r = bk[0] - r; g = bk[1] - g; b = bk[2] - b; break;
+        default: r = bk[0] + (r >> 2); g = bk[1] + (g >> 2); b = bk[2] + (b >> 2); break;
+        }
+        r = clamp8(r); g = clamp8(g); b = clamp8(b);
+    }
+    *d = (uint16_t)((stp ? 0x8000 : 0) | (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10) | (p->mask_set ? 0x8000 : 0));
+    *lp = (uint16_t)(0x8000 | (r & 7) | ((g & 7) << 3) | ((b & 7) << 6));
+    if (!semi) bare[lp - low] = 0;
+    if (!p->zt) zbuf[lp - low] = -1;
+}
+
+/* 5-bit channel to 8 bits, as the picture shows it */
+static inline int expand5(int c) { return (c << 3) | (c >> 2); }
 
 /* Shade one pixel: texture and/or colour, dithering, blending. */
 static inline void shade(const RPrim *p, uint16_t *d, int x, int y, int r, int g, int b, int u, int v, int dith) {
+    uint16_t *lp = low_of(d);
+    if (lp) {
+        /* 24-bit colour: lit in full precision, no dither (the PC
+         * version's Direct3D draws so). The game's colour 128 leaves a
+         * texel as it is, as on the PS1. */
+        if (p->textured) {
+            uint16_t t = texel(p, u, v);
+            if (!t) return;
+            int tr = expand5(t & 31), tg = expand5((t >> 5) & 31), tb = expand5((t >> 10) & 31);
+            if (!p->raw) { tr = (tr * r + 64) >> 7; tg = (tg * g + 64) >> 7; tb = (tb * b + 64) >> 7; }
+            put8(d, lp, tr, tg, tb, t & 0x8000, p->semi && (t & 0x8000), p);
+        } else
+            put8(d, lp, r, g, b, 0, p->semi, p);
+        return;
+    }
     if (p->textured) {
         uint16_t t = texel(p, u, v);
         if (!t) return;
@@ -189,15 +271,50 @@ static inline int hd_texel(const RPrim *p, float U, float V, const float *lo, fl
 /* 4x4 ordered dither, in 1/16ths of a 5-bit step */
 static const uint8_t bayer4[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 
-/* An HD texel, lit, to the 15-bit picture. The light is applied to the
- * image's full 8-bit colour and the result dithered down (finely, at the
- * high resolution): rounded to the PS1's 5 bits first, a smooth HD
- * texture under the game's shading shows hard bands, dark contour lines
- * that crawl as the light on a surface changes. */
+/* The game's own texture at texel position (U, V), fractions included,
+ * filtered as the PC version's Direct3D draws it: bilinear between the
+ * four texels around, leaving out the transparent ones (colour 0), so a
+ * cut-out edge doesn't darken. The nearest texel says transparent or not,
+ * and semi-transparent or not (its STP bit), as at 1x. lo: as hd_texel,
+ * the texels the polygon maps, which filtering stays inside. 0:
+ * transparent. Colours to 0..255. */
+static inline int smooth_texel(const RPrim *p, float U, float V, const float *lo, float *rgb, int *stp) {
+    uint16_t n = texel(p, (int)U, (int)V);
+    if (!n) return 0;
+    float x_lo = lo[0] + 0.5f, x_hi = lo[1] - 0.5f, y_lo = lo[2] + 0.5f, y_hi = lo[3] - 0.5f;
+    if (x_hi >= x_lo) U = U < x_lo ? x_lo : U > x_hi ? x_hi : U;
+    if (y_hi >= y_lo) V = V < y_lo ? y_lo : V > y_hi ? y_hi : V;
+    U -= 0.5f; V -= 0.5f;
+    int u0 = (int)floorf(U), v0 = (int)floorf(V);
+    float au = U - (float)u0, av = V - (float)v0;
+    uint16_t q[4] = {texel(p, u0, v0), texel(p, u0 + 1, v0), texel(p, u0, v0 + 1), texel(p, u0 + 1, v0 + 1)};
+    float wt[4] = {(1 - au) * (1 - av), au * (1 - av), (1 - au) * av, au * av};
+    float r = 0, g = 0, b = 0, sum = 0;
+    for (int i = 0; i < 4; i++) {
+        if (!q[i]) continue;
+        r += wt[i] * (float)(q[i] & 31);
+        g += wt[i] * (float)((q[i] >> 5) & 31);
+        b += wt[i] * (float)((q[i] >> 10) & 31);
+        sum += wt[i];
+    }
+    if (sum <= 0) { r = (float)(n & 31); g = (float)((n >> 5) & 31); b = (float)((n >> 10) & 31); sum = 1; }
+    const float k = 255.0f / 31.0f;
+    rgb[0] = r / sum * k; rgb[1] = g / sum * k; rgb[2] = b / sum * k;
+    *stp = (n & 0x8000) != 0;
+    return 1;
+}
+
+/* An HD texel or a smoothed game texel, lit, to the 15-bit picture. The
+ * light is applied to the full 8-bit colour and the result dithered down
+ * (finely, at the high resolution): rounded to the PS1's 5 bits first, a
+ * smooth texture under the game's shading shows hard bands, dark contour
+ * lines that crawl as the light on a surface changes. */
 static inline void shade_hd(const RPrim *p, uint16_t *d, int r, int g, int b, float U, float V, const float *lo, int x, int y) {
     float c[3];
     int stp;
-    if (!hd_texel(p, U, V, lo, c, &stp)) return;
+    if (!p->hd) {
+        if (!smooth_texel(p, U, V, lo, c, &stp)) return;
+    } else if (!hd_texel(p, U, V, lo, c, &stp)) return;
     /* blended where the game's own texel is (its STP bit): packs made for
      * Beetle PSX mostly leave alpha at 255, which would make a game's
      * see-through glows and glass solid */
@@ -205,8 +322,15 @@ static inline void shade_hd(const RPrim *p, uint16_t *d, int r, int g, int b, fl
     if (!p->raw) {
         c[0] *= (float)r * (1.0f / 128); c[1] *= (float)g * (1.0f / 128); c[2] *= (float)b * (1.0f / 128);
     }
-    /* 0..255 to 0..31 with the dither's fraction added */
-    float dt = ((float)bayer4[y & 3][x & 3] + 0.5f) * (1.0f / 16);
+    uint16_t *lp = low_of(d);
+    if (lp) {                                  /* 24-bit colour: as it is */
+        put8(d, lp, (int)(c[0] + 0.5f), (int)(c[1] + 0.5f), (int)(c[2] + 0.5f), stp, p->semi && stp, p);
+        return;
+    }
+    /* 0..255 to 0..31 with the dither's fraction added. A smoothed game
+     * texel keeps the PS1's brightness on average: its shading truncates
+     * (shade), so the dither is centred on 0 instead of 1/2. */
+    float dt = ((float)bayer4[y & 3][x & 3] + 0.5f) * (1.0f / 16) - (p->hd ? 0.0f : 0.5f);
     int o[3];
     for (int i = 0; i < 3; i++) {
         int v = (int)(c[i] * (31.0f / 255.0f) + dt);
@@ -231,13 +355,39 @@ static Plane plane(const double X[3], const double Y[3], double v0, double v1, d
 #define FIX 256                                    /* sub-pixel steps */
 
 int g_zp_on, g_zp_x, g_zp_y; unsigned g_zp_f;
-static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
+
+/* Everything about a triangle that doesn't depend on the pixel: raster_tri
+ * runs it over its pixels, the GPU renderer (render_gpu.c) packs it. */
+typedef struct {
+    int64_t ex[3], ey[3], ec[3], bias[3], mbias[3];
+    double margin;                               /* high-res pixels */
+    int guarded, zuse, ztest, zwrite, gour, dith, smooth, persp, pcol;
+    int umin, umax, vmin, vmax;
+    uint32_t id;
+    int x0, x1, y0, y1;                          /* clipped to the drawing area */
+    Plane pr, pg, pb, pu, pv, pw, qw, qu, qv, qr, qg, qb;
+    int32_t dr, dg, db, du, dv;
+} TriSetup;
+
+/* Two depth buffer ids (tri_setup) of one object: the same model if both
+ * models are known, else the same texture page and CLUT. */
+static inline int same_object(uint32_t a, uint32_t b) {
+    if ((a >> 21) && (b >> 21) && a != 0xFFFFFFFFu && b != 0xFFFFFFFFu) return (a >> 21) == (b >> 21);
+    return a == b;
+}
+
+static int tri_setup(const Target *t, const RPrim *p, TriSetup *q) {
     const RVtx *v = p->v;
     int s = t->scale;
-    /* hardware limit: polygons this large aren't drawn */
+    memset(q, 0, sizeof *q);
+    /* hardware limit: polygons this large aren't drawn. Not for 3D drawn
+     * in perspective at a higher resolution: there the game no longer
+     * splits close polygons (rt.c), and a wall right in front of you is
+     * one polygon far wider than the screen. */
     float minxf = fminf(v[0].x, fminf(v[1].x, v[2].x)), maxxf = fmaxf(v[0].x, fmaxf(v[1].x, v[2].x));
     float minyf = fminf(v[0].y, fminf(v[1].y, v[2].y)), maxyf = fmaxf(v[0].y, fmaxf(v[1].y, v[2].y));
-    if (maxxf - minxf >= 1024 || maxyf - minyf >= 512) return;
+    int whole = g_persp && p->zt == 2 && t->buf == hires && t->scale > 1;
+    if ((maxxf - minxf >= 1024 || maxyf - minyf >= 512) && !whole) return 0;
     int64_t X[3], Y[3];
     double Xd[3], Yd[3];
     for (int i = 0; i < 3; i++) {
@@ -247,18 +397,15 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
         Y[i] = (int64_t)llround(Yd[i] * FIX);
     }
     int64_t area = (X[1] - X[0]) * (Y[2] - Y[0]) - (X[2] - X[0]) * (Y[1] - Y[0]);
-    if (area == 0) return;
+    if (area == 0) return 0;
     int o[3] = {0, 1, 2};
     if (area < 0) { o[1] = 2; o[2] = 1; }
     /* edges: e opposite vertex o[e], from o[e+1] to o[e+2] */
-    int64_t ex[3], ey[3], ec[3];
-    int64_t bias[3], mbias[3];
-    /* Opaque 3D at a higher resolution gets a margin, up to a PS1 pixel
-     * wide, drawn only over what lies well behind it (the depth buffer
-     * says): the PS1's whole pixels close the gaps a model's tiny
-     * triangles and its parts leave between them, gaps that a sharper
-     * picture shows (and that open and shut as models move: flicker). The
-     * model's own triangles, at its own depth, are never drawn over. */
+    /* Opaque 3D at a higher resolution gets a hairline margin (half a
+     * pixel) against the cracks between a model's own triangles. The gaps
+     * between its parts, which the PS1's whole pixels close and a sharper
+     * picture shows, are filled when the picture is shown (Close model
+     * gaps, display.c), so outlines keep their size. */
     int zuse = p->zt && zbuf && t->buf == hires && s > 1;
     double margin = 0;                           /* high-res pixels */
     int guarded = 0;                             /* only over what lies well behind */
@@ -276,7 +423,9 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     int sliver = cross2 * cross2 < 0.0625 * len2;     /* height = cross / length < 1/4 */
     if (zuse && !p->semi && !g_no_overlap && !sliver) {
         margin = 0.5;                            /* hairlines between a model's triangles */
-        if (g_gap_fill) {                        /* Close model gaps: small triangles (distant models) */
+        static int grow = -1;                    /* RT_GAP_GROW: the old Close model gaps, for comparisons */
+        if (grow < 0) grow = getenv("RT_GAP_GROW") != NULL;
+        if (g_gap_fill && grow) {                /* small triangles (distant models) drawn larger */
             double a = fabs((double)(v[1].x - v[0].x) * (v[2].y - v[0].y) - (double)(v[2].x - v[0].x) * (v[1].y - v[0].y)) / 2;
             double m = g_overlap * s;
             /* small in every direction: long thin slivers (the game's
@@ -295,13 +444,13 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     }
     for (int e = 0; e < 3; e++) {
         int a = o[(e + 1) % 3], b = o[(e + 2) % 3];
-        ex[e] = -(Y[b] - Y[a]);                   /* d/dx */
-        ey[e] = (X[b] - X[a]);                    /* d/dy */
-        ec[e] = -(ex[e] * X[a] + ey[e] * Y[a]);
+        q->ex[e] = -(Y[b] - Y[a]);                /* d/dx */
+        q->ey[e] = (X[b] - X[a]);                 /* d/dy */
+        q->ec[e] = -(q->ex[e] * X[a] + q->ey[e] * Y[a]);
         int dy = (int)(Y[b] - Y[a]), dx = (int)(X[b] - X[a]);
         int top_left = (dy < 0) || (dy == 0 && dx > 0);
-        bias[e] = top_left ? 0 : -1;
-        mbias[e] = bias[e] + (int64_t)(margin * FIX * sqrt((double)ex[e] * ex[e] + (double)ey[e] * ey[e]));
+        q->bias[e] = top_left ? 0 : -1;
+        q->mbias[e] = q->bias[e] + (int64_t)(margin * FIX * sqrt((double)q->ex[e] * q->ex[e] + (double)q->ey[e] * q->ey[e]));
     }
     int x0 = (int)floor(minxf * s), x1 = (int)ceil(maxxf * s);
     int y0 = (int)floor(minyf * s), y1 = (int)ceil(maxyf * s);
@@ -311,22 +460,28 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
     if (x1 > cx1) x1 = cx1;
     if (y0 < cy0) y0 = cy0;
     if (y1 > cy1) y1 = cy1;
-    if (y0 < band0) y0 = band0;
-    if (y1 >= band1) y1 = band1 - 1;
-    if (x0 > x1 || y0 > y1) return;
+    if (x0 > x1 || y0 > y1) return 0;
+    q->x0 = x0; q->x1 = x1; q->y0 = y0; q->y1 = y1;
+    q->margin = margin;
+    q->guarded = guarded;
+    q->zuse = zuse;
 
-    Plane pr = {0}, pg = {0}, pb = {0}, pu = {0}, pv = {0};
     int gour = p->gouraud;
     if (gour) {
-        pr = plane(Xd, Yd, v[0].r, v[1].r, v[2].r);
-        pg = plane(Xd, Yd, v[0].g, v[1].g, v[2].g);
-        pb = plane(Xd, Yd, v[0].b, v[1].b, v[2].b);
+        q->pr = plane(Xd, Yd, v[0].r, v[1].r, v[2].r);
+        q->pg = plane(Xd, Yd, v[0].g, v[1].g, v[2].g);
+        q->pb = plane(Xd, Yd, v[0].b, v[1].b, v[2].b);
     }
     if (p->textured) {
-        pu = plane(Xd, Yd, v[0].u, v[1].u, v[2].u);
-        pv = plane(Xd, Yd, v[0].v, v[1].v, v[2].v);
+        q->pu = plane(Xd, Yd, v[0].u, v[1].u, v[2].u);
+        q->pv = plane(Xd, Yd, v[0].v, v[1].v, v[2].v);
     }
-    int dith = p->dither && s == 1 && (gour || (p->textured && !p->raw));
+    q->gour = gour;
+    q->dith = p->dither && s == 1 && (gour || (p->textured && !p->raw));
+    /* Smooth textures: the game's own textures on 3D surfaces (every corner
+     * from the GTE) in the high-resolution picture; 2D (menus, the HUD,
+     * text) keeps its sharp texels. */
+    q->smooth = g_smooth_tex && p->textured && p->zt && s > 1 && t->buf == hires;
     /* Texture coordinates stay off the far edge of the triangle's texture
      * area (its largest u and v), as on the PS1: it never draws a
      * triangle's right and bottom edge, so at 1x the texel column and row
@@ -342,29 +497,44 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
         if (umax > umin) umax--;
         if (vmax > vmin) vmax--;
     }
+    q->umin = umin; q->umax = umax; q->vmin = vmin; q->vmax = vmax;
     /* depth: 1/z, linear on the screen */
-    int ztest = zuse && g_depth_buffer;              /* the Depth fix setting */
+    q->ztest = zuse && g_depth_buffer;               /* the Depth fix setting */
     /* Slivers (the game's thin highlight strips, edge on surfaces) don't
      * hide anything: what the game draws over them still covers them. */
-    int zwrite = zuse && !sliver;
+    q->zwrite = zuse && !sliver;
     /* texture page and CLUT: a model part's own triangles share both;
      * decals (a dart board on a wall) and other objects drawn with the
      * room's page have their own CLUT */
-    uint32_t id = p->textured ? 1u + (uint32_t)(p->tx >> 6) + ((uint32_t)(p->ty >> 8) << 4) +
-                                ((uint32_t)(p->clut_x >> 4) << 5) + ((uint32_t)p->clut_y << 11)
-                              : 0xFFFFFFFFu;
-    Plane pw = {0};
-    if (zuse) pw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
+    q->id = p->textured ? 1u + (uint32_t)(p->tx >> 6) + ((uint32_t)(p->ty >> 8) << 4) +
+                          ((uint32_t)(p->clut_x >> 4) << 5) + ((uint32_t)p->clut_y << 11)
+                        : 0xFFFFFFFFu;
+    /* and the model it belongs to, when known (the root of its matrices'
+     * chain, gte.c), in the top bits: a model's parts often have pages of
+     * their own (a zombie's head and torso), and they are one object */
+    if (p->textured && p->obj) q->id |= (((p->obj * 0x9E3779B1u) >> 21) | 1u) << 21;
+    if (zuse) q->pw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
     /* Perspective-correct textures (a 3D polygon, every corner's depth
      * known): the PS1 interpolates u and v straight across the screen,
      * which bends a texture's straight lines across big polygons and makes
      * them swim as the view moves; sharp HD textures show it most. */
-    int persp = g_persp && p->textured && p->zt == 2 && v[0].z > 0 && v[1].z > 0 && v[2].z > 0;
-    Plane qw = {0}, qu = {0}, qv = {0};
+    int pz = g_persp && p->zt == 2 && v[0].z > 0 && v[1].z > 0 && v[2].z > 0;
+    int persp = pz && p->textured;
+    /* The same for the colours at the corners (the game's lighting and
+     * depth fog): spread straight across the screen, the light and shadow
+     * on a wall slide over it as you walk, most where the game splits
+     * close polygons into smaller ones. Direct3D (the PC version) spreads
+     * them in perspective. */
+    int pcol = pz && gour;
+    if (persp || pcol) q->qw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
+    if (pcol) {
+        q->qr = plane(Xd, Yd, v[0].r / v[0].z, v[1].r / v[1].z, v[2].r / v[2].z);
+        q->qg = plane(Xd, Yd, v[0].g / v[0].z, v[1].g / v[1].z, v[2].g / v[2].z);
+        q->qb = plane(Xd, Yd, v[0].b / v[0].z, v[1].b / v[1].z, v[2].b / v[2].z);
+    }
     if (persp) {
-        qw = plane(Xd, Yd, 1.0 / v[0].z, 1.0 / v[1].z, 1.0 / v[2].z);
-        qu = plane(Xd, Yd, v[0].u / v[0].z, v[1].u / v[1].z, v[2].u / v[2].z);
-        qv = plane(Xd, Yd, v[0].v / v[0].z, v[1].v / v[1].z, v[2].v / v[2].z);
+        q->qu = plane(Xd, Yd, v[0].u / v[0].z, v[1].u / v[1].z, v[2].u / v[2].z);
+        q->qv = plane(Xd, Yd, v[0].v / v[0].z, v[1].v / v[1].z, v[2].v / v[2].z);
         static int pl = -1;
         if (pl < 0) pl = getenv("RT_PERSP_LOG") != NULL;
         if (pl) {
@@ -374,9 +544,33 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                        v[0].x, v[0].y, v[1].x, v[1].y, v[2].x, v[2].y, v[0].u, v[0].v, v[1].u, v[1].v, v[2].u, v[2].v);
         }
     }
+    q->persp = persp;
+    q->pcol = pcol;
     const int32_t one = 65536;
-    int32_t dr = (int32_t)(pr.a * one), dg = (int32_t)(pg.a * one), db = (int32_t)(pb.a * one);
-    int32_t du = (int32_t)(pu.a * one), dv = (int32_t)(pv.a * one);
+    q->dr = (int32_t)(q->pr.a * one); q->dg = (int32_t)(q->pg.a * one); q->db = (int32_t)(q->pb.a * one);
+    q->du = (int32_t)(q->pu.a * one); q->dv = (int32_t)(q->pv.a * one);
+    return 1;
+}
+
+static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
+    TriSetup q;
+    if (!tri_setup(t, p, &q)) return;
+    const RVtx *v = p->v;
+    int s = t->scale;
+    int x0 = q.x0, x1 = q.x1, y0 = q.y0, y1 = q.y1;
+    if (y0 < band0) y0 = band0;
+    if (y1 >= band1) y1 = band1 - 1;
+    if (y0 > y1) return;
+    const int64_t *ex = q.ex, *ey = q.ey, *ec = q.ec, *bias = q.bias, *mbias = q.mbias;
+    double margin = q.margin;
+    int guarded = q.guarded, zuse = q.zuse, ztest = q.ztest, zwrite = q.zwrite, gour = q.gour, dith = q.dith;
+    int smooth = q.smooth, persp = q.persp, pcol = q.pcol;
+    int umin = q.umin, umax = q.umax, vmin = q.vmin, vmax = q.vmax;
+    uint32_t id = q.id;
+    Plane pr = q.pr, pg = q.pg, pb = q.pb, pu = q.pu, pv = q.pv, pw = q.pw;
+    Plane qw = q.qw, qu = q.qu, qv = q.qv, qr = q.qr, qg = q.qg, qb = q.qb;
+    const int32_t one = 65536;
+    int32_t dr = q.dr, dg = q.dg, db = q.db, du = q.du, dv = q.dv;
     for (int y = y0; y <= y1; y++) {
         int64_t py = (int64_t)y * FIX;
         int64_t w[3];
@@ -398,14 +592,14 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
         float *zrow = zuse ? zbuf + (size_t)y * t->stride : NULL;
         uint32_t *idrow = zuse ? zid + (size_t)y * t->stride : NULL;
         double wz = zuse ? pw.a * x0 + pw.b * y + pw.c : 0;
-        double qwv = 0, quv = 0, qvv = 0;
-        if (persp) {
-            /* sampled at the pixel's centre, as the affine values are */
-            qwv = qw.a * x0 + qw.b * y + qw.c; quv = qu.a * x0 + qu.b * y + qu.c; qvv = qv.a * x0 + qv.b * y + qv.c;
-        }
-        for (int x = x0; x <= x1; x++, wz += pw.a, qwv += qw.a, quv += qu.a, qvv += qv.a) {
+        double qwv = 0, quv = 0, qvv = 0, qrv = 0, qgv = 0, qbv = 0;
+        /* sampled at the pixel's centre, as the affine values are */
+        if (persp || pcol) qwv = qw.a * x0 + qw.b * y + qw.c;
+        if (persp) { quv = qu.a * x0 + qu.b * y + qu.c; qvv = qv.a * x0 + qv.b * y + qv.c; }
+        if (pcol) { qrv = qr.a * x0 + qr.b * y + qr.c; qgv = qg.a * x0 + qg.b * y + qg.c; qbv = qb.a * x0 + qb.b * y + qb.c; }
+        for (int x = x0; x <= x1; x++, wz += pw.a, qwv += qw.a, quv += qu.a, qvv += qv.a, qrv += qr.a, qgv += qg.a, qbv += qb.a) {
+            double iz = (persp || pcol) && qwv > 0 ? 1.0 / qwv : 0;
             if (persp && qwv > 0) {
-                double iz = 1.0 / qwv;
                 u = (int32_t)(quv * iz * one) + one / 1024;
                 vv = (int32_t)(qvv * iz * one) + one / 1024;
             }
@@ -436,9 +630,9 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                     float zs = zrow[x];
                     if ((float)wz > zs * 0.88f && (float)wz < zs) {
                         float behind = 1.0f / (float)wz - 1.0f / zs;   /* in GTE depth units */
-                        float tol = 0.004f / zs;
+                        float tol = g_depth_rel / zs;
                         if (tol < g_depth_tol) tol = g_depth_tol;
-                        if (behind > tol && (idrow[x] == id || g_depth_any)) goto next;
+                        if (behind > tol && (same_object(idrow[x], id) || g_depth_any)) goto next;
                         /* Another object's surface well in front (the
                          * PS1 sorts whole polygons, so a stair rail can
                          * come after the ceiling it's behind): hidden
@@ -457,14 +651,19 @@ static void raster_tri(const Target *t, int band0, int band1, const RPrim *p) {
                     if (zwrite && core == 1 && !p->semi && (!p->textured || texel(p, tu, tv))) { zrow[x] = (float)wz; idrow[x] = id; }
                 }
                 int cr = v[0].r, cg = v[0].g, cb = v[0].b;
-                if (gour) {
+                if (pcol && qwv > 0) {
+                    cr = (int)(qrv * iz + 0.5); cg = (int)(qgv * iz + 0.5); cb = (int)(qbv * iz + 0.5);
+                    cr = cr < 0 ? 0 : cr > 255 ? 255 : cr;
+                    cg = cg < 0 ? 0 : cg > 255 ? 255 : cg;
+                    cb = cb < 0 ? 0 : cb > 255 ? 255 : cb;
+                } else if (gour) {
                     cr = r >> 16; cg = g >> 16; cb = b >> 16;
                     cr = cr < 0 ? 0 : cr > 255 ? 255 : cr;
                     cg = cg < 0 ? 0 : cg > 255 ? 255 : cg;
                     cb = cb < 0 ? 0 : cb > 255 ? 255 : cb;
                 }
                 if (g_sliver_mark && zuse && !zwrite) { row[x] = core == 2 ? 0x03E0 : 0x001F; goto next; }
-                if (p->hd) {
+                if (p->hd || smooth) {
                     float U = (float)u * (1.0f / 65536), V = (float)vv * (1.0f / 65536);
                     float ulo = (float)umin, uhi = (float)umax + 0.999f, vlo = (float)vmin, vhi = (float)vmax + 0.999f;
                     U = U < ulo ? ulo : U > uhi ? uhi : U;
@@ -628,6 +827,7 @@ static void run_ops(int band0, int band1) {
                 for (int x = o->x * S; x < (o->x + o->w) * S; x++) {
                     size_t i = (size_t)yy * hires_t.stride + (x % (1024 * S));
                     hires[i] = g_fill_mark && o->w >= 256 ? 0x7C1F : o->color;
+                    low[i] = 0;
                     zbuf[i] = 0;
                     bare[i] = o->w >= 256 && o->h >= 128;
                 }
@@ -648,12 +848,218 @@ static void run_ops(int band0, int band1) {
                 for (int x = 0; x < o->w * S; x++) {
                     size_t i = (size_t)yy * hires_t.stride + ((o->x * S + x) % (1024 * S));
                     hires[i] = src[x / S];
+                    low[i] = 0;
                     bare[i] = 0;
+                    zbuf[i] = -1;
                 }
             }
             break;
         }
     }
+}
+
+/* ------------------------------------------------------------ the graphics card */
+
+/* Draw with the graphics card (setting): the queue runs there instead of
+ * on the worker threads (render_gpu.c). The arrays above then hold what was
+ * last read back from it, for the picture shown. */
+int g_gpu = 0;
+static int gpu_on, gpu_dirty;
+static uint32_t *gops;
+static size_t gops_cap;
+static uint16_t *gpool;
+static size_t gpool_n, gpool_cap;
+static int want_x, want_y, want_w, want_h;     /* the area the picture shown needs (high-res), or none */
+
+static void put_d(uint32_t *w, int at, double d) { memcpy(&w[at], &d, 8); }
+
+static uint32_t *gop_new(int *n) {
+    if ((size_t)(*n + 1) * GOP_WORDS > gops_cap) {
+        gops_cap = gops_cap ? gops_cap * 2 : (size_t)4096 * GOP_WORDS;
+        gops = realloc(gops, gops_cap * 4);
+    }
+    uint32_t *w = gops + (size_t)(*n)++ * GOP_WORDS;
+    memset(w, 0, GOP_WORDS * 4);
+    return w;
+}
+
+static void gop_prim_common(uint32_t *w, const RPrim *p) {
+    w[GO_FLAGS] = (p->textured ? GF_TEX : 0) | (p->raw ? GF_RAW : 0) | (p->semi ? GF_SEMI : 0) |
+                  ((uint32_t)(p->abr & 3) << GF_ABR_SH) | ((uint32_t)(p->depth & 3) << GF_DEPTH_SH) |
+                  (p->mask_set ? GF_MSET : 0) | (p->mask_check ? GF_MCHK : 0) | (p->zt ? GF_ZT : 0);
+    if (p->textured && p->hd && rgpu_hd_add(p->hd, &w[GO_HD_OFFSET])) {
+        w[GO_FLAGS] |= GF_HD;
+        w[GO_HD_W] = (uint32_t)p->hd->w;
+        w[GO_HD_H] = (uint32_t)p->hd->h;
+        memcpy(&w[GO_HD_OX], &p->hd_ox, sizeof(float));
+        memcpy(&w[GO_HD_OY], &p->hd_oy, sizeof(float));
+        memcpy(&w[GO_HD_KX], &p->hd_kx, sizeof(float));
+        memcpy(&w[GO_HD_KY], &p->hd_ky, sizeof(float));
+    }
+    w[GO_TEX] = (uint32_t)(p->tx & 0xFFFF) | ((uint32_t)p->ty << 16);
+    w[GO_CLUT] = (uint32_t)(p->clut_x & 0xFFFF) | ((uint32_t)p->clut_y << 16);
+    w[GO_TWIN] = (uint32_t)(p->twmx & 0xFF) | ((uint32_t)(p->twmy & 0xFF) << 8) | ((uint32_t)(p->twox & 0xFF) << 16) |
+                 ((uint32_t)(p->twoy & 0xFF) << 24);
+    w[GO_COLOR] = (uint32_t)(p->v[0].r & 0xFF) | ((uint32_t)(p->v[0].g & 0xFF) << 8) | ((uint32_t)(p->v[0].b & 0xFF) << 16);
+}
+
+/* A rectangle (the area raster_rect draws) as an op. */
+static void gop_rect(int *n, const RPrim *p, int nx, int ny, int pw, int ph, int r, int g, int b) {
+    int s = S;
+    int x0 = nx * s, y0 = ny * s, x1 = (nx + pw) * s - 1, y1 = (ny + ph) * s - 1;
+    int cx0 = p->dx1 * s, cx1 = (p->dx2 + 1) * s - 1, cy0 = p->dy1 * s, cy1 = (p->dy2 + 1) * s - 1;
+    int ys = y0 > cy0 ? y0 : cy0, ye = y1 < cy1 ? y1 : cy1;
+    int xs = x0 > cx0 ? x0 : cx0, xe = x1 < cx1 ? x1 : cx1;
+    double sq0 = 0, sqk = 0;
+    if (p->sqx1 > p->sqx0) {
+        sq0 = p->sqx0 * s;
+        sqk = pw / ((p->sqx1 - p->sqx0) * s);
+        xs = (int)ceil(sq0 - 0.5);
+        xe = (int)ceil(p->sqx1 * s - 0.5) - 1;
+        if (xs < cx0) xs = cx0;
+        if (xe > cx1) xe = cx1;
+    }
+    if (xs > xe || ys > ye) return;
+    uint32_t *w = gop_new(n);
+    w[GO_KIND] = GK_RECT;
+    gop_prim_common(w, p);
+    w[GO_COLOR] = (uint32_t)(r & 0xFF) | ((uint32_t)(g & 0xFF) << 8) | ((uint32_t)(b & 0xFF) << 16);
+    w[GO_FLAGS] |= (p->flipx ? GF_FLIPX : 0) | (p->flipy ? GF_FLIPY : 0) | (sqk > 0 ? GF_SQ : 0);
+    w[GO_X0] = (uint32_t)xs; w[GO_X1] = (uint32_t)xe; w[GO_Y0] = (uint32_t)ys; w[GO_Y1] = (uint32_t)ye;
+    w[GO_RX] = (uint32_t)nx; w[GO_RY] = (uint32_t)ny; w[GO_RW] = (uint32_t)pw; w[GO_RH] = (uint32_t)ph;
+    w[GO_U0V0] = (uint32_t)(p->v[0].u & 0xFFFF) | ((uint32_t)(p->v[0].v & 0xFFFF) << 16);
+    put_d(w, GO_SQ0, sq0);
+    put_d(w, GO_SQK, sqk);
+}
+
+/* The queue as the card's ops. */
+static int gpu_pack(void) {
+    int n = 0;
+    gpool_n = 0;
+    for (int i = 0; i < nq; i++) {
+        Op *o = &queue[i];
+        if (o->op == OP_PRIM && o->prim.kind == RP_TRI) {
+            const RPrim *p = &o->prim;
+            TriSetup q;
+            if (!tri_setup(&hires_t, p, &q)) continue;
+            uint32_t *w = gop_new(&n);
+            w[GO_KIND] = GK_TRI;
+            gop_prim_common(w, p);
+            w[GO_FLAGS] |= (q.gour ? GF_GOUR : 0) | (q.smooth ? GF_SMOOTH : 0) | (q.persp ? GF_PERSP : 0) |
+                           (q.pcol ? GF_PCOL : 0) | (q.zuse ? GF_ZUSE : 0) | (q.ztest ? GF_ZTEST : 0) |
+                           (q.zwrite ? GF_ZWRITE : 0) | (q.guarded ? GF_GUARD : 0) | (q.margin > 0 ? GF_MARGIN : 0);
+            w[GO_X0] = (uint32_t)q.x0; w[GO_X1] = (uint32_t)q.x1; w[GO_Y0] = (uint32_t)q.y0; w[GO_Y1] = (uint32_t)q.y1;
+            w[GO_UV] = (uint32_t)(q.umin & 0xFF) | ((uint32_t)(q.umax & 0xFF) << 8) | ((uint32_t)(q.vmin & 0xFF) << 16) |
+                       ((uint32_t)(q.vmax & 0xFF) << 24);
+            w[GO_ID] = q.id;
+            w[GO_DU] = (uint32_t)q.du; w[GO_DV] = (uint32_t)q.dv;
+            w[GO_DR] = (uint32_t)q.dr; w[GO_DG] = (uint32_t)q.dg; w[GO_DB] = (uint32_t)q.db;
+            for (int e = 0; e < 3; e++) {
+                w[GO_BIAS + e] = (uint32_t)(int32_t)q.bias[e];
+                put_d(w, GO_EX + 2 * e, (double)q.ex[e]);
+                put_d(w, GO_EY + 2 * e, (double)q.ey[e]);
+                put_d(w, GO_EC + 2 * e, (double)q.ec[e]);
+                put_d(w, GO_MB + 2 * e, (double)q.mbias[e]);
+            }
+            const Plane *pl[12] = {&q.pr, &q.pg, &q.pb, &q.pu, &q.pv, &q.pw, &q.qw, &q.qu, &q.qv, &q.qr, &q.qg, &q.qb};
+            for (int k = 0; k < 12; k++) {
+                put_d(w, GO_PL + k * 6, pl[k]->a);
+                put_d(w, GO_PL + k * 6 + 2, pl[k]->b);
+                put_d(w, GO_PL + k * 6 + 4, pl[k]->c);
+            }
+        } else if (o->op == OP_PRIM && o->prim.kind == RP_RECT) {
+            const RPrim *p = &o->prim;
+            gop_rect(&n, p, (int)p->v[0].x, (int)p->v[0].y, p->w, p->h, p->v[0].r, p->v[0].g, p->v[0].b);
+        } else if (o->op == OP_PRIM) {               /* a line: its PS1 pixels, as raster_line steps them */
+            const RPrim *p = &o->prim;
+            RPrim q = *p;
+            q.sqx0 = q.sqx1 = 0;
+            q.flipx = q.flipy = 0;
+            q.v[0].u = q.v[0].v = 0;
+            int ax = (int)lroundf(p->v[0].x), ay = (int)lroundf(p->v[0].y);
+            int bx = (int)lroundf(p->v[1].x), by = (int)lroundf(p->v[1].y);
+            int dx = bx - ax, dy = by - ay;
+            if (abs(dx) >= 1024 || abs(dy) >= 512) continue;
+            int m = abs(dx) > abs(dy) ? abs(dx) : abs(dy);
+            for (int k = 0; k <= m; k++) {
+                int x = m ? ax + (dx * k + (dx >= 0 ? m / 2 : -m / 2)) / m : ax;
+                int y = m ? ay + (dy * k + (dy >= 0 ? m / 2 : -m / 2)) / m : ay;
+                if (x < p->dx1 || x > p->dx2 || y < p->dy1 || y > p->dy2) continue;
+                int r = p->v[0].r, g = p->v[0].g, b = p->v[0].b;
+                if (p->gouraud && m) {
+                    r += (p->v[1].r - r) * k / m;
+                    g += (p->v[1].g - g) * k / m;
+                    b += (p->v[1].b - b) * k / m;
+                }
+                gop_rect(&n, &q, x, y, 1, 1, r, g, b);
+            }
+        } else {
+            uint32_t *w = gop_new(&n);
+            w[GO_RX] = (uint32_t)o->x; w[GO_RY] = (uint32_t)o->y; w[GO_RW] = (uint32_t)o->w; w[GO_RH] = (uint32_t)o->h;
+            if (o->op == OP_FILL) {
+                w[GO_KIND] = GK_FILL;
+                w[GO_FILLC] = o->color;
+                w[GO_FLAGS] = o->w >= 256 && o->h >= 128 ? GF_BIGFILL : 0;
+            } else if (o->op == OP_ZCLEAR)
+                w[GO_KIND] = GK_ZCLEAR;
+            else {
+                w[GO_KIND] = GK_UPLOAD;
+                size_t k = (size_t)o->w * o->h;
+                if (gpool_n + k > gpool_cap) {
+                    gpool_cap = (gpool_n + k) * 2;
+                    gpool = realloc(gpool, gpool_cap * sizeof *gpool);
+                }
+                memcpy(gpool + gpool_n, o->pixels, k * sizeof *gpool);
+                w[GO_POOL] = (uint32_t)gpool_n;
+                gpool_n += k;
+            }
+        }
+    }
+    return n;
+}
+
+static void gpu_run(void) {
+    int n = gpu_pack();
+    GpuParams gp = {g_depth_tol, g_cross_tol, g_margin_depth, g_depth_rel, g_true_color, g_far_page, g_depth_any, g_margin_any};
+    rgpu_draw(gops, n, gpool, gpool_n, &g_vram[0][0], &gp);
+    gpu_dirty = 1;
+}
+
+/* The arrays up to date with the card, where the picture shown needs them. */
+static void gpu_fetch(void) {
+    if (!gpu_on || !gpu_dirty) return;
+    if (want_w > 0) rgpu_read(want_x, want_y, want_w, want_h, hires, low, bare, zbuf);
+    else rgpu_read(0, 0, 1024 * S, 512 * S, hires, low, bare, zbuf);
+    gpu_dirty = 0;
+    want_w = 0;
+}
+
+void render_want(int x, int y, int w, int h) { want_x = x; want_y = y; want_w = w; want_h = h; }
+
+int render_on_gpu(void) { return gpu_on; }
+
+/* The graphics card setting changed while running: the high-resolution
+ * picture moves over to the card or back. 0: drawing stays as it was (no
+ * usable card). */
+int render_set_gpu(int on) {
+    g_gpu = on;
+    if (!!on == gpu_on || S == 1) return 1;
+    render_sync();
+    if (on) {
+        if (!rgpu_init(S)) return 0;
+        if (zid) memset(zid, 0, hires_n * sizeof *zid);
+        rgpu_write(hires, low, bare, zbuf, zid);
+        gpu_on = 1;
+        gpu_dirty = 0;
+    } else {
+        gpu_dirty = 1;
+        want_w = 0;
+        gpu_fetch();                             /* the whole picture back, for the CPU to go on from */
+        gpu_on = 0;
+        if (S > 4) render_set_scale(4);
+    }
+    rt_log("renderer: now drawing with the %s", gpu_on ? "graphics card" : "processor");
+    return 1;
 }
 
 /* ------------------------------------------------------------ workers */
@@ -728,14 +1134,18 @@ void render_sync(void) {
         rt_log("ops: tri %u (%.0f px) semi-tri %u (%.0f) rect %u (%.0f) line %u fill %u (%.0f) upload %u (%.0f) other %u",
                k[0], area[0], k[1], area[1], k[2], area[2], k[3], k[4], area[4], k[5], area[5], k[6]);
     }
-    go_workers();
-    run_ops(band_of[0][0], band_of[0][1]);
-    wait_workers();
+    if (gpu_on) gpu_run();
+    else {
+        go_workers();
+        run_ops(band_of[0][0], band_of[0][1]);
+        wait_workers();
+    }
     for (int i = 0; i < nq; i++)
         if (queue[i].op == OP_UPLOAD) free(queue[i].pixels);
     nq = 0;
     memset(tex_tiles, 0, sizeof tex_tiles);
     memset(drawn_tiles, 0, sizeof drawn_tiles);
+    rgpu_hd_reset();                             /* no queued references survive cache eviction */
     texpack_frame();
 }
 
@@ -750,7 +1160,10 @@ static void set_bands(void) {
 }
 
 void render_init(int scale, int threads) {
-    S = scale < 1 ? 1 : scale > 4 ? 4 : scale;
+    S = scale < 1 ? 1 : scale > 8 ? 8 : scale;
+    if (getenv("RT_GPU")) g_gpu = atoi(getenv("RT_GPU"));
+    if (S > 1 && g_gpu) gpu_on = rgpu_init(S);
+    if (!gpu_on && S > 4) S = 4;                 /* above 4x only on the card */
     g_tex_edge = getenv("RT_TEX_EDGE") != NULL;      /* for comparing */
     g_depth_any = getenv("RT_DEPTH_ANY") != NULL;
     g_fill_mark = getenv("RT_FILL_MARK") != NULL;
@@ -762,6 +1175,7 @@ void render_init(int scale, int threads) {
     g_margin_any = getenv("RT_MARGIN_ANY") != NULL;
     if (getenv("RT_NO_GAP_FILL")) g_gap_fill = 0;
     if (getenv("RT_DEPTH_TOL")) g_depth_tol = (float)atof(getenv("RT_DEPTH_TOL"));
+    if (getenv("RT_DEPTH_REL")) g_depth_rel = (float)atof(getenv("RT_DEPTH_REL"));
     if (getenv("RT_FAR_PAGE")) g_far_page = atoi(getenv("RT_FAR_PAGE"));
     if (getenv("RT_CROSS_TOL")) g_cross_tol = (float)atof(getenv("RT_CROSS_TOL"));
     g_margin_log = getenv("RT_MARGIN_LOG") != NULL;
@@ -773,6 +1187,7 @@ void render_init(int scale, int threads) {
         zbuf = calloc((size_t)1024 * S * 512 * S, sizeof *zbuf);
         zid = calloc((size_t)1024 * S * 512 * S, sizeof *zid);
         bare = calloc((size_t)1024 * S * 512 * S, 1);
+        low = calloc((size_t)1024 * S * 512 * S, sizeof *low);
         hires_n = (size_t)1024 * S * 512 * S;
         hires_t = (Target){hires, 1024 * S, S, 512 * S};
     }
@@ -781,7 +1196,8 @@ void render_init(int scale, int threads) {
     if (nworkers > MAX_WORKERS) nworkers = MAX_WORKERS;
     set_bands();
     if (S > 1) { start_workers(); workers_started = 1; }
-    rt_log("renderer: %dx internal resolution, %d threads", S, nworkers + 1);
+    rt_log("renderer: %dx internal resolution, %s", S, gpu_on ? "graphics card" : "processor");
+    if (!gpu_on) rt_log("renderer: %d threads", nworkers + 1);
 }
 
 /* Change the internal resolution while running: the new high-res VRAM
@@ -800,17 +1216,26 @@ void render_reload(void) {
     if (S > 1) upscale_from_native();
     if (zbuf) memset(zbuf, 0, (size_t)1024 * S * 512 * S * sizeof *zbuf);
     if (bare) memset(bare, 0, hires_n);
+    if (low) memset(low, 0, hires_n * sizeof *low);
+    if (gpu_on && S > 1) {
+        if (zid) memset(zid, 0, hires_n * sizeof *zid);
+        rgpu_write(hires, low, bare, zbuf, zid);
+        gpu_dirty = 0;
+    }
 }
 
 void render_set_scale(int scale) {
-    scale = scale < 1 ? 1 : scale > 4 ? 4 : scale;
+    int top = gpu_on ? 8 : 4;
+    scale = scale < 1 ? 1 : scale > top ? top : scale;
     if (scale == S) return;
     render_sync();
     free(hires);
     free(zbuf);
     free(zid);
     free(bare);
+    free(low);
     bare = NULL;
+    low = NULL;
     hires_n = 0;
     hires = NULL;
     zbuf = NULL;
@@ -822,11 +1247,14 @@ void render_set_scale(int scale) {
         zbuf = calloc((size_t)W * 512 * S, sizeof *zbuf);
         zid = calloc((size_t)W * 512 * S, sizeof *zid);
         bare = calloc((size_t)W * 512 * S, 1);
+        low = calloc((size_t)W * 512 * S, sizeof *low);
         hires_n = (size_t)W * 512 * S;
         for (int y = 0; y < 512 * S; y++)
             for (int x = 0; x < W; x++) hires[(size_t)y * W + x] = g_vram[y / S][x / S];
         hires_t = (Target){hires, W, S, 512 * S};
         if (!workers_started) { start_workers(); workers_started = 1; }
+        if (!gpu_on && g_gpu) gpu_on = rgpu_init(S);   /* the setting on, from 1x */
+        if (gpu_on) { rgpu_set_scale(S); rgpu_write(hires, low, bare, zbuf, zid); gpu_dirty = 0; }
     }
     set_bands();
     rt_log("renderer: now %dx internal resolution", S);
@@ -836,13 +1264,22 @@ int render_scale(void) { return S; }
 
 /* The high-res VRAM's bare-pixel map (NULL at 1x or with Close model
  * gaps off), same layout as render_hires. */
-const uint8_t *render_bare(void) { return S > 1 && g_gap_fill ? bare : NULL; }
+const uint8_t *render_bare(void) { gpu_fetch(); return S > 1 && g_gap_fill ? bare : NULL; }
+
+/* The high-res depth (1/z per pixel; 0: no 3D there, -1: 2D drawn over the
+ * 3D), NULL at 1x or with Close model gaps off; same layout as render_hires. */
+const float *render_depth(void) { gpu_fetch(); return S > 1 && g_gap_fill ? zbuf : NULL; }
 
 const uint16_t *render_hires(int *stride) {
     render_sync();
+    gpu_fetch();
     *stride = S > 1 ? 1024 * S : 1024;
     return S > 1 ? hires : &g_vram[0][0];
 }
+
+/* The high-res VRAM's 24-bit colour plane (NULL at 1x), same layout as
+ * render_hires. */
+const uint16_t *render_low(void) { gpu_fetch(); return S > 1 ? low : NULL; }
 
 
 /* The VRAM a textured primitive reads: its texture coordinates' bounds in
@@ -1017,17 +1454,26 @@ void render_copy(int sx, int sy, int dx, int dy, int w, int h, int mask_set, int
             *d = tmp[i] | (mask_set ? 0x8000 : 0);
         }
     }
-    if (S > 1) {
+    if (S > 1 && gpu_on) {
+        rgpu_copy(sx, sy, dx, dy, w, h, mask_set, mask_check);
+        gpu_dirty = 1;
+    } else if (S > 1) {
         int W = 1024 * S, H = 512 * S;
-        uint16_t *row = malloc((size_t)w * S * sizeof *row);
+        uint16_t *row = malloc((size_t)w * S * 2 * sizeof *row), *lrow = row + (size_t)w * S;
         for (int j = 0; j < h * S; j++) {
             int ys = (sy * S + j) % H, yd = (dy * S + j) % H;
-            for (int i = 0; i < w * S; i++) row[i] = hires[(size_t)ys * W + (sx * S + i) % W];
+            for (int i = 0; i < w * S; i++) {
+                size_t k = (size_t)ys * W + (sx * S + i) % W;
+                row[i] = hires[k];
+                lrow[i] = low[k];
+            }
             for (int i = 0; i < w * S; i++) {
                 uint16_t *d = &hires[(size_t)yd * W + (dx * S + i) % W];
                 if (mask_check && (*d & 0x8000)) continue;
                 *d = row[i] | (mask_set ? 0x8000 : 0);
                 bare[(size_t)(d - hires)] = 0;
+                low[(size_t)(d - hires)] = lrow[i];
+                zbuf[(size_t)(d - hires)] = -1;
             }
         }
         free(row);

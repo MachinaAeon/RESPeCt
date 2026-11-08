@@ -150,10 +150,11 @@ static void squeeze_clip(RPrim *p) {
 /* Vertex k of the command: position (with the GTE's fractions if this word
  * is one the GTE stored), plus drawing offset. Returns 1 if it came from the GTE. */
 static int vertex_exact;                         /* the last vertex_pos found its corner by address */
+static uint32_t vertex_obj;                      /* and the model it belongs to (gte_precise) */
 static int vertex_pos(int k, float *x, float *y, float *z) {
     uint32_t w = g.cmd[k];
     float fx, fy, fz = 0;
-    int got = gte_precise(cmd_src[k], w, &fx, &fy, &fz);
+    int got = gte_precise(cmd_src[k], w, &fx, &fy, &fz, &vertex_obj);
     vertex_exact = got == 2;
     *z = got ? fz : 0;
     if (g_subpixel && got) {
@@ -177,13 +178,14 @@ static void exec_poly(void) {
     p.textured = tex;
     RVtx v[4];
     int k = 0, ngte = 0, stored = 0, nexact = 0;
-    uint32_t color = c & 0xFFFFFF;
+    uint32_t color = c & 0xFFFFFF, obj = 0;
     for (int i = 0; i < nv; i++) {
         if (i > 0 && gour) color = g.cmd[k] & 0xFFFFFF;
         if (i == 0 || gour) k++;
         stored |= corner_stored(k);
         ngte += vertex_pos(k++, &v[i].x, &v[i].y, &v[i].z);
         nexact += vertex_exact;
+        obj = i == 0 ? vertex_obj : obj == vertex_obj ? obj : 0;   /* one model, or not known */
         v[i].r = color & 0xFF;
         v[i].g = (color >> 8) & 0xFF;
         v[i].b = (color >> 16) & 0xFF;
@@ -228,6 +230,7 @@ static void exec_poly(void) {
     p.zt = ngte == nv;
     for (int i = 0; i < nv; i++) if (v[i].z <= 0) p.zt = 0;
     if (p.zt && nexact == nv) p.zt = 2;              /* every corner surely its own: depths fit for perspective */
+    p.obj = p.zt ? obj : 0;
     p.v[0] = v[0]; p.v[1] = v[1]; p.v[2] = v[2];
     render_prim(&p);
     if (quad) {

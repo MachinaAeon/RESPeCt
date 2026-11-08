@@ -15,6 +15,7 @@
 #include "savestate.h"
 
 extern int16_t g_fps_pitch_limit;          /* port/src/rt.c, from resurv.ini */
+void input_take_look(int *dx, int *dy);    /* port/src/sio.c: mouse motion since the last game frame */
 
 #define SPEED_WALK  (-0x50)
 #define SPEED_RUN   (-0x96)
@@ -213,6 +214,8 @@ static void dualshock_section(void) {
     else if (v < 0x50) g_playerMoveFlags |= MOVE_TURN_LEFT;
 }
 
+static s32 fps_pitch;                       /* this frame's look up/down (fps_section) */
+
 /* FPS mode: digital pad in port 1 and a PlayStation Mouse in port 2. */
 static s32 fps_active(void) {
     return g_padTypeBit == 0x80000 && (g_padState2 & PADSTATE_TYPE_MASK) == PADTYPE_MOUSE;
@@ -230,7 +233,12 @@ static void fps_section(void) {
     b &= ~BTN_FIRE;
     if (ok && !(m[3] & MOUSE_LEFT) && !sg_at_payphone()) b |= BTN_FIRE;   /* no shots at a payphone */
 
-    g_playerYawVel = (s16)(ok ? (s8)m[4] : 0);   /* the PC side scales by sensitivity */
+    /* the mouse's whole motion since the last game frame (the PC side
+     * scales it by sensitivity), not the pad buffer's last vblank */
+    int dx, dy;
+    input_take_look(&dx, &dy);
+    g_playerYawVel = (s16)(ok ? dx : 0);
+    fps_pitch = ok ? dy : 0;
 
     /* W forward (sprint with Shift), S back, A/D alone strafe; player_Update
      * turns the step for strafes and diagonals. */
@@ -307,6 +315,9 @@ void n_player_Control(void) {
             else digital_section();
         } else if (fps) {
             g_playerYawVel = 0;              /* no control (e.g. cutscene) */
+            int dx, dy;
+            input_take_look(&dx, &dy);       /* motion meanwhile doesn't turn you afterwards */
+            fps_pitch = 0;
         }
         break;
     }
@@ -390,16 +401,19 @@ void n_player_Update(void) {
     port_weapon_frame();
     sg_game_frame(g_sg_use);
     g_sg_use = 0;
+    if (g_playerFrozen && fps_active()) {
+        int dx, dy;
+        input_take_look(&dx, &dy);           /* frozen: motion meanwhile doesn't turn you afterwards */
+    }
     if (!g_playerFrozen) {
         n_player_Control();
         s32 fps = fps_active() && D_80062DEC;
         s32 pitch = D_800A865C;
         if (fps) {
             /* mouse Y tilts the view (mouse down = look down) */
-            const u8 *m = gp(g_padBuf2Addr);
-            s32 dy = m[0] == 0 ? (s8)m[5] : 0;
             s32 limit = g_fps_pitch_limit;
-            pitch += dy;
+            pitch += fps_pitch;
+            fps_pitch = 0;
             if (pitch > limit) pitch = limit;
             else if (pitch < -limit) pitch = -limit;
             D_800A865C = (s16)pitch;

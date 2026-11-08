@@ -233,15 +233,17 @@ void plat_frame(void) {
                      MEM_R32(0x800B4BA0), MEM_R32(0x800B3E20));
             if (strcmp(now, last)) { rt_log("flags: %s", now); strcpy(last, now); }
         }
-        /* RT_WATCH=addr: log the 8 bytes there every 10 frames */
+        /* RT_WATCH=addr: log the 8 bytes there every 10 frames (RT_WATCH_EVERY=n: every n) */
         const char *wa = getenv("RT_WATCH");
-        if (wa && g_frame % 10 == 0) {
+        if (wa && g_frame % (getenv("RT_WATCH_EVERY") ? atoi(getenv("RT_WATCH_EVERY")) : 10) == 0) {
             uint32_t a = (uint32_t)strtoul(wa, NULL, 16);
             rt_log("watch %08X: %04X %04X %04X %04X", a, MEM_R16(a), MEM_R16(a + 2), MEM_R16(a + 4), MEM_R16(a + 6));
         }
         if (g_input.mouse_present && g_frame >= (uint32_t)mfrom && g_frame < (uint32_t)mto) {
             g_input.mouse_dx += mdx;
             g_input.mouse_dy += mdy;
+            g_input.look_dx += mdx;
+            g_input.look_dy += mdy;
         }
     }
     {
@@ -253,11 +255,24 @@ void plat_frame(void) {
             e = strchr(e, ',');
             if (e) e++;
         }
+        /* RT_GPU_AT=frame:on,...: switch the graphics card on or off while running */
+        e = getenv("RT_GPU_AT");
+        while (e && *e) {
+            unsigned f; int on;
+            if (sscanf(e, "%u:%d", &f, &on) == 2 && f == g_frame) render_set_gpu(on);
+            e = strchr(e, ',');
+            if (e) e++;
+        }
     }
     if (every && g_frame % every == 0) {
         static uint32_t bgrx[2560 * 1920];
         static uint8_t rgb[2560 * 1920 * 3];
         int w, h;
+        {   /* RT_SHOW=w,h: the picture made at the size a window would show it (graphics card) */
+            extern int g_display_w, g_display_h;
+            const char *e = getenv("RT_SHOW");
+            if (e) sscanf(e, "%d,%d", &g_display_w, &g_display_h);
+        }
         display_grab_bgrx(bgrx, &w, &h);
         for (int i = 0; i < w * h; i++) {
             rgb[i * 3] = (uint8_t)(bgrx[i] >> 16);
@@ -322,6 +337,7 @@ void plat_frame(void) {
 }
 
 int plat_quit(void) { return 0; }
+void plat_poll_look(void) {}
 void plat_fatal(const char *msg) { (void)msg; }
 
 void sg_save_done(int ok) { rt_log("savegame: save %s", ok ? "ok" : "FAILED"); }

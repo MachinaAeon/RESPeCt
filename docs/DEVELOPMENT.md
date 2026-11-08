@@ -192,7 +192,8 @@ machine code to C (`port/gen/`, generated from your disc, not in git) and
 | --- | --- |
 | `rt.c`, `bios.c`, `thread.c` | CPU state, calls into overlays, BIOS services, threads and interrupts as coroutines |
 | `gpu.c`, `render.c` | GPU commands; rasterizer for the PS1's VRAM and a 1-4x high-resolution copy (worker threads) |
-| `gte.c` | Geometry coprocessor, with fractional screen positions kept for the renderer |
+| `render_gpu.c`, `render_gpu.hlsl` | The same high-resolution drawing on the graphics card (Direct3D 11 compute shaders), up to 8x |
+| `gte.c` | Geometry coprocessor, with fractional screen positions, depths and models' matrices in full precision kept for the renderer |
 | `cdrom.c`, `iso.c` | CD drive and file system on the `.bin` image |
 | `spu.c`, `mdec.c` | Sound (voices, reverb, XA streaming) and movie decoding |
 | `card.c`, `sio.c` | Memory cards (`.mcd` files) and controller port |
@@ -300,6 +301,83 @@ play one sample at once: a swarm of bugs keys the same one-shot sound on all
 With "Steady 3D", a corner's exact projected position is found by the RAM
 word the GTE stored it in (port/src/gte.c); looking it up by its pixel alone
 mixed up about one corner in eight on small, distant models.
+
+### Steady 3D and the depth fix at high resolutions
+
+What makes models tremble at 4x and up, and what port/src/gte.c does about
+it (the high-resolution picture only: everything the game reads stays the
+GTE's own integers):
+
+- Each part of a model is drawn with its own matrix, which libgs's GsGetLs
+  builds through the GTE with a cut to whole units at each step. The same
+  chain is multiplied out in double precision (hook on the call, interp.c)
+  and goes with the matrix when the game loads it (SetRotMatrix,
+  SetTransMatrix): corners, and their depths, come from it.
+- NCLIP (keep or drop a face) takes its sign from the corners' fractions:
+  on whole pixels a distant model's tiny faces came and went as the camera
+  turned (129-151 of a zombie's 156 triangles drawn, now all of them).
+- Corners a fraction of a pixel apart are not welded together any more,
+  and the pass that filled background between a model's parts is off: with
+  the matrices exact the seams meet, and both moved outlines by a few
+  pixels from frame to frame.
+- The depth fix knows which model a polygon belongs to (the root of its
+  coordinate chain): a model's parts hide each other 2 units behind; other
+  objects keep the PS1's order, so a model reaching into another (a hand
+  through the floor) is drawn as on the PS1 at any distance. (A threshold
+  measured along the view, as before, grows with the distance and the
+  slant: hands sank into the floor more or less as you walked.)
+
+The bench checks all of this on recorded frames: `RT_INT_MATRIX`,
+`RT_INT_NCLIP`, `RT_INT_Z`, `RT_WELD`, `RT_HOLES`, `RT_DEPTH_TOL`,
+`RT_CROSS_TOL` bring back the old behaviour for comparisons.
+
+### Graphics card
+
+With `graphics_card = 1` the queue render.c's worker threads run goes to the
+card instead (port/src/render_gpu.c): render_gpu.hlsl runs the same code as
+raster_tri, raster_rect and run_ops, one thread per pixel, each pixel's
+operations in the queue's order (binned to 16x16 tiles), edges in double
+precision so they come out exactly as the CPU's 64-bit integers. The
+picture shown is made there too (24-bit colour, brightness, Close model
+gaps) and at the window's size, shrunk by area. The PS1's own VRAM stays on
+the CPU (the game reads it); the card gets a copy with every batch for
+textures. Replacement images are copied into a separate RGBA8 shader
+buffer and referenced by each primitive's original texpack mapping. The
+shader mirrors the CPU's bilinear sampler, atlas bounds, alpha classes,
+lighting and PS1 blend modes. Native VRAM and the texture matcher are
+unchanged. Image identities are shared within a synchronized drawing queue
+and reset before texpack_frame can evict decoded images. GPU transfers are
+bounded to 128 MiB per queue; allocation failure or a larger queue uses the
+original texture and logs a warning. The CPU staging arena and GPU buffer
+retain their capacity for reuse.
+
+An old save state without tracked texture uploads still needs a room load
+before its textures can match the pack, on either renderer. This change
+does not reconstruct those missing upload records.
+
+`port/tests/run-gpu-hd.ps1` builds and executes the production CPU/D3D11
+rasterizers with synthetic images (no game assets). It checks rectangles,
+triangles, alpha thresholds, blending, lighting, atlas limits, perspective,
+multiple images and cache renewal at 2x, 3x and 4x, with HD on/off and
+24-bit colour on/off. Native VRAM and STP must match exactly; filtered
+24-bit RGB permits at most one rounding step. A usable D3D11 device with
+double precision is required (exit 2 means unavailable). This does not
+replace testing the real pack and gameplay.
+
+Validation of GPU HD support: 158 synthetic CPU/GPU comparisons passed.
+Three filtered Gouraud cases differ by one RGB level in a few pixels,
+within the declared rounding tolerance; STP and native VRAM match exactly.
+A controlled 21-frame arcade-room replay with the real pack at 2x produced
+an identical CPU HD/GPU HD displayed frame and identical native VRAM with
+HD on and off. GPU HD was also observed in the Windows frontend at 8x.
+Interactive F2 and live renderer switching with HD, other hardware, and
+full-game pack compatibility remain unverified by these checks. Actual
+allocation failure during buffer growth has not been fault-injected.
+
+Frames from
+the headless runner with `RT_GPU=1` are identical to the CPU's;
+`RT_GPU_AT=frame:on` switches while running, `RT_SHOW=w,h` makes the picture
+at a window's size.
 
 ### Field of view
 

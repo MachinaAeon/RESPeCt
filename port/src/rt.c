@@ -1,6 +1,7 @@
 /* Runtime core: CPU state, calls through pointers and into overlays,
  * arithmetic helpers, COP0, and the time/interrupt poll. */
 #include "rt.h"
+#include "render.h"
 #include "savestate.h"
 
 #include <stdio.h>
@@ -264,6 +265,21 @@ static void write_port_config(void) {
     MEM_W16(0x8001128E, 1);
     MEM_W16(0x80011290, (uint16_t)g_fps_pitch_limit);
     MEM_W16(0x80011292, 0);
+    /* Close-up 3D: the game's drawing code splits a polygon into smaller
+     * ones while it's near (depth under 0x80060D3C, 1400), so the PS1's
+     * straight-across texturing doesn't bend it. At a higher resolution
+     * textures and colours are drawn in perspective, and the split only
+     * makes floors and walls jump as you walk: where it starts, the pieces
+     * and their corner colours change at once. With the threshold at 0 a
+     * polygon is still split where the GTE reports corners off the screen
+     * or behind the camera, which the GPU couldn't draw whole. */
+    extern int g_persp;
+    static int keep = -1;                       /* RT_KEEP_SPLIT: the game's own threshold, for comparisons */
+    if (keep < 0) keep = getenv("RT_KEEP_SPLIT") != NULL;
+    uint32_t thr = MEM_R32(0x80060D3C), want = g_persp && render_scale() > 1 && !keep ? 0 : 0x578;
+    if ((thr == 0x578 || thr == 0) && thr != want) MEM_W32(0x80060D3C, want);
+    extern int g_whole_polys;
+    g_whole_polys = want == 0;
 }
 
 /* Advance the hardware clock by one slice and run due interrupts. */

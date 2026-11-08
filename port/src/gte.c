@@ -40,6 +40,15 @@ static uint32_t pack(int16_t lo, int16_t hi) { return (uint16_t)lo | ((uint32_t)
 
 static int clamp5(int16_t v) { int x = v >> 7; return x < 0 ? 0 : x > 31 ? 31 : x; }
 
+static void moving_push(uint32_t word, float x, float y, float z, uint32_t o);   /* precision, below */
+static void matrix_written(int r, uint32_t v);                        /* precise matrices, below */
+static int prec_rot, prec_trans;
+static float sxy_fz[3];                                 /* depths for the picture, below */
+static uint32_t sxy_fo[3];                              /* their models, below */
+static uint32_t prec_obj;                               /* the model the precise matrix belongs to, below */
+static int precise_view(const int64_t m[3], int16_t vx, int16_t vy, int16_t vz, double out[3]);
+static void moving_frac(uint32_t word, float *x, float *y);
+
 uint32_t gte_read_data(int r) {
     switch (r) {
     case 0: return pack(G.v[0].x, G.v[0].y);
@@ -51,8 +60,12 @@ uint32_t gte_read_data(int r) {
     case 6: return G.rgbc;
     case 7: return G.otz;
     case 8: case 9: case 10: case 11: return (uint32_t)(int32_t)G.ir[r - 8];
-    case 12: case 13: case 14: return pack(G.sx[r - 12], G.sy[r - 12]);
-    case 15: return pack(G.sx[2], G.sy[2]);
+    case 12: case 13: case 14: case 15: {
+        int k = r == 15 ? 2 : r - 12;
+        uint32_t w = pack(G.sx[k], G.sy[k]);
+        moving_push(w, G.fx[k], G.fy[k], sxy_fz[k] >= 0 ? sxy_fz[k] : (float)G.sz[k + 1], sxy_fo[k]);
+        return w;
+    }
     case 16: case 17: case 18: case 19: return G.sz[r - 16];
     case 20: case 21: case 22: return G.rgb[r - 20];
     case 23: return G.res1;
@@ -77,11 +90,19 @@ void gte_write_data(int r, uint32_t v) {
     case 6: G.rgbc = v; break;
     case 7: G.otz = (uint16_t)v; break;
     case 8: case 9: case 10: case 11: G.ir[r - 8] = lo; break;
-    case 12: case 13: case 14: G.sx[r - 12] = lo; G.sy[r - 12] = hi; G.fx[r - 12] = lo; G.fy[r - 12] = hi; break;
+    case 12: case 13: case 14:
+        G.sx[r - 12] = lo; G.sy[r - 12] = hi; G.fx[r - 12] = lo; G.fy[r - 12] = hi;
+        sxy_fz[r - 12] = -1;
+        sxy_fo[r - 12] = 0;
+        moving_frac(v, &G.fx[r - 12], &G.fy[r - 12]);     /* a point read back: its fractions too */
+        break;
     case 15:
         G.sx[0] = G.sx[1]; G.sy[0] = G.sy[1]; G.fx[0] = G.fx[1]; G.fy[0] = G.fy[1];
         G.sx[1] = G.sx[2]; G.sy[1] = G.sy[2]; G.fx[1] = G.fx[2]; G.fy[1] = G.fy[2];
         G.sx[2] = lo; G.sy[2] = hi; G.fx[2] = lo; G.fy[2] = hi;
+        sxy_fz[0] = sxy_fz[1]; sxy_fz[1] = sxy_fz[2]; sxy_fz[2] = -1;
+        sxy_fo[0] = sxy_fo[1]; sxy_fo[1] = sxy_fo[2]; sxy_fo[2] = 0;
+        moving_frac(v, &G.fx[2], &G.fy[2]);
         break;
     case 16: case 17: case 18: case 19: G.sz[r - 16] = (uint16_t)v; break;
     case 20: case 21: case 22: G.rgb[r - 20] = v; break;
@@ -136,8 +157,8 @@ uint32_t gte_read_ctrl(int r) {
 }
 
 void gte_write_ctrl(int r, uint32_t v) {
-    if (r < 5) { set_mat(G.rt, r, v); return; }
-    if (r < 8) { G.tr[r - 5] = (int32_t)v; return; }
+    if (r < 5) { set_mat(G.rt, r, v); matrix_written(r, v); return; }
+    if (r < 8) { G.tr[r - 5] = (int32_t)v; matrix_written(r, v); return; }
     if (r < 13) { set_mat(G.llm, r - 8, v); return; }
     if (r < 16) { G.bk[r - 13] = (int32_t)v; return; }
     if (r < 21) { set_mat(G.lcm, r - 16, v); return; }
@@ -218,17 +239,55 @@ static void push_sz(int64_t v) {
     G.sz[3] = (uint16_t)v;
 }
 
-static void precise_record(int16_t sx, int16_t sy, float fx, float fy, float fz);
+static void precise_record(int16_t sx, int16_t sy, float fx, float fy, float fz, uint32_t o);
 
-static void push_sxy(int32_t x, int32_t y, float fx, float fy) {
-    if (x < -0x400) { G.flag |= 1u << 14; x = -0x400; fx = -1024.0f; }
-    else if (x > 0x3FF) { G.flag |= 1u << 14; x = 0x3FF; fx = 1023.0f; }
-    if (y < -0x400) { G.flag |= 1u << 13; y = -0x400; fy = -1024.0f; }
-    else if (y > 0x3FF) { G.flag |= 1u << 13; y = 0x3FF; fy = 1023.0f; }
+/* Close-up polygons drawn whole (rt.c: the game's distance split is off).
+ * A polygon drawn by the game's drivers whose corners land off the screen
+ * is split by them all the same, as the GPU can't draw one that large; the
+ * high-resolution picture can, so there the corner keeps its true position
+ * (the screen position stays clamped, as the hardware's) and the driver
+ * isn't told: the polygon stays whole and doesn't jump as you approach.
+ * Corners too close or behind (the division overflowing, depth clamped)
+ * are still reported, and those polygons are still split. */
+uint32_t g_gte_pc;                                /* interp.c: the GTE command's address */
+int g_whole_polys;                                /* rt.c */
+extern int g_subpixel;
+static int whole_corner(void) {
+    return g_whole_polys && g_subpixel && g_gte_pc >= 0x8003DF90u && g_gte_pc < 0x80058600u &&
+           !(G.flag & (3u << 17));
+}
+
+/* NCLIP from the corners' fractions, when they're the whole ones' own (the
+ * high-resolution picture; RT_INT_NCLIP: whole pixels, for comparisons).
+ * Within a few pixels: a model's precise matrices put its corners up to a
+ * pixel or so from the GTE's own. */
+static int precise_nclip(void) {
+    static int off = -1;
+    if (off < 0) off = getenv("RT_INT_NCLIP") != NULL;
+    if (off || !g_subpixel) return 0;
+    for (int i = 0; i < 3; i++)
+        if (fabsf(G.fx[i] - G.sx[i]) > 4.0f || fabsf(G.fy[i] - G.sy[i]) > 4.0f) return 0;
+    return 1;
+}
+
+/* The SXY stack's depths for the high-resolution picture: the model's
+ * matrix in full precision where there is one, else SZ (whole units; -1:
+ * not known, SZ then). Two surfaces a few units apart (a head against the
+ * shirt it pokes out of) are told apart by these. */
+static float sxy_fz[3] = {-1, -1, -1};
+
+static void push_sxy(int32_t x, int32_t y, float fx, float fy, float fz, uint32_t o) {
+    int whole = whole_corner();
+    if (x < -0x400) { if (!whole) { G.flag |= 1u << 14; fx = -1024.0f; } x = -0x400; }
+    else if (x > 0x3FF) { if (!whole) { G.flag |= 1u << 14; fx = 1023.0f; } x = 0x3FF; }
+    if (y < -0x400) { if (!whole) { G.flag |= 1u << 13; fy = -1024.0f; } y = -0x400; }
+    else if (y > 0x3FF) { if (!whole) { G.flag |= 1u << 13; fy = 1023.0f; } y = 0x3FF; }
     G.sx[0] = G.sx[1]; G.sy[0] = G.sy[1]; G.fx[0] = G.fx[1]; G.fy[0] = G.fy[1];
     G.sx[1] = G.sx[2]; G.sy[1] = G.sy[2]; G.fx[1] = G.fx[2]; G.fy[1] = G.fy[2];
     G.sx[2] = (int16_t)x; G.sy[2] = (int16_t)y; G.fx[2] = fx; G.fy[2] = fy;
-    precise_record((int16_t)x, (int16_t)y, fx, fy, (float)G.sz[3]);
+    sxy_fz[0] = sxy_fz[1]; sxy_fz[1] = sxy_fz[2]; sxy_fz[2] = fz;
+    sxy_fo[0] = sxy_fo[1]; sxy_fo[1] = sxy_fo[2]; sxy_fo[2] = o;
+    precise_record((int16_t)x, (int16_t)y, fx, fy, fz, o);
 }
 
 static uint8_t unr_table[0x101];
@@ -302,7 +361,21 @@ static void rtp(int i, int last) {
     int64_t y = (int64_t)n * G.ir[2] + G.ofy;
     chk_mac(0, x);
     chk_mac(0, y);
-    push_sxy((int32_t)(x >> 16), (int32_t)(y >> 16), (float)((double)x / 65536.0), (float)((double)y / 65536.0));
+    float fx = (float)((double)x / 65536.0), fy = (float)((double)y / 65536.0);
+    double pv[3];
+    float fz = (float)G.sz[3];
+    uint32_t fo = 0;
+    if (sf_shift == 12 && precise_view(m, v.x, v.y, v.z, pv) && pv[2] >= 1.0) {
+        /* the corner from the model's matrix in full precision (below) */
+        double k = projection_h() / pv[2];
+        fx = (float)(pv[0] * k * (g_widescreen ? 0.75 : 1.0) + G.ofx / 65536.0);
+        fy = (float)(pv[1] * k + G.ofy / 65536.0);
+        static int whole_z = -1;                 /* RT_INT_Z: SZ's whole units, for comparisons */
+        if (whole_z < 0) whole_z = getenv("RT_INT_Z") != NULL;
+        if (!whole_z && pv[2] < 65535) fz = (float)pv[2];
+        fo = prec_obj;
+    }
+    push_sxy((int32_t)(x >> 16), (int32_t)(y >> 16), fx, fy, fz, fo);
     if (last) {
         int64_t d = (int64_t)n * G.dqa + G.dqb;
         chk_mac(0, d);
@@ -378,6 +451,17 @@ void gte_command(uint32_t cmd) {
     case 0x06: {                                                     /* NCLIP */
         int64_t v = (int64_t)G.sx[0] * G.sy[1] + (int64_t)G.sx[1] * G.sy[2] + (int64_t)G.sx[2] * G.sy[0] -
                     (int64_t)G.sx[0] * G.sy[2] - (int64_t)G.sx[1] * G.sy[0] - (int64_t)G.sx[2] * G.sy[1];
+        if (precise_nclip()) {
+            /* The face's side from its corners' true positions: on whole
+             * pixels a small or distant face that's nearly edge-on, or a
+             * hair's width, comes out the wrong way or of no area at all, so
+             * the game drops it, and as the camera moves it comes and goes:
+             * distant models' faces flicker and holes open. The game only
+             * uses the sign (and zero) to keep or drop the face. */
+            double a = (double)G.fx[0] * G.fy[1] + (double)G.fx[1] * G.fy[2] + (double)G.fx[2] * G.fy[0] -
+                       (double)G.fx[0] * G.fy[2] - (double)G.fx[1] * G.fy[0] - (double)G.fx[2] * G.fy[1];
+            v = a > 0 ? (a < 1 ? 1 : (int64_t)a) : a < 0 ? (a > -1 ? -1 : (int64_t)a) : 0;
+        }
         set_mac(0, v, 0);
         break;
     }
@@ -550,7 +634,7 @@ int g_widescreen, g_subpixel;
  * GPU is about to draw. */
 #define PBUCKETS 65536
 #define PWAYS 8
-typedef struct { uint32_t word; uint32_t gen; float x, y, z; } Precise;
+typedef struct { uint32_t word; uint32_t gen; float x, y, z; uint32_t o; } Precise;
 static Precise pcache[PBUCKETS][PWAYS];
 static uint32_t pgen = 1;
 
@@ -563,7 +647,7 @@ void gte_precise_frame(void) { pgen++; }
 
 /* Every distinct corner projected recently is kept (several can share a
  * pixel: distant models, the seams between a model's parts). */
-static void precise_record(int16_t sx, int16_t sy, float fx, float fy, float fz) {
+static void precise_record(int16_t sx, int16_t sy, float fx, float fy, float fz, uint32_t o) {
     uint32_t w = (uint16_t)sx | ((uint32_t)(uint16_t)sy << 16);
     Precise *b = pcache[phash(w)], *p = &b[0];
     for (int i = 0; i < PWAYS; i++) {
@@ -578,6 +662,7 @@ static void precise_record(int16_t sx, int16_t sy, float fx, float fy, float fz)
     p->x = fx;
     p->y = fy;
     p->z = fz;
+    p->o = o;
 }
 
 /* Where the game stored projected points (SWC2 of an SXY register) and the
@@ -587,19 +672,249 @@ static void precise_record(int16_t sx, int16_t sy, float fx, float fy, float fz)
  * where 3D sat in an earlier frame. */
 static uint32_t sxy_word[0x80000], sxy_gen[0x80000];
 static float sxy_px[0x80000], sxy_py[0x80000], sxy_pz[0x80000];   /* that corner's exact position, depth */
+static uint32_t sxy_po[0x80000];                                   /* and model */
+
+uint8_t g_sxy_mark[0x80000];
+uint32_t g_sxy_filter[8];
+static int g_sxy_moving;
+
+/* The game's code also moves projected points itself: read from the GTE
+ * (MFC2) or from where it stored them, then written into a drawing packet
+ * or a buffer of its own. Found by value alone, a corner that stays on the
+ * same pixel can take another frame's or another corner's position, and
+ * polygons jump as the view moves. Points just read are kept here, and a
+ * store of the same value soon after takes the point along to its new
+ * address, which the GPU then finds by address (as PGXP follows copies). */
+#define MOVING 16
+static struct { uint32_t word, gen; float x, y, z; uint32_t o; } moving[MOVING];
+static int moving_at;
+
+static void moving_push(uint32_t word, float x, float y, float z, uint32_t o) {
+    moving_at = (moving_at + 1) % MOVING;
+    moving[moving_at].word = word;
+    moving[moving_at].gen = pgen;
+    moving[moving_at].x = x;
+    moving[moving_at].y = y;
+    moving[moving_at].z = z;
+    moving[moving_at].o = o;
+    g_sxy_moving = 1;
+    memset(g_sxy_filter, 0, sizeof g_sxy_filter);
+    for (int k = 0; k < MOVING; k++) {
+        uint32_t h = (moving[k].word * 0x9E3779B1u) >> 24;
+        if (moving[k].gen) g_sxy_filter[h >> 5] |= 1u << (h & 31);
+    }
+}
+
+/* The newest point just read with this value, or -1. */
+static int moving_find(uint32_t word) {
+    for (int n = 0; n < MOVING; n++) {
+        int k = (moving_at - n + MOVING) % MOVING;
+        if (moving[k].word == word && moving[k].gen && moving[k].gen + 2 >= pgen) return k;
+    }
+    return -1;
+}
+
+static void moving_frac(uint32_t word, float *x, float *y) {
+    int k = g_sxy_moving ? moving_find(word) : -1;
+    if (k >= 0) { *x = moving[k].x; *y = moving[k].y; }
+}
+
+static void sxy_set(uint32_t i, uint32_t word, float x, float y, float z, uint32_t o) {
+    sxy_word[i] = word;
+    sxy_gen[i] = pgen;
+    sxy_px[i] = x;
+    sxy_py[i] = y;
+    sxy_pz[i] = z;
+    sxy_po[i] = o;
+    g_sxy_mark[i] = 1;
+}
+
+void sxy_load(uint32_t p, uint32_t v) {
+    uint32_t i = p >> 2;
+    if (sxy_word[i] == v && sxy_gen[i] + 6 >= pgen) moving_push(v, sxy_px[i], sxy_py[i], sxy_pz[i], sxy_po[i]);
+    else g_sxy_mark[i] = 0;
+}
+
+void sxy_store(uint32_t p, uint32_t v) {
+    uint32_t i = p >> 2;
+    int k = g_sxy_moving ? moving_find(v) : -1;
+    if (k >= 0) sxy_set(i, v, moving[k].x, moving[k].y, moving[k].z, moving[k].o);
+    else g_sxy_mark[i] = 0;
+}
+
+/* The scratchpad, where the game's drawing code keeps points too. */
+static struct { uint32_t word, gen; float x, y, z; uint32_t o; } sc_sxy[256];
+
+void sxy_scratch_load(uint32_t p, uint32_t v) {
+    uint32_t i = (p & 0x3FC) >> 2;
+    if (sc_sxy[i].word == v && sc_sxy[i].gen && sc_sxy[i].gen + 6 >= pgen) moving_push(v, sc_sxy[i].x, sc_sxy[i].y, sc_sxy[i].z, sc_sxy[i].o);
+}
+
+void sxy_scratch_store(uint32_t p, uint32_t v) {
+    uint32_t i = (p & 0x3FC) >> 2;
+    int k = g_sxy_moving ? moving_find(v) : -1;
+    if (k < 0) { sc_sxy[i].gen = 0; return; }
+    sc_sxy[i].word = v;
+    sc_sxy[i].gen = pgen;
+    sc_sxy[i].x = moving[k].x;
+    sc_sxy[i].y = moving[k].y;
+    sc_sxy[i].z = moving[k].z;
+    sc_sxy[i].o = moving[k].o;
+}
+
+/* ------------------------------------------------------------ precise matrices
+ * Each part of a model (a zombie's torso, upper arm, forearm...) is drawn
+ * with its own matrix: libgs's GsGetLs multiplies the camera's matrix and
+ * every parent's along the chain, through the GTE, cutting the result to
+ * whole units and 1/4096ths at each step. The cuts differ from part to
+ * part and change as the camera moves, so the parts slide against each
+ * other by a fraction of a PS1 pixel (a few pixels at a higher
+ * resolution): models' joints open and shut and their faces shift. Here
+ * the same chain is also multiplied out in double precision when the game
+ * asks for it, and when the game then loads that matrix into the GTE
+ * (SetRotMatrix, SetTransMatrix) the precise one goes with it, for the
+ * high-resolution picture only: everything the game reads stays the
+ * GTE's own integers. */
+#define F_GS_GET_LS     0x800339E8u              /* (coord, ls) */
+#define F_GS_GET_LWS    0x80033CB8u              /* (coord, lw, ls) */
+#define F_SET_ROT_M     0x8002A778u              /* (matrix) */
+#define F_SET_TRANS_M   0x8002A7A8u              /* (matrix) */
+#define GS_WS_MATRIX    0x80065BB0u              /* GsWSMATRIX: world to screen */
+#define COORD_SUPER     0x4C                     /* GsCOORDINATE2: parent */
+
+typedef struct { double r[9], t[3]; } DMat;     /* rotation in 1.0 = 4096 units, translation */
+#define SHADOWS 64
+static struct { uint32_t addr, gen, root; DMat m; } shadow[SHADOWS];
+static uint32_t shadow_root;                     /* the chain's root (the model) of the last one found */
+static int shadow_at;
+static DMat prec;                                /* the precise matrix in the GTE */
+/* prec_rot, prec_trans (declared at the top): RT / TR hold it */
+/* Precise rotations and translations the game loaded lately, by the words
+ * they were loaded as: drawing code saves and restores matrices
+ * (PushMatrix / PopMatrix) part after part, so any of them can come back. */
+#define KNOWN 64
+static struct { uint32_t w[5], gen, root; double r[9]; } known_rot[KNOWN];
+static struct { uint32_t w[3], gen; double t[3]; } known_trans[KNOWN];
+static int known_rot_at, known_trans_at;
+
+static void dmat_read(uint32_t a, DMat *d) {
+    for (int i = 0; i < 9; i++) d->r[i] = (int16_t)MEM_R16(a + 2 * i) / 4096.0;
+    for (int i = 0; i < 3; i++) d->t[i] = (int32_t)MEM_R32(a + 0x14 + 4 * i);
+}
+
+static void dmat_mul(const DMat *a, const DMat *b, DMat *o) {
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++)
+            o->r[i * 3 + j] = a->r[i * 3] * b->r[j] + a->r[i * 3 + 1] * b->r[3 + j] + a->r[i * 3 + 2] * b->r[6 + j];
+        o->t[i] = a->r[i * 3] * b->t[0] + a->r[i * 3 + 1] * b->t[1] + a->r[i * 3 + 2] * b->t[2] + a->t[i];
+    }
+}
+
+/* GsGetLs / GsGetLws: local to screen = world to screen x root ... x coord. */
+static void shadow_ls(uint32_t coord, uint32_t dest) {
+    uint32_t chain[100];
+    int n = 0;
+    for (uint32_t c = coord; c && n < 100; c = MEM_R32(c + COORD_SUPER)) chain[n++] = c;
+    if (!n) return;
+    DMat w, t, cm, ws, ls;
+    dmat_read(chain[n - 1] + 4, &w);
+    for (int k = n - 2; k >= 0; k--) { dmat_read(chain[k] + 4, &cm); dmat_mul(&w, &cm, &t); w = t; }
+    dmat_read(GS_WS_MATRIX, &ws);
+    dmat_mul(&ws, &w, &ls);
+    shadow_at = (shadow_at + 1) % SHADOWS;
+    shadow[shadow_at].addr = dest;
+    shadow[shadow_at].gen = pgen;
+    shadow[shadow_at].m = ls;
+    shadow[shadow_at].root = chain[n - 1];
+}
+
+static const DMat *shadow_of(uint32_t a) {
+    for (int n = 0; n < SHADOWS; n++) {
+        int k = (shadow_at - n + SHADOWS) % SHADOWS;
+        if (shadow[k].addr == a && shadow[k].gen && shadow[k].gen + 2 >= pgen) { shadow_root = shadow[k].root; return &shadow[k].m; }
+    }
+    return NULL;
+}
+
+/* interp.c: a call to game code. */
+void gte_call_hook(uint32_t addr) {
+    if (addr != F_GS_GET_LS && addr != F_GS_GET_LWS && addr != F_SET_ROT_M && addr != F_SET_TRANS_M) return;
+    if (!g_subpixel) return;
+    if (addr == F_GS_GET_LS) { shadow_ls(R[4], R[5]); return; }
+    if (addr == F_GS_GET_LWS) { shadow_ls(R[4], R[6]); return; }
+    uint32_t a = R[4];
+    const DMat *d = shadow_of(a);
+    if (!d) return;
+    if (addr == F_SET_ROT_M) {
+        /* the game's result: the same matrix, give or take its cuts (which
+         * add up along a model's chain: a few units) */
+        for (int i = 0; i < 9; i++)
+            if (fabs(d->r[i] * 4096.0 - (int16_t)MEM_R16(a + 2 * i)) > 16) return;
+        known_rot_at = (known_rot_at + 1) % KNOWN;
+        for (int i = 0; i < 5; i++) known_rot[known_rot_at].w[i] = MEM_R32(a + 4 * i);
+        known_rot[known_rot_at].w[4] &= 0xFFFF;
+        known_rot[known_rot_at].gen = pgen;
+        memcpy(known_rot[known_rot_at].r, d->r, sizeof d->r);
+        known_rot[known_rot_at].root = shadow_root;
+    } else {
+        for (int i = 0; i < 3; i++)
+            if (fabs(d->t[i] - (int32_t)MEM_R32(a + 0x14 + 4 * i)) > 16) return;
+        known_trans_at = (known_trans_at + 1) % KNOWN;
+        for (int i = 0; i < 3; i++) known_trans[known_trans_at].w[i] = MEM_R32(a + 0x14 + 4 * i);
+        known_trans[known_trans_at].gen = pgen;
+        memcpy(known_trans[known_trans_at].t, d->t, sizeof d->t);
+    }
+}
+
+/* RT/TR written: precise while they hold the words of a precise matrix the
+ * game loaded lately (SetRotMatrix / SetTransMatrix), however they got
+ * there again (PopMatrix, another load). */
+static void matrix_written(int r, uint32_t v) {
+    (void)v;
+    if (r < 5) {
+        uint32_t cur[5];
+        for (int k = 0; k < 4; k++) cur[k] = gte_read_ctrl(k);
+        cur[4] = gte_read_ctrl(4) & 0xFFFF;
+        prec_rot = 0;
+        for (int n = 0; n < KNOWN; n++) {
+            int k = (known_rot_at - n + KNOWN) % KNOWN;
+            if (known_rot[k].gen && known_rot[k].gen + 2 >= pgen && !memcmp(cur, known_rot[k].w, sizeof cur)) {
+                memcpy(prec.r, known_rot[k].r, sizeof prec.r);
+                prec_rot = 1;
+                prec_obj = known_rot[k].root;
+                break;
+            }
+        }
+    } else {
+        uint32_t cur[3] = {(uint32_t)G.tr[0], (uint32_t)G.tr[1], (uint32_t)G.tr[2]};
+        prec_trans = 0;
+        for (int n = 0; n < KNOWN; n++) {
+            int k = (known_trans_at - n + KNOWN) % KNOWN;
+            if (known_trans[k].gen && known_trans[k].gen + 2 >= pgen && !memcmp(cur, known_trans[k].w, sizeof cur)) {
+                memcpy(prec.t, known_trans[k].t, sizeof prec.t);
+                prec_trans = 1;
+                break;
+            }
+        }
+    }
+}
+
+/* A corner through the precise matrix (view space), if the GTE holds one
+ * and it agrees with the GTE's own result. */
+static int precise_view(const int64_t m[3], int16_t vx, int16_t vy, int16_t vz, double out[3]) {
+    static int off = -1;                         /* RT_INT_MATRIX: the GTE's own matrices, for comparisons */
+    if (off < 0) off = getenv("RT_INT_MATRIX") != NULL;
+    if (off || !prec_rot || !prec_trans) return 0;
+    for (int i = 0; i < 3; i++) {
+        out[i] = prec.r[i * 3] * vx + prec.r[i * 3 + 1] * vy + prec.r[i * 3 + 2] * vz + prec.t[i];
+        if (fabs(out[i] - m[i] / 4096.0) > 24) return 0;
+    }
+    return 1;
+}
 
 void gte_swc2(uint32_t addr, int reg) {
-    uint32_t v = gte_read_data(reg);
-    if (reg >= 12 && reg <= 15 && (addr & 0x1FFFFFFF) < 0x00800000) {
-        uint32_t i = (addr & 0x1FFFFF) >> 2;
-        sxy_word[i] = v;
-        sxy_gen[i] = pgen;
-        int k = reg == 15 ? 2 : reg - 12;
-        sxy_px[i] = G.fx[k];
-        sxy_py[i] = G.fy[k];
-        sxy_pz[i] = (float)G.sz[k + 1];
-    }
-    MEM_W32(addr, v);
+    uint32_t v = gte_read_data(reg);         /* an SXY: now among the points just read */
+    MEM_W32(addr, v);                        /* (RAM or scratchpad: takes the point along) */
 }
 
 int gte_stored_sxy(uint32_t addr, uint32_t word) {
@@ -616,8 +931,14 @@ static Precise *precise_find(uint32_t word) {
     return NULL;
 }
 
-static float g_weld = -1;                       /* weld radius, pixels (RT_WELD) */
-#define WELD (g_weld >= 0 ? g_weld : (g_weld = getenv("RT_WELD") ? (float)atof(getenv("RT_WELD")) : 0.35f))
+/* Weld radius, pixels (RT_WELD; 0: off). Off now: with the models'
+ * matrices in full precision a seam's corners already meet, and a distant
+ * model has many corners within a fraction of a pixel of each other, so
+ * welding them snapped a head's or a hand's corner onto a neighbour's for
+ * a frame or a few (half a PS1 pixel, 4 at 8x): necks and wrists that
+ * jumped as the camera moved. 0.35 was the old radius. */
+static float g_weld = -1;
+#define WELD (g_weld >= 0 ? g_weld : (g_weld = getenv("RT_WELD") ? (float)atof(getenv("RT_WELD")) : 0.0f))
 
 
 static unsigned st_addr, st_addr_amb, st_hash, st_hash_amb, st_miss;
@@ -627,7 +948,8 @@ void gte_precise_stats(void) {
     st_addr = st_addr_amb = st_hash = st_hash_amb = st_miss = 0;
 }
 
-int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z) {
+int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z, uint32_t *o) {
+    if (o) *o = 0;
     /* The corner the GTE stored at this very address: its own position.
      * (Looking the word up alone mixes up corners that land on the same
      * pixel, which small, distant models are full of.) */
@@ -650,6 +972,7 @@ int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z) {
                 if ((n & 0x3FFFF) == 0) rt_log("precise: %u lookups, %u differ by more than 1/4 pixel", n, diff);
             }
             if (z) *z = sxy_pz[i];
+            if (o) *o = sxy_po[i];
             st_addr++;
             /* Corners a hair apart (where a model's parts meet: each part has
              * its own copy of the seam's corners) are welded to the one the
@@ -696,6 +1019,7 @@ int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z) {
     }
     if (best >= 0) {
         if (z) *z = b[best].z;
+        if (o) *o = b[best].o;
         st_hash++;
         int amb = 0;
         for (int j = 0; j < PWAYS; j++)

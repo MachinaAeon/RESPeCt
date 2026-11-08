@@ -37,9 +37,25 @@ void mem_slow_w8(uint32_t a, uint32_t v);
 #define RAM_PHYS(a) ((a) & 0x1FFFFFFFu)
 #define IS_RAM(p)   ((p) < 0x800000u)
 
+/* Projected points copied by the game's code (gte.c, "precision"): a RAM
+ * word holding one has its mark set; a load of it and a store of the same
+ * value carry the point's exact position along. */
+extern uint8_t g_sxy_mark[RAM_SIZE / 4];
+extern uint32_t g_sxy_filter[8];          /* hashes of the points just read */
+static inline int sxy_maybe(uint32_t v) { uint32_t h = (v * 0x9E3779B1u) >> 24; return (g_sxy_filter[h >> 5] >> (h & 31)) & 1; }
+void sxy_load(uint32_t p, uint32_t v);
+void sxy_store(uint32_t p, uint32_t v);
+void sxy_scratch_load(uint32_t p, uint32_t v);
+void sxy_scratch_store(uint32_t p, uint32_t v);
+
 static inline uint32_t MEM_R32(uint32_t a) {
     uint32_t p = RAM_PHYS(a);
-    if (IS_RAM(p)) { uint32_t v; memcpy(&v, g_ram + (p & 0x1FFFFC), 4); return v; }
+    if (IS_RAM(p)) {
+        uint32_t v;
+        memcpy(&v, g_ram + (p & 0x1FFFFC), 4);
+        if (g_sxy_mark[(p & 0x1FFFFC) >> 2]) sxy_load(p & 0x1FFFFC, v);
+        return v;
+    }
     return mem_slow_r32(a);
 }
 static inline uint32_t MEM_R16(uint32_t a) {
@@ -62,7 +78,11 @@ extern uint32_t g_watch_lo, g_watch_hi;
 static inline void MEM_W32(uint32_t a, uint32_t v) {
     WATCH(a, v, 4);
     uint32_t p = RAM_PHYS(a);
-    if (IS_RAM(p)) { memcpy(g_ram + (p & 0x1FFFFC), &v, 4); return; }
+    if (IS_RAM(p)) {
+        if (g_sxy_mark[(p & 0x1FFFFC) >> 2] || sxy_maybe(v)) sxy_store(p & 0x1FFFFC, v);
+        memcpy(g_ram + (p & 0x1FFFFC), &v, 4);
+        return;
+    }
     mem_slow_w32(a, v);
 }
 static inline void MEM_W16(uint32_t a, uint32_t v) {

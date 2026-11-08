@@ -31,6 +31,7 @@ typedef struct RPrim {
     int mask_set, mask_check;
     int w, h, flipx, flipy;                  /* rectangles */
     int zt;                                  /* 3D with depth: depth-test it */
+    uint32_t obj;                            /* 3D: the model it belongs to (gte.c), 0 if not known */
     float sqx0, sqx1;                        /* widescreen: a rectangle squeezed to x sqx0..sqx1 (if sqx1 > sqx0) */
     const HdImg *hd;                         /* HD texture pack image to draw from (texpack.c), high-res only: */
     float hd_ox, hd_oy, hd_kx, hd_ky;        /*   its pixel = (hd_ox + u * hd_kx, hd_oy + v * hd_ky) */
@@ -46,10 +47,15 @@ void render_copy(int sx, int sy, int dx, int dy, int w, int h, int mask_set, int
 void render_before_write(int x, int y, int w, int h); /* CPU is about to write this g_vram area */
 void render_uploaded(int x, int y, int w, int h);  /* g_vram area written by the CPU */
 void render_sync(void);
+void render_want(int x, int y, int w, int h);      /* the high-res area the picture shown needs next */
+int render_on_gpu(void);                           /* drawing with the graphics card */
+int render_set_gpu(int on);                        /* the setting changed while running; 0: no usable card */
 void render_zclear(int x, int y, int w, int h);    /* a new frame starts drawing here */
 extern int g_depth_buffer;                         /* setting */                            /* finish queued high-res drawing */
 const uint16_t *render_hires(int *stride);
+const uint16_t *render_low(void);                 /* 24-bit colour: the low bits of the high-res VRAM (render.c) */
 const uint8_t *render_bare(void);                 /* pixels still bare from the screen clear (render.c) */         /* high-res VRAM (scale x 1024 wide) */
+const float *render_depth(void);                  /* 1/z per high-res pixel, -1 under 2D (render.c) */
 
 extern int g_gap_fill;                     /* Close model gaps (margins on distant models' triangles) */
 

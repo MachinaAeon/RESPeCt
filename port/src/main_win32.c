@@ -317,6 +317,23 @@ static void toggle_fullscreen(void) {
     if (captured) { captured = 0; set_capture(1); }
 }
 
+/* The frame to show: drawing on the graphics card, made at the size it's
+ * shown at (paint's picture area), so a picture drawn larger than the
+ * window comes out smoothed rather than with rows and columns dropped. */
+static void grab_frame(void) {
+    extern int g_display_w, g_display_h, g_display_smooth;
+    RECT r;
+    GetClientRect(hwnd, &r);
+    int cw = r.right, ch = r.bottom;
+    int an = g_widescreen ? 16 : 4, ad = g_widescreen ? 9 : 3;
+    int dw = cw, dh = cw * ad / an;
+    if (dh > ch) { dh = ch; dw = ch * an / ad; }
+    g_display_w = dw > 0 ? dw : 0;
+    g_display_h = dh > 0 ? dh : 0;
+    g_display_smooth = g_cfg.smooth_scaling;
+    display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+}
+
 static int key_down(int vk);
 static void paint(HDC dc) {
     RECT r;
@@ -714,6 +731,7 @@ static void read_input(void) {
         }
         g_input.mouse_left = g_input.mouse_right = 0;
         g_input.mouse_dx = g_input.mouse_dy = 0;
+        g_input.look_dx = g_input.look_dy = 0;
         frac_x = frac_y = 0;
     } else {
         menu_acc_x = menu_acc_y = 0;
@@ -724,10 +742,12 @@ static void read_input(void) {
             was = g_input.mouse_left;
         }
         g_input.mouse_right = 0;
-        g_input.mouse_dx += scaled(&frac_x, dx * 2.0 * g_cfg.sens_x);
-        g_input.mouse_dy += scaled(&frac_y, dy * 2.0 * g_cfg.sens_y * (g_cfg.invert_y ? -1 : 1));
-        g_input.mouse_dx += scaled(&pad_fx, pad_dx);
-        g_input.mouse_dy += scaled(&pad_fy, pad_dy);
+        int mx = scaled(&frac_x, dx * 2.0 * g_cfg.sens_x) + scaled(&pad_fx, pad_dx);
+        int my = scaled(&frac_y, dy * 2.0 * g_cfg.sens_y * (g_cfg.invert_y ? -1 : 1)) + scaled(&pad_fy, pad_dy);
+        g_input.mouse_dx += mx;
+        g_input.mouse_dy += my;
+        g_input.look_dx += mx;
+        g_input.look_dy += my;
     }
     g_input.buttons = b;
     /* Don't build up a backlog of motion the game hasn't read. */
@@ -735,6 +755,28 @@ static void read_input(void) {
     if (g_input.mouse_dx < -512) g_input.mouse_dx = -512;
     if (g_input.mouse_dy > 512) g_input.mouse_dy = 512;
     if (g_input.mouse_dy < -512) g_input.mouse_dy = -512;
+    if (g_input.look_dx > 1024) g_input.look_dx = 1024;
+    if (g_input.look_dx < -1024) g_input.look_dx = -1024;
+    if (g_input.look_dy > 1024) g_input.look_dy = 1024;
+    if (g_input.look_dy < -1024) g_input.look_dy = -1024;
+}
+
+/* FPS turning, when the game takes the mouse's motion for its frame: raw
+ * input that came in since this vblank's read_input, so a movement doesn't
+ * wait up to a vblank for the next one. */
+void plat_poll_look(void) {
+    if (!captured || menu_open || suppress_keys) return;
+    MSG m;
+    while (PeekMessage(&m, hwnd, WM_INPUT, WM_INPUT, PM_REMOVE)) DispatchMessage(&m);
+    long dx = pending_dx, dy = pending_dy;
+    if (!dx && !dy) return;
+    pending_dx = pending_dy = 0;
+    int mx = scaled(&frac_x, dx * 2.0 * g_cfg.sens_x);
+    int my = scaled(&frac_y, dy * 2.0 * g_cfg.sens_y * (g_cfg.invert_y ? -1 : 1));
+    g_input.mouse_dx += mx;
+    g_input.mouse_dy += my;
+    g_input.look_dx += mx;
+    g_input.look_dy += my;
 }
 
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS *ep) {
@@ -803,8 +845,10 @@ static void menu_build(void) {
     add_item(0, IT_INT, "Controller dead zone", &g_cfg.pad_deadzone, 0, 50, 1, "How much stick movement around the centre is ignored, in %.");
     add_item(0, IT_BOOL, "Skip intro", &g_cfg.skip_intro, 0, 1, 1, "Fast-forward the logos and warnings at startup.");
     add_item(1, IT_BOOL, "Fullscreen", &g_cfg.fullscreen, 0, 1, 1, "F11 or Alt+Enter also switches.");
-    add_item(1, IT_SCALE, "Resolution", &g_cfg.resolution_scale, 1, 4, 1,
-             "Internal rendering resolution. Higher is sharper and needs a faster PC.");
+    add_item(1, IT_BOOL, "Graphics card", &g_cfg.graphics_card, 0, 1, 1,
+             "Draw with the graphics card (Direct3D 11): much faster, and resolutions up to 8x. HD texture packs are supported.");
+    add_item(1, IT_SCALE, "Resolution", &g_cfg.resolution_scale, 1, 8, 1,
+             "Internal rendering resolution. Higher is sharper and needs a faster PC (above 4x: graphics card).");
     add_item(1, IT_BOOL, "Widescreen (experimental)", &g_cfg.widescreen, 0, 1, 1,
              "16:9: a wider view of the 3D scene; the HUD keeps its shape. Some full-screen menus are stretched.");
     add_item(1, IT_INT, "Brightness (%)", &g_cfg.brightness, 50, 200, 5,
@@ -822,13 +866,17 @@ static void menu_build(void) {
     add_item(1, IT_BOOL, "Auto resolution", &g_cfg.auto_resolution, 0, 1, 1,
              "Lower the resolution by itself when this PC can't keep the game at full speed (it's drawn by the CPU, not the graphics card).");
     add_item(1, IT_BOOL, "Perspective-correct textures", &g_cfg.perspective, 0, 1, 1,
-             "Textures stay straight on big walls and floors instead of bending and swimming as you move (the PlayStation can't do this).");
+             "Textures stay straight on big walls and floors instead of bending and swimming as you move (the PlayStation can't do this). At 2x and higher, close floors and walls also stay whole instead of jumping as the game splits them.");
+    add_item(1, IT_BOOL, "Smooth textures", &g_cfg.smooth_textures, 0, 1, 1,
+             "Smooth the game's own textures on 3D surfaces at 2x and higher, as the PC version draws them, instead of square texels.");
+    add_item(1, IT_BOOL, "24-bit colour", &g_cfg.true_color, 0, 1, 1,
+             "Shade and blend the picture in 24-bit colour at 2x and higher, as the PC version does, instead of the PlayStation's 15 bits: smooth gradients, no banding in the dark.");
     add_item(1, IT_BOOL, "Steady 3D", &g_cfg.subpixel, 0, 1, 1, "Smoother geometry without the PlayStation wobble.");
     add_item(1, IT_BOOL, "Smooth scaling", &g_cfg.smooth_scaling, 0, 1, 1, "Smooth the picture when scaling it to the window.");
     add_item(1, IT_BOOL, "Depth fix", &g_cfg.depth_buffer, 0, 1, 1,
              "Keeps the back of a model from showing through its front (faces, legs), which shows at higher resolutions.");
     add_item(1, IT_BOOL, "Close model gaps", &g_cfg.gap_fill, 0, 1, 1,
-             "Distant models show gaps between their parts at higher resolutions (flickering as they move): draw their small triangles a little larger.");
+             "Close the hair-thin gaps between models' parts and where walls meet, which flicker as things move at higher resolutions. Outlines stay as they are.");
     if (texpack_loaded())
         add_item(1, IT_BOOL, "HD textures", &g_cfg.hd_textures, 0, 1, 1,
                  "Draw the game's textures from the HD texture pack next to the game (shows at resolution 2x and up). F2 also switches.");
@@ -867,7 +915,7 @@ static void apply_audio(void) {
 static void apply_settings(void) {
     apply_audio();
     g_opt_fov = g_cfg.field_of_view;
-    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
+    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp, g_smooth_tex, g_true_color; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; g_smooth_tex = g_cfg.smooth_textures; g_true_color = g_cfg.true_color; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
     rt_set_look_limit(g_cfg.look_limit);
     g_cheat_god = g_cfg.god_mode;
     g_cheat_infinite_ammo = g_cfg.infinite_ammo;
@@ -875,9 +923,14 @@ static void apply_settings(void) {
     g_opt_widescreen = g_cfg.widescreen;
     g_subpixel = g_cfg.subpixel;
     if (!!g_cfg.fullscreen != !!fullscreen) toggle_fullscreen();
+    if (!!g_cfg.graphics_card != render_on_gpu() && !render_set_gpu(g_cfg.graphics_card)) {
+        g_cfg.graphics_card = 0;
+        show_toast("No graphics card with Direct3D 11 that can do this: drawing with the processor");
+    }
+    if (!render_on_gpu() && g_cfg.resolution_scale > 4) g_cfg.resolution_scale = 4;
     if (render_scale() != g_cfg.resolution_scale) {
         render_set_scale(g_cfg.resolution_scale);
-        display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+        grab_frame();
     }
     load_bindings();
 }
@@ -952,10 +1005,10 @@ static void change(int i, int dir) {
         break;
     }
     case IT_INT: case IT_SCALE: {
-        int *v = it->val;
+        int *v = it->val, hi = it->type == IT_SCALE && !render_on_gpu() ? 4 : (int)it->hi;
         *v += dir * (int)it->step;
         if (*v < it->lo) *v = (int)it->lo;
-        if (*v > it->hi) *v = (int)it->hi;
+        if (*v > hi) *v = hi;
         break;
     }
     case IT_BOOL: *(int *)it->val = !*(int *)it->val; break;
@@ -1271,7 +1324,7 @@ static void auto_resolution(int late) {
     int s = render_scale() - 1;
     g_cfg.resolution_scale = s;
     render_set_scale(s);
-    display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+    grab_frame();
     save_settings();
     char m[160];
     snprintf(m, sizeof m, "Resolution lowered to %dx to keep the game at full speed (F1 > Video)", s);
@@ -1318,7 +1371,7 @@ void plat_frame(void) {
     static LARGE_INTEGER last_paint;
     if (!fast || t0.QuadPart - last_paint.QuadPart >= qpf.QuadPart / 60) {
         last_paint = t0;
-        display_grab_bgrx(frame_buf, &frame_w, &frame_h);
+        grab_frame();
         HDC dc = GetDC(hwnd);
         paint(dc);
         ReleaseDC(hwnd, dc);
@@ -1432,12 +1485,13 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         g_cheat_infinite_ammo = g_cfg.infinite_ammo;
         g_cheat_no_reload = g_cfg.no_reload;
         g_opt_fov = g_cfg.field_of_view;
-    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
+    { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp, g_smooth_tex, g_true_color; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; g_smooth_tex = g_cfg.smooth_textures; g_true_color = g_cfg.true_color; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
         apply_audio();
         games_dir();
         pick_latest_slot();
         extern int g_opt_scale, g_opt_threads;
         g_opt_scale = g_cfg.resolution_scale;
+        { extern int g_gpu; g_gpu = g_cfg.graphics_card; }
         g_opt_widescreen = g_cfg.widescreen;
         g_subpixel = g_cfg.subpixel;
         SYSTEM_INFO si;
