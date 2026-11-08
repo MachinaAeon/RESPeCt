@@ -13,6 +13,7 @@
 #include "game_vars.h"
 #include "savegame.h"
 #include "savestate.h"
+#include <stdlib.h>
 
 extern int16_t g_fps_pitch_limit;          /* port/src/rt.c, from resurv.ini */
 void input_take_look(int *dx, int *dy);    /* port/src/sio.c: mouse motion since the last game frame */
@@ -214,6 +215,15 @@ static void dualshock_section(void) {
     else if (v < 0x50) g_playerMoveFlags |= MOVE_TURN_LEFT;
 }
 
+/* RT_PAD_LOOK=1: turn by the pad buffer's last vblank of motion, as the
+ * original build does, so comparison runs with recorded mouse motion match
+ * it (tools/eq sets it). */
+static int pad_look(void) {
+    static int v = -1;
+    if (v < 0) v = getenv("RT_PAD_LOOK") != NULL;
+    return v;
+}
+
 static s32 fps_pitch;                       /* this frame's look up/down (fps_section) */
 
 /* FPS mode: digital pad in port 1 and a PlayStation Mouse in port 2. */
@@ -237,6 +247,7 @@ static void fps_section(void) {
      * scales it by sensitivity), not the pad buffer's last vblank */
     int dx, dy;
     input_take_look(&dx, &dy);
+    if (pad_look()) { dx = (s8)m[4]; dy = (s8)m[5]; }   /* RT_PAD_LOOK: the old way, for comparisons */
     g_playerYawVel = (s16)(ok ? dx : 0);
     fps_pitch = ok ? dy : 0;
 

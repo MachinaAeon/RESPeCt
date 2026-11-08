@@ -170,6 +170,7 @@ void render_reload(void);
 void gte_reset_caches(void);
 void spu_reset_output(void);
 void rt_reset_call_cache(void);
+void rt_split_reset(void);
 
 /* Returns only if the file can't be loaded (msg says why). */
 static void load_now(const char *path, char *msg, size_t msgn) {
@@ -222,6 +223,7 @@ static void load_now(const char *path, char *msg, size_t msgn) {
     spu_reset_output();
     { void cd_reapply_volume(void); cd_reapply_volume(); }
     rt_reset_call_cache();
+    rt_split_reset();
     { extern int thread_current(void);
       rt_log("savestate: loaded %s, frame %u, continuing at %08X (thread %d, sp %08X, ra %08X)", path, g_frame, g_poll_pc | 1, thread_current(), R[29], R[31]); }
     plat_ss_done(1, 1, "Loaded");

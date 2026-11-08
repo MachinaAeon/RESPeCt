@@ -7,6 +7,10 @@
 # with BASE and with NEW for 150 frames and compares RAM.
 # usage: sscompat.sh BASE NEW WORKDIR
 set -u
+# The original build has no Close-up 3D change to the split threshold (rt.c),
+export RT_KEEP_SPLIT=1
+# nor the whole-motion mouse turning (port/decomp/player.c).
+export RT_PAD_LOOK=1
 A=$(realpath "$1"); B=$(realpath "$2"); W=$(realpath -m "$3"); mkdir -p "$W"
 DISC=${DISC:-/root/resurv/disc/image/survivor.bin}
 HERE=$(cd "$(dirname "$0")" && pwd)

@@ -4,6 +4,10 @@
 # function, runs run.sh with it, lists the ones never called.
 # usage: coverage.sh BASE_BINARY WORKDIR
 set -u
+# The original build has no Close-up 3D change to the split threshold (rt.c),
+export RT_KEEP_SPLIT=1
+# nor the whole-motion mouse turning (port/decomp/player.c).
+export RT_PAD_LOOK=1
 BASE=$(realpath "$1"); W=$(realpath -m "$2"); mkdir -p "$W"
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 rm -rf "$W/src"; mkdir -p "$W/src"; cp -r "$ROOT/port/." "$W/src/"; rm -rf "$W/src/build"

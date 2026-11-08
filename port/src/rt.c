@@ -259,6 +259,7 @@ int game_player_in_control(void) {
 int16_t g_fps_pitch_limit = 0x300;          /* used by port/decomp/player.c */
 void rt_set_look_limit(int degrees) { g_fps_pitch_limit = (int16_t)(degrees * 4096 / 360); }
 
+static int split_zeroed;                        /* the threshold's 0 is ours (Close-up 3D) */
 static void write_port_config(void) {
     MEM_W32(0x80011288, 0x52535043);
     MEM_W16(0x8001128C, 1);
@@ -276,11 +277,19 @@ static void write_port_config(void) {
     extern int g_persp;
     static int keep = -1;                       /* RT_KEEP_SPLIT: the game's own threshold, for comparisons */
     if (keep < 0) keep = getenv("RT_KEEP_SPLIT") != NULL;
-    uint32_t thr = MEM_R32(0x80060D3C), want = g_persp && render_scale() > 1 && !keep ? 0 : 0x578;
-    if ((thr == 0x578 || thr == 0) && thr != want) MEM_W32(0x80060D3C, want);
+    /* Only a 0 written here is put back: the game's own 0 (before it sets
+     * the threshold when a game starts) stays, so with the setting off the
+     * RAM is the PS1's. */
+    int whole = g_persp && render_scale() > 1 && !keep;
+    uint32_t thr = MEM_R32(0x80060D3C);
+    if (whole && thr == 0x578) { MEM_W32(0x80060D3C, 0); split_zeroed = 1; }
+    else if (!whole && thr == 0 && split_zeroed) { MEM_W32(0x80060D3C, 0x578); split_zeroed = 0; }
     extern int g_whole_polys;
-    g_whole_polys = want == 0;
+    g_whole_polys = whole;
 }
+
+/* After loading a save state the threshold in RAM is the state's. */
+void rt_split_reset(void) { split_zeroed = 0; }
 
 /* Advance the hardware clock by one slice and run due interrupts. */
 int rt_in_interrupt(void);
