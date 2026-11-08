@@ -176,6 +176,43 @@ ENV[area61]="RT_LOAD=$SAVES/area61.sav RT_CLICK=70060,71550 RT_CLICK_EVERY=9 RT_
 ARGS[area61]="--press 70060:10:700 --press 70860:40:300"; FRAMES[area61]=71550
 ENV[area62]="RT_LOAD=$SAVES/area62.sav RT_CLICK=74471,75961 RT_CLICK_EVERY=9 RT_MOUSE=2,1,74471,75961"
 ARGS[area62]="--press 74471:10:700 --press 75271:40:300"; FRAMES[area62]=75961
+# Saves from a play session (2026-11-08, made with the "Handgun One Shot" mod,
+# testdata/mods_handgun): the same walk; play17 is the sewer by the water
+# where the fogged water driver crashed
+ENV[play1]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play1.sav RT_CLICK=54194,55684 RT_CLICK_EVERY=9 RT_MOUSE=2,1,54194,55684"
+ARGS[play1]="--press 54194:10:700 --press 54994:40:300"; FRAMES[play1]=55684
+ENV[play2]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play2.sav RT_CLICK=55397,56887 RT_CLICK_EVERY=9 RT_MOUSE=2,1,55397,56887"
+ARGS[play2]="--press 55397:10:700 --press 56197:40:300"; FRAMES[play2]=56887
+ENV[play3]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play3.sav RT_CLICK=55714,57204 RT_CLICK_EVERY=9 RT_MOUSE=2,1,55714,57204"
+ARGS[play3]="--press 55714:10:700 --press 56514:40:300"; FRAMES[play3]=57204
+ENV[play4]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play4.sav RT_CLICK=56906,58396 RT_CLICK_EVERY=9 RT_MOUSE=2,1,56906,58396"
+ARGS[play4]="--press 56906:10:700 --press 57706:40:300"; FRAMES[play4]=58396
+ENV[play5]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play5.sav RT_CLICK=57787,59277 RT_CLICK_EVERY=9 RT_MOUSE=2,1,57787,59277"
+ARGS[play5]="--press 57787:10:700 --press 58587:40:300"; FRAMES[play5]=59277
+ENV[play6]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play6.sav RT_CLICK=60406,61896 RT_CLICK_EVERY=9 RT_MOUSE=2,1,60406,61896"
+ARGS[play6]="--press 60406:10:700 --press 61206:40:300"; FRAMES[play6]=61896
+ENV[play7]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play7.sav RT_CLICK=62288,63778 RT_CLICK_EVERY=9 RT_MOUSE=2,1,62288,63778"
+ARGS[play7]="--press 62288:10:700 --press 63088:40:300"; FRAMES[play7]=63778
+ENV[play8]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play8.sav RT_CLICK=66701,68191 RT_CLICK_EVERY=9 RT_MOUSE=2,1,66701,68191"
+ARGS[play8]="--press 66701:10:700 --press 67501:40:300"; FRAMES[play8]=68191
+ENV[play9]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play9.sav RT_CLICK=66918,68408 RT_CLICK_EVERY=9 RT_MOUSE=2,1,66918,68408"
+ARGS[play9]="--press 66918:10:700 --press 67718:40:300"; FRAMES[play9]=68408
+ENV[play10]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play10.sav RT_CLICK=67058,68548 RT_CLICK_EVERY=9 RT_MOUSE=2,1,67058,68548"
+ARGS[play10]="--press 67058:10:700 --press 67858:40:300"; FRAMES[play10]=68548
+ENV[play11]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play11.sav RT_CLICK=73257,74747 RT_CLICK_EVERY=9 RT_MOUSE=2,1,73257,74747"
+ARGS[play11]="--press 73257:10:700 --press 74057:40:300"; FRAMES[play11]=74747
+ENV[play12]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play12.sav RT_CLICK=75465,76955 RT_CLICK_EVERY=9 RT_MOUSE=2,1,75465,76955"
+ARGS[play12]="--press 75465:10:700 --press 76265:40:300"; FRAMES[play12]=76955
+ENV[play13]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play13.sav RT_CLICK=75662,77152 RT_CLICK_EVERY=9 RT_MOUSE=2,1,75662,77152"
+ARGS[play13]="--press 75662:10:700 --press 76462:40:300"; FRAMES[play13]=77152
+ENV[play14]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play14.sav RT_CLICK=76782,78272 RT_CLICK_EVERY=9 RT_MOUSE=2,1,76782,78272"
+ARGS[play14]="--press 76782:10:700 --press 77582:40:300"; FRAMES[play14]=78272
+ENV[play15]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play15.sav RT_CLICK=91069,92559 RT_CLICK_EVERY=9 RT_MOUSE=2,1,91069,92559"
+ARGS[play15]="--press 91069:10:700 --press 91869:40:300"; FRAMES[play15]=92559
+ENV[play16]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play16.sav RT_CLICK=93962,95452 RT_CLICK_EVERY=9 RT_MOUSE=2,1,93962,95452"
+ARGS[play16]="--press 93962:10:700 --press 94762:40:300"; FRAMES[play16]=95452
+ENV[play17]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play17.sav RT_CLICK=94756,96246 RT_CLICK_EVERY=9 RT_MOUSE=2,1,94756,96246"
+ARGS[play17]="--press 94756:10:700 --press 95556:40:300"; FRAMES[play17]=96246
 # the ending: staff credits, skipped with start, and the results screen
 # coming up (area67); the results screen, its "save
 # the weapons?" prompt, the memory card save and back to the title (area68)
@@ -198,7 +235,7 @@ ARGS[options_game]="--press 3900:1:4 --press 4050:20:4 --press 4090:4000:4 --pre
 # the attract demos: start at the title, then left alone
 ENV[demo]="RT_MOUSE=0,0,0,1"; NOSTART[demo]=1
 ARGS[demo]="--press 1650:8:4"; FRAMES[demo]=20000
-AREAS="demo area67 area68 area6 area7 area8 area9 area10 area11 area12 area13 area14 area19 area21 area22 area23 area24 area25 area98 area99 area26 area27 area28 area29 area30 area31 area32 area33 area34 area35 area37 area39 area40 area41 area42 area43 area44 area45 area46 area47 area48 area49 area50 area51 area52 area53 area54 area55 area56 area57 area58 area59 area60 area61 area62"
+AREAS="demo area67 area68 area6 area7 area8 area9 area10 area11 area12 area13 area14 area19 area21 area22 area23 area24 area25 area98 area99 area26 area27 area28 area29 area30 area31 area32 area33 area34 area35 area37 area39 area40 area41 area42 area43 area44 area45 area46 area47 area48 area49 area50 area51 area52 area53 area54 area55 area56 area57 area58 area59 area60 area61 area62 play1 play2 play3 play4 play5 play6 play7 play8 play9 play10 play11 play12 play13 play14 play15 play16 play17"
 LIST=${*:-intro weapons walk menu ammo launcher reloads heavy fight1 hurt1 fight2 fight1s fight1g door death phone gload $AREAS}
 for s in $LIST; do
   for side in ${EQ_SIDES:-base new}; do

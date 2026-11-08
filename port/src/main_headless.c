@@ -236,8 +236,8 @@ void plat_frame(void) {
             MEM_W32(0x800B3D30, door);
             rt_log("door: taking door %d (%08X), to %04X", dn, door, c);
         }
-        /* RT_RAMDUMP=n:dir: write main RAM to dir/rNNNNN.bin every n frames
-         * (for comparing two builds frame by frame) */
+        /* RT_RAMDUMP=n:dir: write the game's 2 MB of RAM to dir/rNNNNN.bin every
+         * n frames (for comparing two builds frame by frame) */
         const char *rd = getenv("RT_RAMDUMP");
         if (rd) {
             unsigned every_n = (unsigned)atoi(rd);
@@ -246,7 +246,7 @@ void plat_frame(void) {
                 char p[512];
                 snprintf(p, sizeof p, "%s/r%05u.bin", dir + 1, g_frame);
                 FILE *f = fopen(p, "wb");
-                if (f) { fwrite(g_ram, 1, RAM_SIZE, f); fclose(f); }
+                if (f) { fwrite(g_ram, 1, RAM_GAME, f); fclose(f); }
             }
         }
         /* RT_FLAGS: log the control state when it changes */

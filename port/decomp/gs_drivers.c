@@ -2516,8 +2516,10 @@ static s32 water_slope(u32 sp, s32 ang) {
  * quad in strip order 0 1 2 3); the player tests' NCLIPs stored at dest
  * (the unit's flags word for triangles, the stack for quads); splash
  * polls at poll; pre: the textured-Gouraud drivers' first test that the
- * normal has a height component. */
-static void water_check(u32 sp, u32 dest, const u32 *vv, int nv, u32 poll, int pre) {
+ * normal has a height component; jslot: the driver's own stack slot for
+ * its loop over the enemies near the object (each driver has its own:
+ * 0x68 in the fogged GT4 driver, where 0x60 is its polygon counter). */
+static void water_check(u32 sp, u32 dest, const u32 *vv, int nv, u32 poll, int pre, u32 jslot) {
     static const s8 ptri[3][3] = { { 0, 1, -1 }, { 0, -1, 2 }, { -1, 1, 2 } };
     static const s8 pquad[4][3] = { { 0, 1, -1 }, { 0, -1, 2 }, { -1, 3, 2 }, { 1, 3, -1 } };
     static const u8 etri[3][2] = { { 0, 1 }, { 1, 2 }, { 2, 0 } };
@@ -2554,7 +2556,7 @@ static void water_check(u32 sp, u32 dest, const u32 *vv, int nv, u32 poll, int p
         }
     }
     if ((s16)GV(u16, 0x800AB514u) == 0) return;
-    const u32 jc = sp + (nv == 3 ? 0x68 : 0x60);
+    const u32 jc = sp + jslot;
     MEM_W16(jc, 0);
     for (;;) {
         const u32 ent = 0x800B3EA8u + (u32)((s32)(s16)MEM_R16(jc) * 12);
@@ -2650,7 +2652,7 @@ static void water_tri_driver(const WaterTri *k) {
             u32 i0 = MEM_R32(sp + 0x44), i1 = MEM_R32(sp + 0x48), i2 = MEM_R32(sp + 0x4C);
             {
                 const u32 vv[3] = { WV(i0), WV(i1), WV(i2) };
-                water_check(sp, w + 0x24, vv, 3, k->poll_splash, k->gt);
+                water_check(sp, w + 0x24, vv, 3, k->poll_splash, k->gt, 0x68);
             }
             u32 a0 = WV(i0), a1 = WV(i1), a2 = WV(i2);
             gte_write_data(0, MEM_R32(a0));
@@ -2796,7 +2798,7 @@ static void quad_ft4_driver(const QuadDrv *k) {
             u32 a0 = VX((s32)w0 >> 16), a1 = VX((s32)w1 >> 16), a2 = VX(w2 & 0xFFFF);
             if (k->water) {
                 const u32 vv[4] = { a0, a1, a2, VX((s32)w2 >> 16) };
-                water_check(sp, sp + 0x40, vv, 4, k->poll_splash, 0);
+                water_check(sp, sp + 0x40, vv, 4, k->poll_splash, 0, 0x60);
             }
             gte_write_data(0, MEM_R32(a0));
             gte_write_data(1, MEM_R32(a0 + 4));
@@ -2934,7 +2936,7 @@ static void quad_gt4_driver(const QuadDrv *k) {
             u32 a0 = VX((s32)w0 >> 16), a1 = VX((s32)w1 >> 16), a2 = VX(w2 & 0xFFFF);
             if (k->water) {
                 const u32 vv[4] = { a0, a1, a2, VX((s32)w2 >> 16) };
-                water_check(sp, sp + 0x40, vv, 4, k->poll_splash, 0);
+                water_check(sp, sp + 0x40, vv, 4, k->poll_splash, 0, 0x60);
             }
             gte_write_data(0, MEM_R32(a0));
             gte_write_data(1, MEM_R32(a0 + 4));
@@ -3079,7 +3081,7 @@ void n_gs_WaterFT4Fog(void) {
             u32 a0 = VX(MEM_R16(e + 4)), a1 = VX(MEM_R16(e + 8)), a2 = VX(MEM_R16(e + 0xA)), a3 = VX(MEM_R16(e + 0xC));
             {
                 const u32 vv[4] = { a0, a1, a2, a3 };
-                water_check(sp, w + 0x28, vv, 4, 0x80051EA8u, 0);
+                water_check(sp, w + 0x28, vv, 4, 0x80051EA8u, 0, 0x58);
             }
             a0 = VX(MEM_R16(e + 4)); a1 = VX(MEM_R16(e + 8)); a2 = VX(MEM_R16(e + 0xA));
             gte_write_data(0, MEM_R32(a0));
@@ -3210,7 +3212,7 @@ void n_gs_WaterGT4Fog(void) {
             const u32 rec = MEM_R32(sp + 0x40);
             {
                 const u32 vv[4] = { VX(MEM_R16(e + 4)), VX(MEM_R16(e + 8)), VX(MEM_R16(e + 0xA)), VX(MEM_R16(e + 0xC)) };
-                water_check(sp, w + 0x28, vv, 4, 0x800545C8u, 0);
+                water_check(sp, w + 0x28, vv, 4, 0x800545C8u, 0, 0x68);
             }
             const u32 pk = R[22];
             const u32 w6 = MEM_R32(e + 2), w4 = MEM_R32(e + 6), w3 = MEM_R32(e + 0xA);
@@ -3380,7 +3382,7 @@ void n_gs_WaterFT3Fog(void) {
             const u32 rec = MEM_R32(sp + 0x40);
             {
                 const u32 vv[3] = { VX(MEM_R16(e + 4)), VX(MEM_R16(e + 6)), VX(MEM_R16(e + 8)) };
-                water_check(sp, w + 0x24, vv, 3, 0x8004E408u, 0);
+                water_check(sp, w + 0x24, vv, 3, 0x8004E408u, 0, 0x58);
             }
             u32 a0 = VX(MEM_R16(e + 4)), a1 = VX(MEM_R16(e + 6)), a2 = VX(MEM_R16(e + 8));
             gte_write_data(0, MEM_R32(a0));
@@ -3505,7 +3507,7 @@ void n_gs_WaterGT3Fog(void) {
             R[20] = rec + 0x32;
             {
                 const u32 vv[3] = { VX(MEM_R16(rec + 0x16)), VX(MEM_R16(rec + 0x18)), VX(MEM_R16(rec + 0x1A)) };
-                water_check(sp, w + 0x24, vv, 3, 0x8004F9E4u, 1);
+                water_check(sp, w + 0x24, vv, 3, 0x8004F9E4u, 1, 0x68);
             }
             u32 v = VX(MEM_R16(rec + 0x16));
             gte_write_data(0, MEM_R32(v));
