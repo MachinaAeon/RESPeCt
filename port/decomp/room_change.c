@@ -24,6 +24,9 @@
 #include "game_stack.h"
 #include "poll.h"
 
+u32 modfs_ui_text(u32 original);                 /* modfs.c: text/UI.txt's version of a string */
+void modfs_pc_used(uint32_t item);               /* modfs_pc_text.inc: the key, for the PC's picture of the message */
+
 void n_room_ChangeStep(void);
 void n_room_DecodeDestination(void);
 void n_room_EntryEvents(void);
@@ -412,7 +415,7 @@ void n_op_Door(void) {
                 GS(u32, sp + 0x10) = 2;
                 GS(u32, sp + 0x14) = 0;
                 GS(u32, sp + 0x18) = 0;
-                GCALL4(F_MSG_ADD_ENTRY, 0x800A2E84u, (u32)-0x80, 0x30, 0x10);
+                GCALL4(F_MSG_ADD_ENTRY, modfs_ui_text(0x800A2E84u), (u32)-0x80, 0x30, 0x10);   /* (text/UI.txt @DOOR_LOCKED_OTHER_SIDE) */
                 g_msgState = 1;
                 g_msgOverMenu = 0;
                 GV(u16, th + 4) = 1;
@@ -422,14 +425,14 @@ void n_op_Door(void) {
             s32 key = (s32)GCALL1(F_FIND_KEY, GV(u32, door + 0x10));
             if (key < 0) {                                     /* no key: locked */
                 GCALL2(F_DOOR_SOUND, door, 0);
-                GCALL2(F_MSG_SHOW, 0x800A2ECCu, 0);
+                GCALL2(F_MSG_SHOW, modfs_ui_text(0x800A2ECCu), 0);   /* (@DOOR_LOCKED) */
                 GV(u16, th + 4) = 2;
                 V0 = 1;
                 return;
             }
             /* "used <key>" */
             s32 n;
-            u32 d = copy_text(MSG_BUF, 0x800A2EF4u, &n, 0x80087D8C);
+            u32 d = copy_text(MSG_BUF, modfs_ui_text(0x800A2EF4u), &n, 0x80087D8C);   /* (@DOOR_USED) */
             GV(u16, d) = 0xFFFE; d += 2;
             GV(u16, d) = 0xFC01; d += 2;
             d = copy_text(d, GV(u32, ITEM_NAMES + (u32)key * 4), &n, 0x80087DE8);
@@ -445,6 +448,7 @@ void n_op_Door(void) {
             GS(u32, sp + 0x10) = 2;
             GS(u32, sp + 0x14) = 0;
             GS(u32, sp + 0x18) = 0;
+            modfs_pc_used((u32)key);
             GCALL4(F_MSG_ADD_ENTRY, MSG_BUF, (u32)x, 0x30, 0x10);
             g_msgState = 1;
             g_msgOverMenu = 0;
@@ -455,7 +459,7 @@ void n_op_Door(void) {
         if (GCALL2(F_FLAG_TEST, EVENT_FLAGS, (u32)fl & 0xFFFFFF) != 0) goto open;
         if (GV(u32, door + 0x10) & 0x40000000) {               /* unlocks from this side */
             GCALL2(F_DOOR_SOUND, door, 1);
-            GCALL2(F_MSG_SHOW, 0x800A2F14u, 0);
+            GCALL2(F_MSG_SHOW, modfs_ui_text(0x800A2F14u), 0);   /* (@DOOR_UNLOCKED) */
             GV(u16, th + 4) = 3;
             V0 = 1;
             return;

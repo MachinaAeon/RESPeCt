@@ -12,6 +12,7 @@
  */
 #include <windows.h>          /* before rt.h: its R macro clashes with winnt.h */
 #include <commdlg.h>
+#include <shellapi.h>
 #include <xinput.h>
 
 #include "rt.h"
@@ -38,7 +39,7 @@ extern int g_opt_fov;                                                       /* g
 static int cutscene_frames;                /* frames in a cutscene so far (for the hint) */
 #define SAVE_SLOTS 99
 static int save_slot = 1;                  /* 1-99: F5 saves there, F9 loads it; F6/F7 pick */
-static char toast[128];
+static char toast[192];
 static DWORD toast_until;
 
 static void show_toast(const char *msg) {
@@ -334,6 +335,57 @@ static void grab_frame(void) {
     display_grab_bgrx(frame_buf, &frame_w, &frame_h);
 }
 
+/* The mods folder, made on the first start with a note on how it works;
+ * and an empty `extract` folder next to the exe asks for the originals
+ * (modfs.c). */
+static void mods_folder(const char *dir) {
+    extern char g_mods_dir[1024], g_extract_dir[1024];
+    if (GetFileAttributesA(g_mods_dir) == INVALID_FILE_ATTRIBUTES && CreateDirectoryA(g_mods_dir, NULL)) {
+        char p[MAX_PATH + 32];
+        snprintf(p, sizeof p, "%s\\README.txt", g_mods_dir);
+        FILE *f = fopen(p, "w");
+        if (f) {
+            fputs("RESPeCt mods\n"
+                  "============\n\n"
+                  "Each folder in here is one mod. Its files take the place of the game's\n"
+                  "while it plays, without changing your disc image:\n\n"
+                  "  mods\\my-mod\\B\\MAPTIM.BIN                  a file of the disc, by its path\n"
+                  "  mods\\my-mod\\stage\\STAGE07\\0700\\0700_A.hmd  a PC version file (PSX_DATA)\n"
+                  "  mods\\my-mod\\map\\MAP00_1.png                a PC version picture (BMP or PNG)\n"
+                  "  mods\\my-mod\\nab\\ENEM11.NAB, .NAC, .png     an enemy's textures, animations\n"
+                  "  mods\\my-mod\\X\\BGM_32.STR\\05.wav          music, voices: a channel of a stream\n"
+                  "  mods\\my-mod\\wav\\Scene05_1.wav             the same, by the PC version's name\n"
+                  "  mods\\my-mod\\NOISE\\001\\02.wav              a sound effect (sound 2 of bank 1)\n"
+                  "  mods\\my-mod\\NOISE\\236\\music1.wav          a room's music as a recording (or .seq)\n"
+                  "  mods\\my-mod\\M\\OPENING.STR\\0042.png       a movie's frame 42\n\n"
+                  "To get the originals to start from, make an empty folder called\n"
+                  "\"extract\" next to RESPeCt.exe and start the game once: everything a\n"
+                  "mod can replace is written there, under the names to use. For movies,\n"
+                  "a folder called \"movie_dump\" gets every frame as the movies play.\n\n"
+                  "Mods apply in alphabetical order, or in the order of an order.txt in\n"
+                  "this folder (one folder name per line); the later one wins. A folder\n"
+                  "whose name starts with _ is switched off.\n\n"
+                  "On start the game says how many files it used. What each file did, or\n"
+                  "why it wasn't used, is in resurv.log (lines starting \"mods:\").\n"
+                  "All the details: docs/MODDING.md on the RESPeCt page.\n", f);
+            fclose(f);
+        }
+    }
+    snprintf(g_extract_dir, sizeof g_extract_dir, "%sextract", dir);
+    char pat[MAX_PATH + 16];
+    snprintf(pat, sizeof pat, "%s\\*", g_extract_dir);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    int empty = h != INVALID_HANDLE_VALUE;
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if (strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, "..")) empty = 0;
+        } while (empty && FindNextFileA(h, &fd));
+        FindClose(h);
+    }
+    if (!empty) g_extract_dir[0] = 0;            /* only into an empty one: never over a modder's work */
+}
+
 static int key_down(int vk);
 static void paint(HDC dc) {
     RECT r;
@@ -386,12 +438,12 @@ static void paint(HDC dc) {
         HFONT f = CreateFontA(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, "Segoe UI");
         HGDIOBJ of = SelectObject(dc, f);
         SetBkMode(dc, TRANSPARENT);
-        RECT r = {dx + fh, dy + fh, dx + dw - fh, dy + fh * 3};
+        RECT r = {dx + fh, dy + fh, dx + dw - fh, dy + fh * 5};   /* (a long one goes on over more lines) */
         RECT sh = {r.left + 2, r.top + 2, r.right + 2, r.bottom + 2};
         SetTextColor(dc, RGB(0, 0, 0));
-        DrawTextA(dc, toast, -1, &sh, DT_LEFT | DT_TOP | DT_SINGLELINE);
+        DrawTextA(dc, toast, -1, &sh, DT_LEFT | DT_TOP | DT_WORDBREAK | DT_NOPREFIX);
         SetTextColor(dc, RGB(235, 235, 235));
-        DrawTextA(dc, toast, -1, &r, DT_LEFT | DT_TOP | DT_SINGLELINE);
+        DrawTextA(dc, toast, -1, &r, DT_LEFT | DT_TOP | DT_WORDBREAK | DT_NOPREFIX);
         SelectObject(dc, of);
         DeleteObject(f);
     }
@@ -810,8 +862,8 @@ typedef struct {
     const char *hint;
 } MenuItem;
 
-static const char *page_names[] = {"Mouse & game", "Video", "Audio", "Keys", "Saves", "Cheats"};
-#define NPAGES 6
+static const char *page_names[] = {"Mouse & game", "Video", "Audio", "Keys", "Saves", "Cheats", "Mods"};
+#define NPAGES 7
 static MenuItem items[96];
 static int nitems;
 static int menu_page, menu_sel, menu_binding = -1, menu_bind_armed;
@@ -825,6 +877,62 @@ static const char *action_labels[ACT_COUNT] = {
 static void add_item(int page, int type, const char *label, void *val, double lo, double hi, double step,
                      const char *hint) {
     items[nitems++] = (MenuItem){page, type, label, val, lo, hi, step, hint};
+}
+
+/* The Mods page: each mod folder on or off (mods/disabled.txt, read on
+ * the next start: the files of a running game stay where they are), the
+ * mods' options, and the folders. */
+#define MAX_MENU_MODS 24
+static char mod_names[MAX_MENU_MODS][96];
+static int mod_on[MAX_MENU_MODS], mod_on_was[MAX_MENU_MODS], nmenu_mods;
+
+static int mod_disabled(const char *name) {
+    extern char g_mods_dir[1024];
+    char p[1100], line[256];
+    snprintf(p, sizeof p, "%s\\disabled.txt", g_mods_dir);
+    FILE *f = fopen(p, "r");
+    int off = 0;
+    while (f && !off && fgets(line, sizeof line, f)) {
+        line[strcspn(line, "\r\n")] = 0;
+        off = !_stricmp(line, name);
+    }
+    if (f) fclose(f);
+    return off;
+}
+
+static void mods_list(void) {
+    extern char g_mods_dir[1024];
+    char pat[1100];
+    snprintf(pat, sizeof pat, "%s\\*", g_mods_dir);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    nmenu_mods = 0;
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == '.' || fd.cFileName[0] == '_') continue;
+        if (nmenu_mods == MAX_MENU_MODS) break;
+        snprintf(mod_names[nmenu_mods], sizeof mod_names[0], "%s", fd.cFileName);
+        mod_on[nmenu_mods] = mod_on_was[nmenu_mods] = !mod_disabled(fd.cFileName);
+        nmenu_mods++;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+}
+
+/* The panel closes: the mods switched on or off go into disabled.txt. */
+static void mods_save(void) {
+    extern char g_mods_dir[1024];
+    int changed = 0;
+    for (int i = 0; i < nmenu_mods; i++) changed |= mod_on[i] != mod_on_was[i];
+    if (!changed) return;
+    char p[1100];
+    snprintf(p, sizeof p, "%s\\disabled.txt", g_mods_dir);
+    FILE *f = fopen(p, "w");
+    if (!f) { show_toast("Couldn't write mods\\disabled.txt"); return; }
+    fputs("# Mods switched off (one folder name a line), from the Mods page of the settings.\n", f);
+    for (int i = 0; i < nmenu_mods; i++) if (!mod_on[i]) fprintf(f, "%s\n", mod_names[i]);
+    fclose(f);
+    for (int i = 0; i < nmenu_mods; i++) mod_on_was[i] = mod_on[i];
+    show_toast("Mods: the change applies when RESPeCt starts again");
 }
 
 static void menu_build(void) {
@@ -892,6 +1000,17 @@ static void menu_build(void) {
              "The magazine is refilled from your spare ammo as you fire, so you never reload. Ammo is still used up.");
     add_item(5, IT_ACTION, "Give all weapons", (void *)3, 0, 0, 0,
              "Adds every weapon to your inventory, loaded, with plenty of ammo for each.");
+    mods_list();
+    for (int i = 0; i < nmenu_mods; i++)
+        add_item(6, IT_BOOL, mod_names[i], &mod_on[i], 0, 1, 1,
+                 "This mod's files (folder mods\\...). PC version mods go in as they are. Applies on the next start; what each file did is in resurv.log.");
+    add_item(6, IT_BOOL, "Plugins (native code)", &g_cfg.mod_plugins, 0, 1, 1,
+             "Run the DLLs mods bring in their plugins folder, like the PC version's DLL mods. Only for mods you trust. Next start.");
+    add_item(6, IT_BOOL, "Bigger enemy models (experimental)", &g_cfg.dynamic_mod_buffers, 0, 1, 1,
+             "Enemy models and animations bigger than the PS1's memory takes, in the extra memory. Next start.");
+    add_item(6, IT_ACTION, "Open the mods folder", (void *)4, 0, 0, 0, "Opens the mods folder: one folder per mod.");
+    add_item(6, IT_ACTION, "Write the originals", (void *)5, 0, 0, 0,
+             "Makes an extract folder; on the next start every file a mod can replace is written there, named as a mod names it.");
     add_item(4, IT_SLOT, "Slot", &save_slot, 1, SAVE_SLOTS, 1,
              "Pick a slot with Left/Right (Shift: 10 at a time), or F6/F7 at any time. F5 saves to it and F9 loads it, even without this panel.");
     add_item(4, IT_ACTION, "Save here", (void *)1, 0, 0, 0, "Save the game exactly as it is now into this slot.");
@@ -987,6 +1106,15 @@ static void change(int i, int dir) {
         menu_toggle();                       /* close the panel; the game runs on */
         if ((intptr_t)it->val == 1) quick_save();
         else if ((intptr_t)it->val == 2) quick_load();
+        else if ((intptr_t)it->val == 4) {
+            extern char g_mods_dir[1024];
+            CreateDirectoryA(g_mods_dir, NULL);
+            ShellExecuteA(NULL, "open", g_mods_dir, NULL, NULL, SW_SHOWNORMAL);
+        } else if ((intptr_t)it->val == 5) {
+            extern char g_extract_dir[1024];
+            CreateDirectoryA(g_extract_dir, NULL);
+            show_toast("The originals will be written to the extract folder on the next start");
+        }
         else if (game_player_in_control()) { g_give_all_request = 1; show_toast("All weapons added"); }
         else show_toast("Weapons can be given while you're playing");
         return;
@@ -1041,6 +1169,7 @@ static void menu_toggle(void) {
         menu_open = 0;
         menu_binding = -1;
         save_settings();
+        mods_save();
         suppress_keys = 1;
         pending_dx = pending_dy = 0;
         if (was_captured) set_capture(1);
@@ -1185,13 +1314,21 @@ static void menu_draw(HDC dc) {
 
     /* tabs */
     SelectObject(dc, font);
-    int tw = (pw - 2 * pad) / NPAGES;
+    int tws[NPAGES], need = 0, tx = px + pad;   /* each tab as wide as its name, sharing the row */
     for (int p = 0; p < NPAGES; p++) {
-        RECT r = {px + pad + p * tw, y, px + pad + (p + 1) * tw - 4, y + row};
+        SIZE s;
+        GetTextExtentPoint32A(dc, page_names[p], (int)strlen(page_names[p]), &s);
+        tws[p] = s.cx + row;
+        need += tws[p];
+    }
+    for (int p = 0; p < NPAGES; p++) {
+        int tw = need ? (int)((long long)tws[p] * (pw - 2 * pad) / need) : (pw - 2 * pad) / NPAGES;
+        RECT r = {tx, y, tx + tw - 4, y + row};
+        tx += tw;
         tab_rect[p] = r;
         FillRect(dc, &r, p == menu_page ? border : tabb);
         SetTextColor(dc, p == menu_page ? RGB(255, 255, 255) : RGB(170, 170, 170));
-        DrawTextA(dc, page_names[p], -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        DrawTextA(dc, page_names[p], -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     }
     y += row + pad / 2;
 
@@ -1337,6 +1474,17 @@ static void auto_resolution(int late) {
 void plat_frame(void) {
     if (g_frame == 1 || g_frame % 300 == 0)
         rt_log("frame %u (last loop %08X)", g_frame, g_poll_pc);
+    if (g_frame == 120) {                        /* mods in use (modfs.c): say so once */
+        int modfs_used(void), modfs_mods(void), modfs_skipped(void), modfs_extracted(void);
+        char m[192] = "";
+        size_t l = 0;
+        if (modfs_extracted()) l += (size_t)snprintf(m, sizeof m, "%d originals written to the extract folder. ", modfs_extracted());
+        if (modfs_skipped())
+            snprintf(m + l, sizeof m - l, "Mods: %d files from %d mods; %d not used (why: resurv.log)", modfs_used(), modfs_mods(), modfs_skipped());
+        else if (modfs_used())
+            snprintf(m + l, sizeof m - l, "Mods: %d files from %d mods (details in resurv.log)", modfs_used(), modfs_mods());
+        if (m[0]) show_toast(m);
+    }
     /* Fast start: run the boot (disc check, logos, warnings) flat out until
      * just before the title screen, unless a key is pressed. The boot takes
      * the same number of frames on every machine. */
@@ -1531,6 +1679,12 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         char *sl = strrchr(dir, '\\');
         if (sl) sl[1] = 0;
         card_set_dir(dir);
+        extern char g_mods_dir[1024], g_movie_dump[1024];   /* mods: the mods folder next to the exe (modfs.c) */
+        snprintf(g_mods_dir, sizeof g_mods_dir, "%smods", dir);
+        snprintf(g_movie_dump, sizeof g_movie_dump, "%smovie_dump", dir);   /* when there's one: the movies' pictures */
+        DWORD at = GetFileAttributesA(g_movie_dump);
+        if (at == INVALID_FILE_ATTRIBUTES || !(at & FILE_ATTRIBUTE_DIRECTORY)) g_movie_dump[0] = 0;
+        mods_folder(dir);
     }
     open_texture_pack();
     audio_init();

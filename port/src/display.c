@@ -5,6 +5,7 @@
 #include "render.h"
 #include "render_gpu.h"
 #include "rt.h"
+#include "modfs_pc_text.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -21,6 +22,8 @@ void display_frame_update(void) {
     GpuDisplay d;
     gpu_display(&d);
     g_widescreen = g_opt_widescreen && MEM_R32(0x8006C118) == 6 && !d.rgb24;
+    void modfs_movie_vblank(void);               /* the movie's frame on screen (modfs.c) */
+    modfs_movie_vblank();
 }
 
 static void px_native(const GpuDisplay *d, int x, int y, uint32_t *r, uint32_t *g, uint32_t *b) {
@@ -287,11 +290,61 @@ static void apply_gamma(uint32_t *out, size_t n) {
     }
 }
 
-void display_grab_bgrx(uint32_t *out, int *w, int *h) {
+const uint32_t *modfs_movie_picture(int *w, int *h);
+
+/* A picture (BGRX) to w x h, bilinear: smaller pictures are blown up
+ * smoothly, bigger ones are averaged over each output pixel's area. */
+static void picture_scale(const uint32_t *in, int iw, int ih, uint32_t *out, int w, int h) {
+    for (int y = 0; y < h; y++) {
+        int y0 = (int)((int64_t)y * ih / h), y1 = (int)((int64_t)(y + 1) * ih / h);
+        for (int x = 0; x < w; x++) {
+            int x0 = (int)((int64_t)x * iw / w), x1 = (int)((int64_t)(x + 1) * iw / w);
+            uint32_t c[3] = {0, 0, 0};
+            if (x1 - x0 > 1 || y1 - y0 > 1) {       /* shrinking: the area's mean */
+                uint32_t n = 0;
+                for (int yy = y0; yy < y1; yy++)
+                    for (int xx = x0; xx < x1; xx++, n++) {
+                        uint32_t p = in[(size_t)yy * iw + xx];
+                        c[0] += p & 0xFF; c[1] += (p >> 8) & 0xFF; c[2] += (p >> 16) & 0xFF;
+                    }
+                for (int k = 0; k < 3; k++) c[k] = (c[k] + n / 2) / n;
+            } else {                                /* growing: between the four nearest */
+                float fx = (x + 0.5f) * iw / w - 0.5f, fy = (y + 0.5f) * ih / h - 0.5f;
+                if (fx < 0) fx = 0;
+                if (fy < 0) fy = 0;
+                int ax = (int)fx, ay = (int)fy, bx = ax + 1 < iw ? ax + 1 : ax, by = ay + 1 < ih ? ay + 1 : ay;
+                float tx = fx - ax, ty = fy - ay;
+                uint32_t p00 = in[(size_t)ay * iw + ax], p01 = in[(size_t)ay * iw + bx];
+                uint32_t p10 = in[(size_t)by * iw + ax], p11 = in[(size_t)by * iw + bx];
+                for (int k = 0; k < 3; k++) {
+                    float a = (float)((p00 >> (8 * k)) & 0xFF), b = (float)((p01 >> (8 * k)) & 0xFF);
+                    float e = (float)((p10 >> (8 * k)) & 0xFF), f = (float)((p11 >> (8 * k)) & 0xFF);
+                    float top = a + (b - a) * tx, bot = e + (f - e) * tx;
+                    c[k] = (uint32_t)(top + (bot - top) * ty + 0.5f);
+                }
+            }
+            out[(size_t)y * w + x] = c[0] | c[1] << 8 | c[2] << 16;
+        }
+    }
+}
+
+static void display_grab_bgrx_base(uint32_t *out, int *w, int *h) {
     build_luts();
     GpuDisplay d;
     gpu_display(&d);
     int s = render_scale();
+    const uint32_t *mp;
+    int mw, mh;
+    if (d.enabled && (mp = modfs_movie_picture(&mw, &mh))) {   /* a mod's picture for this frame of a movie */
+        int ow = d.w * s, oh = d.h * s;
+        if (render_on_gpu() && g_display_w > 0 && g_display_h > 0) { ow = g_display_w; oh = g_display_h; }
+        while (ow > 2560 || oh > 1920) { ow = ow * 3 / 4; oh = oh * 3 / 4; }
+        picture_scale(mp, mw, mh, out, ow, oh);
+        *w = ow;
+        *h = oh;
+        apply_gamma(out, (size_t)ow * oh);
+        return;
+    }
     if (d.rgb24 && d.enabled && s > 1 && g_opt_movie_upscale && d.w <= 640 && d.h <= 512) {
         int f = s;
         while (f > 1 && (d.w * f > 2560 || d.h * f > 1920 || d.w * f > 2560 || (size_t)d.w * f * d.h * 3 > sizeof mv_tmp / sizeof mv_tmp[0])) f--;
@@ -362,4 +415,13 @@ void display_grab_bgrx(uint32_t *out, int *w, int *h) {
     const float *depth = render_depth();
     if (depth && display_holes()) close_holes(out, depth, stride, s, X, Y, W, H);
     if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);
+}
+
+/* The GUI and headless captures both use this final CPU/GPU presentation path. */
+void display_grab_bgrx(uint32_t *out, int *w, int *h) {
+    display_grab_bgrx_base(out, w, h);
+    if (modfs_pc_has_bitmaps()) {
+        GpuDisplay d; gpu_display(&d);
+        if (d.enabled && !d.rgb24) modfs_pc_composite(out, *w, *h, d.w, d.h);
+    }
 }

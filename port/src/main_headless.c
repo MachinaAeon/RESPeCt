@@ -134,6 +134,18 @@ void plat_frame(void) {
             if (getenv("RT_SAVE_SKIP")) g_ss_skip = atoi(getenv("RT_SAVE_SKIP"));
             ss_request_save(path);
         }
+        /* RT_DUMP_FILE=lba:size=path: disc sectors as the game reads them (mods in), at frame 2 */
+        const char *df = getenv("RT_DUMP_FILE");
+        unsigned dl, ds;
+        if (df && g_frame == 2 && sscanf(df, "%u:%u=", &dl, &ds) == 2 && strchr(df, '=')) {
+            FILE *o = fopen(strchr(df, '=') + 1, "wb");
+            uint8_t sec[2352];
+            for (unsigned k = 0; o && k * 2048 < ds; k++) {
+                cd_read_sector_raw(dl + k, sec);
+                fwrite(sec + 24, 1, ds - k * 2048 < 2048 ? ds - k * 2048 : 2048, o);
+            }
+            if (o) fclose(o);
+        }
         const char *l = getenv("RT_LOAD");
         if (l && !done_load && g_frame == 2) { done_load = 1; ss_request_load(l); }
         /* RT_LOAD_AT=frame:path loads in the middle of a run */
@@ -210,6 +222,19 @@ void plat_frame(void) {
                 rt_log("savegame: load request -> %d", sg_request_load(gs));
             for (const char *q = getenv("RT_GUSE_AT"); q && *q; q = strchr(q, ',') ? strchr(q, ',') + 1 : NULL)
                 if ((unsigned)atoi(q) == g_frame) g_sg_use = 1;
+        }
+        /* RT_DOOR_AT=frame:n: take the room's door n then, as the door script
+         * does once it opens (room_change.c, n_op_Door) */
+        const char *dr = getenv("RT_DOOR_AT");
+        unsigned dfr; int dn;
+        if (dr && sscanf(dr, "%u:%d", &dfr, &dn) == 2 && dfr == g_frame) {
+            uint32_t door = MEM_R32(0x800B3D30) + (uint32_t)dn * 0x18;
+            uint16_t c = (uint16_t)MEM_R16(door + 2);
+            MEM_W16(0x800B3D2C, 1);
+            MEM_W16(0x800B3D2E, MEM_R16(door + 4));
+            MEM_W16(0x800B3D34, (int16_t)c < 0 ? (uint16_t)((0u - c) & 0xFF) : c);
+            MEM_W32(0x800B3D30, door);
+            rt_log("door: taking door %d (%08X), to %04X", dn, door, c);
         }
         /* RT_RAMDUMP=n:dir: write main RAM to dir/rNNNNN.bin every n frames
          * (for comparing two builds frame by frame) */
@@ -374,6 +399,13 @@ int main(int argc, char **argv) {
         }
     }
     rt_set_log(stderr);
+    {   /* RT_MODS=dir: a mods folder; RT_MOVIE_DUMP=dir: the movies' pictures written there (modfs.c) */
+        extern char g_mods_dir[1024], g_movie_dump[1024];
+        if (getenv("RT_MODS")) snprintf(g_mods_dir, sizeof g_mods_dir, "%s", getenv("RT_MODS"));
+        if (getenv("RT_MOVIE_DUMP")) snprintf(g_movie_dump, sizeof g_movie_dump, "%s", getenv("RT_MOVIE_DUMP"));
+        extern char g_extract_dir[1024];        /* RT_EXTRACT=dir: the originals written there */
+        if (getenv("RT_EXTRACT")) snprintf(g_extract_dir, sizeof g_extract_dir, "%s", getenv("RT_EXTRACT"));
+    }
     { extern int g_audio_limiter; g_audio_limiter = getenv("RT_LIMITER") != NULL; }
     if (getenv("RT_NO_DEPTH")) g_depth_buffer = 0;
     if (getenv("RT_NO_PERSP")) { extern int g_persp; g_persp = 0; }

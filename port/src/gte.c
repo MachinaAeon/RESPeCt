@@ -674,7 +674,7 @@ static uint32_t sxy_word[0x80000], sxy_gen[0x80000];
 static float sxy_px[0x80000], sxy_py[0x80000], sxy_pz[0x80000];   /* that corner's exact position, depth */
 static uint32_t sxy_po[0x80000];                                   /* and model */
 
-uint8_t g_sxy_mark[0x80000];
+uint8_t g_sxy_mark[RAM_GAME / 4];
 uint32_t g_sxy_filter[8];
 static int g_sxy_moving;
 
@@ -918,7 +918,7 @@ void gte_swc2(uint32_t addr, int reg) {
 }
 
 int gte_stored_sxy(uint32_t addr, uint32_t word) {
-    if (!addr || (addr & 0x1FFFFFFF) >= 0x00800000) return 0;
+    if (!addr || (addr & 0x1FFFFFFF) >= RAM_GAME) return 0;
     uint32_t i = (addr & 0x1FFFFF) >> 2;
     return sxy_gen[i] && sxy_gen[i] + 8 >= pgen && sxy_word[i] == word;
 }
@@ -955,7 +955,7 @@ int gte_precise(uint32_t addr, uint32_t word, float *x, float *y, float *z, uint
      * pixel, which small, distant models are full of.) */
     static int old = -1;
     if (old < 0) old = getenv("RT_PRECISE_OLD") != NULL;
-    if (!old && addr && (addr & 0x1FFFFFFF) < 0x00800000) {
+    if (!old && addr && (addr & 0x1FFFFFFF) < RAM_GAME) {
         uint32_t i = (addr & 0x1FFFFF) >> 2;
         if (sxy_gen[i] && sxy_gen[i] + 6 >= pgen && sxy_word[i] == word) {
             static int stat = -1;

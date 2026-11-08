@@ -39,7 +39,7 @@ static void dma_done(int ch) {
 
 static void dma_gpu(DmaChan *c) {
     uint32_t mode = (c->chcr >> 9) & 3, to_dev = c->chcr & 1;
-    uint32_t a = c->madr & 0x1FFFFC;
+    uint32_t a = c->madr & 0x7FFFFC;
     if (mode == 2) {                         /* linked list (ordering table) */
         int guard = 0;
         for (;;) {
@@ -52,7 +52,7 @@ static void dma_gpu(DmaChan *c) {
             g_gp0_src = 0;
             if (hdr & 0x800000)
                 break;
-            a = hdr & 0x1FFFFC;
+            a = hdr & 0x7FFFFC;
             if (++guard > 0x100000) { rt_log("GPU DMA: list loop"); break; }
         }
         c->madr = 0x00FFFFFF;
@@ -70,10 +70,10 @@ static void dma_gpu(DmaChan *c) {
 }
 
 static void dma_otc(DmaChan *c) {
-    uint32_t a = c->madr & 0x1FFFFC, n = c->bcr & 0xFFFF;
+    uint32_t a = c->madr & 0x7FFFFC, n = c->bcr & 0xFFFF;
     if (!n) n = 0x10000;
     for (uint32_t i = 0; i < n; i++, a -= 4)
-        MEM_W32(a, i == n - 1 ? 0x00FFFFFF : ((a - 4) & 0x1FFFFC));
+        MEM_W32(a, i == n - 1 ? 0x00FFFFFF : ((a - 4) & 0x7FFFFC));
 }
 
 static int mdec_pending;
@@ -82,7 +82,7 @@ static void dma_start(int ch) {
     DmaChan *c = &dma[ch];
     uint32_t mode = (c->chcr >> 9) & 3;
     uint32_t words = (c->bcr & 0xFFFF) * (mode == 1 ? (c->bcr >> 16) : 1);
-    uint32_t a = c->madr & 0x1FFFFC;
+    uint32_t a = c->madr & 0x7FFFFC;
     if (mode != 2 && words == 0) words = 0x10000;
     switch (ch) {
     case 0:                                  /* MDEC in */
@@ -238,6 +238,7 @@ void hw_advance(uint32_t cycles) {
             gte_precise_frame();
             { void gte_precise_stats(void); if (g_frame % 10 == 0) gte_precise_stats(); }
             plat_frame();
+            { void modplug_frame(void); modplug_frame(); }   /* mods' plugins (modplug.c) */
         }
     }
 }

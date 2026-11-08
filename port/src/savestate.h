@@ -12,6 +12,7 @@
 
 typedef struct StateIO StateIO;
 
+int ss_saving(const StateIO *io);                   /* writing a save (not reading one) */
 void ss_field(StateIO *io, const char *name, void *p, size_t n);
 /* A growable buffer of *n elements of elem bytes (*cap allocated). */
 void ss_buffer(StateIO *io, const char *name, void **p, uint32_t *n, uint32_t *cap, size_t elem);

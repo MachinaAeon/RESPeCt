@@ -47,6 +47,10 @@
 #define NAMES           0x800A8678u           /* item names box: +0x1A4.., lines at +0x1AC */
 #define ITEM_LOOK_TAB   0x800A6D5Cu           /* name text per item id */
 
+/* Optional text resource overrides; unchanged addresses without a mod. */
+u32 modfs_ui_text(u32 original);
+u32 modfs_list_text(u32 original);
+
 /* ---- game functions ---- */
 #define F_SET_PROJECTION 0x8002D818u
 #define F_SET_REF_VIEW2  0x80033FD8u

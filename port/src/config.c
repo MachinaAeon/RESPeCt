@@ -148,6 +148,13 @@ static const char *default_ini =
     "; Fast-forward the logos, warnings and disc check at startup.\n"
     "skip_intro = 0\n"
     "\n"
+    "[mods]\n"
+    "; Experimental: model/animation room arena in the extra RAM. Restart required.\n"
+    "dynamic_mod_buffers = 0\n"
+    "; Run the plugins mods bring (their plugins folder: native code, like the\n"
+    "; PC version's DLL mods). Only switch this on for mods you trust.\n"
+    "mod_plugins = 0\n"
+    "\n"
     "[cheats]\n"
     "; Health stays full.\n"
     "god_mode = 0\n"
@@ -264,6 +271,8 @@ static void parse_line(const char *section, char *key, char *val) {
     else if (!strcmp(key, "gap_fill")) g_cfg.gap_fill = i;
     else if (!strcmp(key, "hd_textures")) g_cfg.hd_textures = i;
     else if (!strcmp(key, "hd_texture_memory")) g_cfg.hd_texture_memory = i < 256 ? 256 : i;
+    else if (!strcmp(key, "dynamic_mod_buffers")) g_cfg.dynamic_mod_buffers = i == 1;
+    else if (!strcmp(key, "mod_plugins")) g_cfg.mod_plugins = i == 1;
     else if (!strcmp(key, "skip_intro")) g_cfg.skip_intro = i;
     else if (!strcmp(key, "god_mode")) g_cfg.god_mode = i;
     else if (!strcmp(key, "infinite_ammo")) g_cfg.infinite_ammo = i;
@@ -407,6 +416,8 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "hd_textures")) snprintf(out, n, "%d", g_cfg.hd_textures);
     else if (!strcmp(key, "hd_texture_memory")) snprintf(out, n, "%d", g_cfg.hd_texture_memory);
     else if (!strcmp(key, "skip_intro")) snprintf(out, n, "%d", g_cfg.skip_intro);
+    else if (!strcmp(key, "dynamic_mod_buffers")) snprintf(out, n, "%d", g_cfg.dynamic_mod_buffers);
+    else if (!strcmp(key, "mod_plugins")) snprintf(out, n, "%d", g_cfg.mod_plugins);
     else if (!strcmp(key, "god_mode")) snprintf(out, n, "%d", g_cfg.god_mode);
     else if (!strcmp(key, "infinite_ammo")) snprintf(out, n, "%d", g_cfg.infinite_ammo);
     else if (!strcmp(key, "no_reload")) snprintf(out, n, "%d", g_cfg.no_reload);

@@ -10,6 +10,7 @@
  * Decompiled from the game's code; RAM-identical to the originals
  * (checked with tools/eq). */
 #include "libgs.h"
+#include "modmem.h"
 
 void n_test_InitState(void);
 void n_room_Start(void);
@@ -228,6 +229,13 @@ void n_heap_Top(void) { V0 = HEAP_TOP; }
 /* 800735B4 (words): take words * 4 bytes of the heap; -1 if that runs
  * past its end (0x800BBCD0), else 0. */
 void n_heap_Alloc(void) {
+    if (modmem_active()) {
+        u32 next;
+        if (!modmem_heap_take(HEAP_TOP, (uint64_t)A0 * 4, &next)) { V0 = 0xFFFFFFFFu; return; }
+        HEAP_TOP = next;
+        V0 = 0;
+        return;
+    }
     u32 top = HEAP_TOP + (A0 << 2);
     HEAP_TOP = top;
     V0 = top < HEAP_END ? 0 : 0xFFFFFFFFu;

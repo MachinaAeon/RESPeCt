@@ -160,7 +160,7 @@ int disc_image_open(const char *path, char *err, size_t n) {
 uint32_t disc_image_sectors(void) { return nsectors; }
 uint32_t disc_expected_sectors(void) { return DISC_SECTORS; }
 
-int cd_read_sector_raw(uint32_t lba, uint8_t out[2352]) {
+static int read_disc_sector(uint32_t lba, uint8_t out[2352]) {
     if (lba >= nsectors) { memset(out, 0, 2352); return 0; }
     if (raw) {
         seek_to(raw, (int64_t)lba * 2352);
@@ -179,6 +179,14 @@ int cd_read_sector_raw(uint32_t lba, uint8_t out[2352]) {
     return 0;
 }
 
+/* A sector as the game sees it: the disc's, or a mod's (modfs.c). */
+int modfs_sector(uint32_t lba, uint8_t out[2352]);
+int cd_read_sector_raw(uint32_t lba, uint8_t out[2352]) {
+    int ok = read_disc_sector(lba, out);
+    if (modfs_sector(lba, out)) ok = 1;
+    return ok;
+}
+
 /* ------------------------------------------------------------ checking */
 
 static uint64_t fnv64_update(uint64_t h, const uint8_t *p, size_t n) {
@@ -189,7 +197,7 @@ static uint64_t fnv64_update(uint64_t h, const uint8_t *p, size_t n) {
 /* Find a file by path ("X/VC/VC05.BIN") in the image's ISO 9660 tree. */
 static int find_path(const char *name, uint32_t *lba, uint32_t *size) {
     uint8_t s[2352];
-    if (!cd_read_sector_raw(16, s) || memcmp(s + 25, "CD001", 5)) return 0;
+    if (!read_disc_sector(16, s) || memcmp(s + 25, "CD001", 5)) return 0;
     const uint8_t *root = s + 24 + 156;
     uint32_t dlba = root[2] | root[3] << 8 | root[4] << 16 | (uint32_t)root[5] << 24;
     uint32_t dlen = root[10] | root[11] << 8 | root[12] << 16 | (uint32_t)root[13] << 24;
@@ -198,7 +206,7 @@ static int find_path(const char *name, uint32_t *lba, uint32_t *size) {
         size_t part = slash ? (size_t)(slash - name) : strlen(name);
         int found = 0;
         for (uint32_t sec = 0; sec * 2048 < dlen && !found; sec++) {
-            if (!cd_read_sector_raw(dlba + sec, s)) return 0;
+            if (!read_disc_sector(dlba + sec, s)) return 0;
             const uint8_t *d = s + 24;
             for (int o = 0; o < 2048 && d[o];) {
                 int len = d[o], nlen = d[o + 32];
@@ -224,7 +232,7 @@ static int find_path(const char *name, uint32_t *lba, uint32_t *size) {
 int disc_verify(char *err, size_t n) {
     uint32_t lba, size;
     uint8_t s[2352];
-    if (!find_path("SYSTEM.CNF", &lba, &size) || !cd_read_sector_raw(lba, s)) {
+    if (!find_path("SYSTEM.CNF", &lba, &size) || !read_disc_sector(lba, s)) {
         snprintf(err, n, "it isn't a PlayStation disc image");
         return 0;
     }
@@ -253,7 +261,7 @@ int disc_verify(char *err, size_t n) {
         if (!disc_files[i].hash) continue;
         uint64_t h = 0xCBF29CE484222325ull;
         for (uint32_t k = 0; k * 2048 < size; k++) {
-            if (!cd_read_sector_raw(lba + k, s)) { snprintf(err, n, "it couldn't be read to the end"); return 0; }
+            if (!read_disc_sector(lba + k, s)) { snprintf(err, n, "it couldn't be read to the end"); return 0; }
             uint32_t m = size - k * 2048 < 2048 ? size - k * 2048 : 2048;
             h = fnv64_update(h, s + 24, m);
         }

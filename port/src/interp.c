@@ -79,7 +79,7 @@ static uint32_t patched(const RtModule *m, uint32_t pc) {
 /* Code is always in main RAM. */
 static inline uint32_t ram_word(uint32_t pc) {
     uint32_t v;
-    memcpy(&v, g_ram + (pc & 0x1FFFFC), 4);
+    memcpy(&v, g_ram + (pc & 0x7FFFFC), 4);
     return v;
 }
 
@@ -131,6 +131,21 @@ static void run_func(const RtModule *m, const InFunc *f);
 void interp_call(const RtModule *m, const RtFunc *f) {
     extern void gte_call_hook(uint32_t addr);
     gte_call_hook(f->addr);                     /* gte.c: precise matrices */
+    extern uint32_t g_plug_mask[1024];          /* modplug.c: functions mods' plugins hook */
+    uint32_t a = f->addr;
+    if (__builtin_expect((g_plug_mask[(a >> 7) & 1023] >> ((a >> 2) & 31)) & 1, 0)) {
+        int modplug_enter(uint32_t addr), modplug_before(int first);
+        void modplug_after(int first);
+        int h = modplug_enter(a);
+        if (h >= 0) {
+            if (!modplug_before(h)) {
+                if (f->fn) f->fn();
+                else run_func(m, f->meta);
+            }
+            modplug_after(h);
+            return;
+        }
+    }
     if (f->fn) f->fn();
     else run_func(m, f->meta);
 }

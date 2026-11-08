@@ -68,11 +68,12 @@ typedef struct Entry {
     HdImg img;
     unsigned last_used;
     struct Entry *next_done;
+    int mod;                                /* a mod's (texpack_add_image): in memory, never let go */
 } Entry;
 
 static char pack_dir[1024];
 static Entry *entries;
-static int nentries;
+static int nentries, entries_cap;
 static uint32_t *tex_hashes;               /* sorted, unique */
 static int ntex;
 
@@ -110,10 +111,9 @@ static void add_name(const char *name) {
     if (strcasecmp(ext, "png") && strcasecmp(ext, "jpg") && strcasecmp(ext, "jpeg") && strcasecmp(ext, "bmp") &&
         strcasecmp(ext, "tga"))
         return;
-    static int cap;
-    if (nentries == cap) {
-        cap = cap ? cap * 2 : 1024;
-        entries = realloc(entries, (size_t)cap * sizeof *entries);
+    if (nentries >= entries_cap) {
+        entries_cap = entries_cap ? entries_cap * 2 : 1024;
+        entries = realloc(entries, (size_t)entries_cap * sizeof *entries);
     }
     Entry *e = &entries[nentries++];
     memset(e, 0, sizeof *e);
@@ -121,12 +121,36 @@ static void add_name(const char *name) {
     e->name = strdup(name);
 }
 
+/* Images mods give (modfs.c), added to whatever pack is open. */
+static struct { uint64_t key; HdImg img; } *mod_imgs;
+static int nmod_imgs;
+
+static void add_mod_images(void) {
+    for (int i = 0; i < nmod_imgs; i++) {
+        if (nentries >= entries_cap) {
+            entries_cap = entries_cap ? entries_cap * 2 : 1024;
+            entries = realloc(entries, (size_t)entries_cap * sizeof *entries);
+        }
+        Entry *e = &entries[nentries++];
+        memset(e, 0, sizeof *e);
+        e->key = mod_imgs[i].key;
+        e->name = strdup("a mod's picture");
+        e->img = mod_imgs[i].img;
+        e->state = E_READY;
+        e->mod = 1;
+    }
+}
+
 static void build_index(void) {
+    add_mod_images();
     qsort(entries, (size_t)nentries, sizeof *entries, cmp_entry);
     /* the same texture and palette in two formats: keep the first (png sorts before others by name? keep any) */
     int k = 0;
     for (int i = 0; i < nentries; i++) {
-        if (k && entries[k - 1].key == entries[i].key) { free(entries[i].name); continue; }
+        if (k && entries[k - 1].key == entries[i].key) {       /* (a mod's picture wins over a pack's) */
+            if (entries[i].mod) { free(entries[k - 1].name); entries[k - 1] = entries[i]; } else free(entries[i].name);
+            continue;
+        }
         entries[k++] = entries[i];
     }
     nentries = k;
@@ -318,6 +342,23 @@ int texpack_open_listing(const char *list, const char *dir) {
 }
 
 int texpack_loaded(void) { return nentries > 0; }
+
+/* A mod's picture for a texture (its upload's hash, its palette's): kept
+ * in memory, whatever pack is open (or none). */
+void texpack_add_image(uint32_t hash, uint32_t pal, int w, int h, uint32_t *px) {
+    mod_imgs = realloc(mod_imgs, (size_t)(nmod_imgs + 1) * sizeof *mod_imgs);
+    mod_imgs[nmod_imgs].key = (uint64_t)hash << 32 | pal;
+    mod_imgs[nmod_imgs].img = (HdImg){w, h, px};
+    nmod_imgs++;
+    int k = 0;                                   /* the index again, with the pack's entries as they are */
+    for (int i = 0; i < nentries; i++) {
+        if (entries[i].mod) { free(entries[i].name); continue; }
+        entries[k++] = entries[i];
+    }
+    nentries = k;
+    free(tex_hashes);
+    build_index();
+}
 
 /* ------------------------------------------------------------ VRAM writes */
 
@@ -540,7 +581,7 @@ void texpack_frame(void) {
     while (bytes_ready > g_hd_budget) {
         Entry *old = NULL;
         for (int i = 0; i < nentries; i++)
-            if (entries[i].state == E_READY && entries[i].last_used + 2 < g_frame &&
+            if (entries[i].state == E_READY && !entries[i].mod && entries[i].last_used + 2 < g_frame &&
                 (!old || entries[i].last_used < old->last_used))
                 old = &entries[i];
         if (!old) break;

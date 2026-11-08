@@ -196,7 +196,10 @@ static void sector_tick(void) {
     if ((cd.mode & 0x40) && (submode & 0x04) && s[15] == 2) {
         /* XA-ADPCM audio: to the SPU (if the filter matches), not to the host. */
         if (!(cd.mode & 0x08) || (file == cd.filter_file && chan == cd.filter_chan))
-            if (!cd.muted) spu_xa_sector(s);
+            if (!cd.muted) {
+                int modfs_xa(uint32_t lba, const uint8_t *s);      /* a mod's sound in its place (modfs.c) */
+                if (!modfs_xa(cd.pos - 1, s)) spu_xa_sector(s);
+            }
         return;
     }
     if ((cd.mode & 0x08) && (submode & 0x04)) return;
@@ -220,6 +223,8 @@ static void deliver(void) {
         cd_read_sector_raw(r.lba, s);
         if (cd.mode & 0x20) { memcpy(cd.data, s + 12, 2340); cd.data_len = 2340; }
         else { memcpy(cd.data, s + 24, 2048); cd.data_len = 2048; }
+        void modfs_data(uint32_t lba, const uint8_t *s);           /* a movie's frames as they're read (modfs.c) */
+        modfs_data(r.lba, s);
         cd.data_ready = 0;
         cd.data_pos = 0;
     }

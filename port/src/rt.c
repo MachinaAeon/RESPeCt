@@ -9,6 +9,7 @@
 
 Cpu g_cpu;
 uint8_t g_ram[RAM_SIZE];
+int g_ram_ext_used;                              /* modfs.c put something past the game's 2 MB */
 uint8_t g_scratch[SCRATCH_SIZE];
 int32_t g_rt_budget = POLL_SLICE;
 uint32_t g_poll_pc;
@@ -27,7 +28,7 @@ static uint64_t fnv64(const uint8_t *p, uint32_t n) {
 }
 
 static int module_loaded(const RtModule *m) {
-    const uint8_t *ram = g_ram + (m->vram & 0x1FFFFF);
+    const uint8_t *ram = g_ram + (m->vram & 0x7FFFFF);
     if (m->sig) return memcmp(ram, m->sig, m->sig_len) == 0;
     return fnv64(ram, m->sig_len) == m->sig_hash;
 }
@@ -99,6 +100,33 @@ void rt_call(uint32_t addr) {
 }
 
 void rt_reset_call_cache(void) { memset(call_cache, 0, sizeof call_cache); }
+
+/* modplug.c: a function of the game's code starts at addr (any module, loaded or not). */
+int rt_is_function(uint32_t addr) {
+    for (int i = 0; i < rt_module_count; i++) {
+        const RtModule *m = &rt_modules[i];
+        uint32_t p = addr & 0x1FFFFFFF;
+        if (p >= (m->code_lo & 0x1FFFFFFF) && p < (m->code_hi & 0x1FFFFFFF) && find_func(m, addr)) return 1;
+    }
+    return 0;
+}
+
+/* modplug.c: the native C functions of the game at addr, in every module
+ * (overlays share addresses: an enemy program's slot has 15); how many. */
+int rt_natives_at(uint32_t addr, RtFn *out, int max) {
+    int n = 0;
+    for (int i = 0; i < rt_module_count && n < max; i++) {
+        const RtModule *m = &rt_modules[i];
+        uint32_t p = addr & 0x1FFFFFFF;
+        const RtFunc *f;
+        if (p >= (m->code_lo & 0x1FFFFFFF) && p < (m->code_hi & 0x1FFFFFFF) && (f = find_func(m, addr)) && f->fn) {
+            int dup = 0;
+            for (int k = 0; k < n; k++) dup |= out[k] == f->fn;
+            if (!dup) out[n++] = f->fn;
+        }
+    }
+    return n;
+}
 
 /* Functions that may contain pc, nearest first (for resuming a save). */
 int rt_resume_candidates(uint32_t pc, const RtModule **mod, const RtFunc **out, int max) {
@@ -315,7 +343,8 @@ int rt_in_interrupt(void) { return irq_depth != 0; }
 void rt_state(StateIO *io) {
     ss_module(io, "rt");
     SS(io, g_cpu);
-    SS(io, g_ram);
+    ss_field(io, "g_ram", g_ram, RAM_GAME);          /* (a save keeps the 2 MB the game has as before) */
+    if (!ss_saving(io) || g_ram_ext_used) ss_field(io, "g_ram_ext", g_ram + RAM_GAME, RAM_SIZE - RAM_GAME);
     SS(io, g_scratch);
     SS(io, g_rt_budget);
     SS(io, g_poll_pc);

@@ -48,6 +48,15 @@ int rt_boot(const char *disc_path) {
         fprintf(stderr, "can't open disc image %s\n", disc_path);
         return 0;
     }
+    {   /* mods: the originals written out first, if asked (from the disc as it is), then files in place of the disc's (modfs.c) */
+        int modfs_extract(void);
+        void modfs_open(void);
+        modfs_extract();
+        modfs_open();
+        extern char g_mods_dir[1024];
+        void modplug_load(const char *mods_dir);
+        modplug_load(g_mods_dir);                /* their plugins (modplug.c), when switched on */
+    }
     uint8_t *exe;
     uint32_t n;
     if (!iso_read_file("KERNEL.BIN", &exe, &n) || memcmp(exe, "PS-X EXE", 8)) {

@@ -40,6 +40,84 @@ typedef struct {
 
 static Voice voices[24];
 static uint32_t endx;
+
+/* Mods' sound effects whole (modfs.c): a sample a mod replaced is still in
+ * SPU RAM, as long as its bank has room for, but when a voice starts it
+ * (found by the CRC of its blocks up to the end flag) the voice plays the
+ * mod's WAV instead, at the game's pitch, envelope and volume, for as long
+ * as the WAV is, repeating from its loop start if the original repeats.
+ * (Port-side, not in save states. A state saved before the mods has the
+ * original samples in SPU RAM: those are found by the original's blocks,
+ * until the game writes that memory again.) */
+typedef struct { uint32_t crc, len; const int16_t *pcm; uint32_t frames; uint64_t k; int64_t loop, lead; int block, amb; } HdSfx;
+static HdSfx *hds;
+static int nhds;
+/* A savestate made before the mods has the original samples in SPU RAM:
+ * the original's blocks (block >= 0: the NOISE.BIN bank it is in) are found
+ * too, but only in what hasn't been written since a state was loaded (one
+ * bit per 16 bytes). One original can be in several banks with a sound
+ * each (amb): the bank the game has loaded tells which. */
+static uint8_t hd_stale[0x80000 / 16 / 8];
+#define HD_WROTE(a) (hd_stale[((a) & 0x7FFFF) >> 7] &= (uint8_t)~(1u << ((((a) & 0x7FFFF) >> 4) & 7)))
+static const HdSfx *hd_of[24];
+static int64_t hd_pos[24];                         /* 32.32, in the WAV's samples */
+
+unsigned long mz_crc32(unsigned long crc, const unsigned char *ptr, size_t buf_len);   /* miniz */
+
+/* modfs.c: the blocks a replaced sample has (crc, len: up to its end flag), the WAV (mono, its
+ * frames at wav_rate), the sample's rate, its loop start in the WAV's samples (-1: it doesn't repeat),
+ * the sample's own samples before the sound starts (a silent block). */
+void spu_hd_add(uint32_t crc, uint32_t len, const int16_t *pcm, uint32_t frames, uint32_t wav_rate, uint32_t rate, int64_t loop, uint32_t lead,
+                int block) {
+    int amb = 0;
+    for (int i = 0; i < nhds; i++)
+        if (hds[i].crc == crc && hds[i].len == len && (hds[i].block < 0) == (block < 0)) {
+            if (block < 0 || hds[i].block == block) return;
+            if (hds[i].pcm != pcm && (hds[i].frames != frames || memcmp(hds[i].pcm, pcm, (size_t)frames * 2))) hds[i].amb = amb = 1;
+        }
+    HdSfx *h = realloc(hds, (size_t)(nhds + 1) * sizeof *hds);
+    if (!h || !rate) return;
+    hds = h;
+    uint64_t k = ((uint64_t)wav_rate << 32) / ((uint64_t)rate * 4096);   /* the WAV's samples per pitch unit, 32.32 */
+    hds[nhds++] = (HdSfx){crc, len, pcm, frames, k, loop, -(int64_t)(((uint64_t)lead * wav_rate << 32) / rate), block, amb};
+}
+
+/* Whether the game has NOISE.BIN block b loaded (its sound slots: 12 bytes each at 0x800637C0, +8 the
+ * bank's handle or -1, +0xA the block). */
+static int hd_block_loaded(int b) {
+    for (int s = 0; s < 16; s++) {
+        int16_t h, blk;
+        memcpy(&h, g_ram + 0x637C0 + s * 12 + 8, 2);
+        memcpy(&blk, g_ram + 0x637C0 + s * 12 + 10, 2);
+        if (h >= 0 && blk == b) return 1;
+    }
+    return 0;
+}
+
+/* savestate.c: a state was loaded; SPU RAM is as it was saved. */
+void spu_hd_state_loaded(void) {
+    memset(hd_stale, 0xFF, sizeof hd_stale);
+}
+
+/* The mod's WAV for the sample at addr, if any. */
+static const HdSfx *hd_find(uint32_t addr) {
+    if (!nhds) return NULL;
+    uint32_t len = 16;
+    while (len < 0x80000 && !(ram[(addr + len - 16 + 1) & 0x7FFFF] & 1)) len += 16;
+    if (addr + len > 0x80000) return NULL;
+    uint32_t crc = (uint32_t)mz_crc32(0, ram + addr, len);
+    int stale = hd_stale[addr >> 7] >> ((addr >> 4) & 7) & 1;
+    const HdSfx *any = NULL;
+    for (int i = 0; i < nhds; i++) {
+        const HdSfx *h = &hds[i];
+        if (h->crc != crc || h->len != len) continue;
+        if (h->block < 0) return h;
+        if (!stale) continue;
+        if (hd_block_loaded(h->block)) return h;
+        if (!h->amb && !any) any = h;            /* (its bank not in the table: the one sound it has) */
+    }
+    return any;
+}
 static int32_t noise_level = 1, noise_timer;
 
 /* The SPU's 4-point Gaussian interpolation table (psx-spx "SPU
@@ -193,6 +271,9 @@ static void key_on(int n) {
     endx &= ~(1u << n);
     decode_block(v);
     if (v->flags & 4) v->repeat = v->addr;
+    hd_of[n] = hd_find(v->addr);
+    if (hd_of[n]) hd_pos[n] = hd_of[n]->lead;      /* (after the silent block the sample starts with) */
+    if (trace && hd_of[n]) rt_log("SPU   a mod's sound, whole: %u frames", hd_of[n]->frames);
 }
 
 static void key_off(int n) {
@@ -211,8 +292,38 @@ static int irq_check_addr(uint32_t addr, uint32_t len) {
     return 0;
 }
 
+/* A mod's WAV playing on voice n: its next sample, the end handled as the SPU's own. */
+static int32_t hd_sample(Voice *v, int n, uint32_t pitch) {
+    const HdSfx *h = hd_of[n];
+    int64_t p = hd_pos[n];
+    int32_t s = 0;
+    if (p >= 0) {
+        uint32_t i = (uint32_t)(p >> 32), f = (uint32_t)(p >> 16) & 0xFFFF;
+        int32_t a = i < h->frames ? h->pcm[i] : 0, b = i + 1 < h->frames ? h->pcm[i + 1] : a;
+        s = a + (int32_t)(((int64_t)(b - a) * f) >> 16);
+    }
+    hd_pos[n] = p + (int64_t)(pitch * h->k);
+    if (hd_pos[n] >= (int64_t)h->frames << 32) {
+        endx |= 1u << n;
+        if (h->loop >= 0 && (uint64_t)h->loop < h->frames) hd_pos[n] = h->loop << 32;
+        else { v->env_phase = ENV_OFF; v->env = 0; hd_of[n] = NULL; }
+    }
+    return s;
+}
+
 /* Next sample of a voice at the current pitch position. */
 static int32_t voice_sample(Voice *v, int n, int32_t pitch_mod) {
+    if (hd_of[n]) {
+        uint32_t pitch = REG(n * 16 + 4);
+        if (n > 0 && ((REG(0x190) | (uint32_t)REG(0x192) << 16) & (1u << n))) {
+            int32_t f = (int16_t)pitch_mod + 0x8000;
+            pitch = (uint32_t)((int32_t)pitch * f >> 15) & 0xFFFF;
+        }
+        if (pitch > 0x3FFF) pitch = 0x4000;
+        int32_t s = hd_sample(v, n, pitch);
+        if ((REG(0x194) | (uint32_t)REG(0x196) << 16) & (1u << n)) s = noise_level;
+        return s;
+    }
     int i = (int)(v->counter >> 12);
     int g = (int)(v->counter >> 4) & 0xFF;
     int32_t s4[4];                                   /* oldest, older, old, new */
@@ -383,6 +494,11 @@ static void xa_out(int16_t l, int16_t r, int rate) {
     xa_last[1] = r;
 }
 
+/* XA audio from a mod (modfs.c): frames of stereo samples at the sector's rate. */
+void spu_xa_pcm(const int16_t *lr, int frames, int rate) {
+    for (int i = 0; i < frames; i++) xa_out(lr[2 * i], lr[2 * i + 1], rate);
+}
+
 void spu_xa_sector(const uint8_t *s) {
     uint8_t coding = s[19];
     int stereo = (coding & 3) == 1;
@@ -530,6 +646,19 @@ static void mix_sample(void) {
         vcr = cr;
         if (cnt & 4) { rl += cl; rr += cr; }
     }
+    {                                                         /* a mod's music (modfs.c): as the sequences' voices, after the main volume */
+        void modfs_music(int32_t *l, int32_t *r);
+        int32_t ml, mr;
+        modfs_music(&ml, &mr);
+        if ((cnt & 0xC000) == 0xC000) {
+            ml = ml * vol_reg(0x180) >> 15;
+            mr = mr * vol_reg(0x182) >> 15;
+            l += ml;
+            r += mr;
+            vcl += ml;
+            vcr += mr;
+        }
+    }
     /* reverb at half rate (22.05 kHz): the input is the average of two
      * samples and the output goes linearly from one result to the next,
      * instead of skipping / repeating samples (which adds a harsh hiss). */
@@ -610,6 +739,7 @@ void spu_write(uint32_t a, uint16_t v) {
     case 0x1A6: xfer_addr = (uint32_t)v * 8; break;
     case 0x1A8:
         irq_check_addr(xfer_addr, 2);
+        HD_WROTE(xfer_addr);
         ram[xfer_addr & 0x7FFFF] = (uint8_t)v;
         ram[(xfer_addr + 1) & 0x7FFFF] = (uint8_t)(v >> 8);
         xfer_addr = (xfer_addr + 2) & 0x7FFFF;
@@ -622,6 +752,7 @@ void spu_write(uint32_t a, uint16_t v) {
 
 void spu_dma_write(uint32_t v) {
     irq_check_addr(xfer_addr, 4);
+    HD_WROTE(xfer_addr);
     for (int i = 0; i < 4; i++) ram[(xfer_addr + i) & 0x7FFFF] = (uint8_t)(v >> (8 * i));
     xfer_addr = (xfer_addr + 4) & 0x7FFFF;
 }
@@ -663,6 +794,7 @@ void spu_state(StateIO *io) {
 /* After loading: drop sound mixed before it. */
 void spu_reset_output(void) {
     out_rd = out_wr;
+    memset(hd_of, 0, sizeof hd_of);
     /* saves from before fixed_vol was kept: take it from the registers */
     for (uint32_t off = 0; off < 0x184; off += 2) {
         int is_vol = (off < 0x180 && (off & 0xF) < 4) || off == 0x180 || off == 0x182;
@@ -673,5 +805,8 @@ void spu_reset_output(void) {
 /* Write sound data straight into SPU RAM from the PC side (as a finished
  * DMA transfer would leave it). */
 void spu_write_ram(uint32_t addr, const uint8_t *data, uint32_t n) {
-    for (uint32_t i = 0; i < n; i++) ram[(addr + i) & 0x7FFFF] = data[i];
+    for (uint32_t i = 0; i < n; i++) {
+        HD_WROTE(addr + i);
+        ram[(addr + i) & 0x7FFFF] = data[i];
+    }
 }

@@ -11,6 +11,7 @@ struct RPrim;
 int texpack_open(const char *dir);                        /* a pack folder: 1 if it has images */
 int texpack_open_listing(const char *list, const char *dir);
 int texpack_loaded(void);
+void texpack_add_image(uint32_t hash, uint32_t pal, int w, int h, uint32_t *px);   /* a mod's picture (modfs.c) */
 void texpack_upload(int x, int y, int w, int h);          /* VRAM written by the CPU */
 void texpack_fill(int x, int y, int w, int h);
 void texpack_copy(int sx, int sy, int dx, int dy, int w, int h);

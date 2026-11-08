@@ -1,0 +1,127 @@
+"""Metadata-only ordered PC NOISE adapter preflight, shared by author tools.
+
+No sound data is stored here. Layouts are derived from a verified original
+PC archive and the supported original disc. Runtime uses the same generated
+profile with its existing bank parser and SPU playback.
+"""
+import re
+import struct
+import zlib
+
+FIELDS = ("block", "native_offset", "pc_offset", "size", "crc", "writable",
+          "header_crc", "body", "programs", "waves", "spu_bytes")
+
+
+def bank_layout(data, offset, size):
+    if offset < 0 or size < 16 or offset + size > len(data):
+        raise ValueError("invalid bank range")
+    c = struct.unpack_from("<I", data, offset)[0]
+    if not 2 <= c <= 8 or 4 + 4 * c > size:
+        raise ValueError("invalid bank part table")
+    parts = struct.unpack_from("<" + "I" * c, data, offset + 4)
+    vh, body = parts[0], parts[-1]
+    if (vh != 4 + 4 * c or vh + 32 > size or body > size or
+            list(parts) != sorted(parts) or data[offset + vh:offset + vh + 4] != b"pBAV"):
+        raise ValueError("invalid VAB layout")
+    programs = struct.unpack_from("<H", data, offset + vh + 18)[0]
+    waves = struct.unpack_from("<H", data, offset + vh + 22)[0]
+    table = vh + 32 + 2048 + 512 * programs
+    if programs > 128 or not 1 <= waves <= 255 or table + 512 > body:
+        raise ValueError("invalid VAB counts")
+    # The native SPU consumer includes entry zero in its address/budget sum.
+    # Every bank in this verified source profile has zero bytes there.
+    if struct.unpack_from("<H", data, offset + table)[0]:
+        raise ValueError("reserved waveform size changed")
+    total = sum(struct.unpack_from("<H", data, offset + table + 2 * i)[0] * 8 for i in range(waves + 1))
+    if body + total > size:
+        raise ValueError("VAB body exceeds bank")
+    structural_crc = zlib.crc32(data[offset + vh:offset + vh + 24], zlib.crc32(data[offset:offset + vh]))
+    return {"header_crc": structural_crc, "body": body,
+            "programs": programs, "waves": waves, "spu_bytes": total}
+
+
+def build_profile(native, pc, offsets, omitted, different):
+    if not offsets or offsets[0] != 0 or offsets[-1] != len(native) or list(offsets) != sorted(offsets):
+        raise ValueError("invalid native block table")
+    rows, cursor = [], 0
+    for block, (start, end) in enumerate(zip(offsets, offsets[1:])):
+        size = end - start
+        if block in omitted or not size:
+            continue
+        if cursor + size > len(pc):
+            raise ValueError("PC archive is shorter than the verified ordered layout")
+        raw, source = native[start:end], pc[cursor:cursor + size]
+        equal = raw == source
+        if not equal and block not in different:
+            raise ValueError(f"unexpected original PC difference in block {block}")
+        row = dict(zip(FIELDS, [block, start, cursor, size, zlib.crc32(source), 0, 0, 0, 0, 0, 0]))
+        try:
+            shape = bank_layout(native, start, size)
+            row.update(shape)
+            row["writable"] = int(equal)
+        except ValueError:
+            pass  # Original non-bank data is retained but never silently edited.
+        rows.append(row)
+        cursor += size
+    if cursor != len(pc):
+        raise ValueError("unaccounted PC archive bytes")
+    return {"pc_size": len(pc), "native_size": len(native), "parts": rows}
+
+
+def preflight(pc, profile):
+    if len(pc) != profile["pc_size"] or not profile["parts"] or len(profile["parts"]) > 1024:
+        raise ValueError("unsupported PC noise archive size or profile")
+    cursor, native_end, changed = 0, 0, []
+    for row in profile["parts"]:
+        pos, size, native = row["pc_offset"], row["size"], row["native_offset"]
+        if (pos != cursor or size <= 0 or pos + size > len(pc) or native < native_end or
+                native + size > profile["native_size"]):
+            raise ValueError("invalid ordered PC noise profile")
+        cursor, native_end = pos + size, native + size
+        if zlib.crc32(pc[pos:pos + size]) == row["crc"]:
+            continue
+        try:
+            if not row["writable"]:
+                raise ValueError("original PC bank differs or has no supported bank consumer")
+            shape = bank_layout(pc, pos, size)
+            if any(shape[k] != row[k] for k in ["header_crc", "body", "programs", "waves"]):
+                raise ValueError("bank part layout/program/waveform counts changed")
+            if shape["spu_bytes"] > row["spu_bytes"]:
+                raise ValueError("bank exceeds its original SPU allocation")
+        except ValueError as exc:
+            raise ValueError(f"PC noise block {row['block']}: {exc}") from exc
+        changed.append(row)
+    if cursor != len(pc):
+        raise ValueError("incomplete PC noise profile")
+    return changed
+
+
+def header(profile):
+    text = ["/* Ordered PC noise/noise.bin layout; metadata only, no sound data.",
+            " * Generated by tools/mod_tables/mod_noisenames.py from user-owned originals.",
+            " * Unchanged PC banks retain the native PS1 bytes. */",
+            "#ifndef MODFS_PC_NOISE_H", "#define MODFS_PC_NOISE_H",
+            f"#define MODFS_PC_NOISE_SIZE {profile['pc_size']}u",
+            f"#define MODFS_PC_NOISE_NATIVE_SIZE {profile['native_size']}u",
+            "typedef struct { uint32_t " + ", ".join(FIELDS) + "; } PcNoisePart;",
+            "static const PcNoisePart modfs_pc_noise[] = {"]
+    for row in profile["parts"]:
+        text.append("    {" + ", ".join(str(row[k]) + "u" for k in FIELDS) + "},")
+    return "\n".join(text + ["};", "#endif", ""])
+
+
+def read_profile_text(text):
+    sizes = {k: int(v) for k, v in re.findall(r"#define MODFS_PC_NOISE_(SIZE|NATIVE_SIZE) (\d+)u", text)}
+    rows = []
+    for raw in re.findall(r"^\s*\{([0-9u, ]+)\},$", text, re.M):
+        values = [int(x.strip().removesuffix("u")) for x in raw.split(",")]
+        if len(values) != len(FIELDS):
+            raise ValueError("unsupported PC noise metadata row")
+        rows.append(dict(zip(FIELDS, values)))
+    if len(sizes) != 2 or not rows:
+        raise ValueError("missing PC noise profile metadata")
+    return {"pc_size": sizes["SIZE"], "native_size": sizes["NATIVE_SIZE"], "parts": rows}
+
+
+def read_profile(path):
+    return read_profile_text(path.read_text(encoding="utf-8"))

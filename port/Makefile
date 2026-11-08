@@ -1,14 +1,17 @@
 # PC port build (Linux, headless runner). Generated code: tools/recomp/recomp.py
 CC ?= clang
 GEN_CFLAGS = -O1 -w -Iinclude -fno-strict-aliasing
-SRC_CFLAGS = -O2 -g -Wall -Wextra -Wno-unused-parameter -Iinclude -Isrc -Ithird_party -Ithird_party/libchdr/include -fno-strict-aliasing
+HOOK_CFLAGS = -fpatchable-function-entry=16 -fno-inline-functions
+SRC_CFLAGS = -O2 -g -Wall -Wextra -Wno-unused-parameter -Iinclude -Isrc -Isrc/mods -Isrc/mods/tables -Ithird_party -Ithird_party/libchdr/include -fno-strict-aliasing
 # libchdr (CHD disc images; BSD) with its zlib (miniz, also used for .zip), LZMA, zstd and FLAC
 CHDR = third_party/libchdr
 CHDR_CFLAGS = -O2 -w -I$(CHDR)/include -I$(CHDR) -Ithird_party -I$(CHDR)/deps/lzma-26.02/include -I$(CHDR)/deps/zstd-1.5.7 -I$(CHDR)/deps/miniz-3.1.2 -DMINIZ_ARCHIVE_APIS -DMINIZ_STDIO
 BUILD = build/linux
 
 GEN = $(wildcard gen/*.c)
-SRC = $(filter-out src/main_%.c,$(wildcard src/*.c))
+SRC = $(filter-out src/main_%.c,$(wildcard src/*.c src/mods/*.c))
+# the mod support's headers, its parts (modfs.c includes them) and generated tables
+MOD_DEPS = $(wildcard src/mods/*.h src/mods/*.inc src/mods/tables/*.h)
 DECOMP = $(wildcard decomp/*.c)
 GEN_O = $(GEN:gen/%.c=$(BUILD)/gen/%.o)
 SRC_O = $(SRC:src/%.c=$(BUILD)/src/%.o)
@@ -20,13 +23,13 @@ $(BUILD)/gen/%.o: gen/%.c include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(GEN_CFLAGS) -c $< -o $@
 
-$(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
+$(BUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h $(MOD_DEPS) include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -c $< -o $@
 
-$(BUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
+$(BUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) $(MOD_DEPS) include/recomp.h
 	@mkdir -p $(dir $@)
-	$(CC) $(SRC_CFLAGS) -Idecomp -c $< -o $@
+	$(CC) $(SRC_CFLAGS) $(HOOK_CFLAGS) -Idecomp -c $< -o $@
 
 $(BUILD)/chdr.o: $(wildcard $(CHDR)/src/*.c) third_party/chdr_all.c
 	@mkdir -p $(dir $@)
@@ -53,13 +56,13 @@ $(WBUILD)/gen/%.o: gen/%.c include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(GEN_CFLAGS) -c $< -o $@
 
-$(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
+$(WBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/texpack.h src/config.h src/disc_ids.h $(MOD_DEPS) include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -c $< -o $@
 
-$(WBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
+$(WBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) $(MOD_DEPS) include/recomp.h
 	@mkdir -p $(dir $@)
-	$(WIN_CC) $(SRC_CFLAGS) -Idecomp -c $< -o $@
+	$(WIN_CC) $(SRC_CFLAGS) $(HOOK_CFLAGS) -Idecomp -c $< -o $@
 
 $(WBUILD)/chdr.o: $(wildcard $(CHDR)/src/*.c) third_party/chdr_all.c
 	@mkdir -p $(dir $@)
@@ -80,13 +83,13 @@ DMETA_O = $(META:meta/%.c=$(DBUILD)/meta/%.o)
 
 dist: $(DBUILD)/resurv_headless
 
-$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
+$(DBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h $(MOD_DEPS) include/recomp.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SRC_CFLAGS) -DRT_DIST -c $< -o $@
 
-$(DBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
+$(DBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) $(MOD_DEPS) include/recomp.h
 	@mkdir -p $(dir $@)
-	$(CC) $(SRC_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
+	$(CC) $(SRC_CFLAGS) $(HOOK_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
 
 $(DBUILD)/meta/%.o: meta/%.c include/recomp.h
 	@mkdir -p $(dir $@)
@@ -106,15 +109,15 @@ WDMETA_O = $(META:meta/%.c=$(WDBUILD)/meta/%.o)
 
 windist: $(WDBUILD)/RESPeCt.exe
 
-$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h include/recomp.h
+$(WDBUILD)/src/%.o: src/%.c src/rt.h src/render.h src/render_gpu.h src/texpack.h src/config.h src/disc_ids.h $(MOD_DEPS) include/recomp.h
 	@mkdir -p $(dir $@)
 	$(WIN_CC) $(SRC_CFLAGS) -I$(CHDR)/deps/miniz-3.1.2 -DRT_DIST -c $< -o $@
 
 $(WDBUILD)/src/render_gpu.o: src/render_gpu.hlsl   # built in (.incbin)
 
-$(WDBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) include/recomp.h
+$(WDBUILD)/decomp/%.o: decomp/%.c $(wildcard decomp/*.h) $(MOD_DEPS) include/recomp.h
 	@mkdir -p $(dir $@)
-	$(WIN_CC) $(SRC_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
+	$(WIN_CC) $(SRC_CFLAGS) $(HOOK_CFLAGS) -DRT_DIST -Idecomp -c $< -o $@
 
 $(WDBUILD)/meta/%.o: meta/%.c include/recomp.h
 	@mkdir -p $(dir $@)

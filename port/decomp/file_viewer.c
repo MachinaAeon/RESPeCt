@@ -21,6 +21,7 @@
  * screen's thread is switched away, but keep the original's frames ($ra
  * and the s registers where its prologue stores them) all the same. */
 #include "status.h"
+#include "modfs_pc_text.h"
 
 void n_files_Start(void);
 void n_files_Screen(void);
@@ -470,6 +471,7 @@ void n_files_Open(void) {
     JAL(0x800C6638u, F_LOAD_TIM, IMAGE_BUF, A1, A2, A3);
     FV_PAGE = 1;
     FV_PAGES = GV(u8, FILE_PAGES + f3);
+    if (modfs_pc_diary_pages(f)) FV_PAGES = modfs_pc_diary_pages(f);
     JAL(0x800C6668u, 0x800C6A08u, 1, 0, A2, A3);
 
     u32 n = JAL(0x800C6670u, F_ALLOC_PANEL, A0, A1, A2, A3);
@@ -578,6 +580,14 @@ void n_files_LoadPage(void) {
     GS(u16, r + 6) = GV(u16, 0x800CF36C + 0xA);
     JAL(0x800C6A70u, F_CLEAR_IMAGE, r, 0, 0, 0);
     u32 f = current_file();
+    if (modfs_pc_diary_load(f, page)) {
+        FV_PAGE_W = 256; FV_PAGE_H = 224;
+        GV(u16, FV_TIM + 8) = 64; GV(u16, FV_TIM + 0xA) = 224;
+        GV(u16, FV_TIM + 0x10) = GS(u16, r);
+        GV(u16, FV_TIM + 0x12) = GS(u16, r + 2);
+        JAL(0x800C6C24u, F_DRAW_SYNC, 0, A1, A2, A3);
+        return;
+    }
     if (dir != 0 || page != 1) {
         u32 f3 = f * 3, k = 0;
         for (;;) {
@@ -741,7 +751,7 @@ turn: {
 
 /* 800C70BC: file 4's pages 5 and 6 are drawn from other places in VRAM. */
 void n_files_PageLayout(void) {
-    if (current_file() != 4) { V0 = 4; return; }
+    if (modfs_pc_diary_pages(current_file()) || current_file() != 4) { V0 = 4; return; }
     u32 pg = FV_PAGE;
     if (pg - 5 >= 2) { V0 = 0; return; }
     u32 p = g_curPanel;

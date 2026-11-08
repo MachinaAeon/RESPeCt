@@ -16,6 +16,8 @@
  * Decompiled from the game's code; RAM-identical to the originals (checked
  * with tools/eq). */
 #include "game_vars.h"
+#include "modmem.h"
+#include "rt.h"
 #include "libgs.h"
 #include "game_stack.h"
 
@@ -114,10 +116,19 @@ void n_enemy_CallProgram(void) {
 /* Load an enemy model file into the load buffer and decompress it; the
  * decompressed data. */
 static u32 load_model(s32 type) {
+    modmem_require_fresh();
+    if (modmem_active()) {
+        u32 packed, parts[3];
+        if (!modfs_model_request_size(ENEMY_FILES,type,&packed,parts) || packed > 0x80150000u-LOAD_BUF)
+            rt_fatal("mods: pickup exceeds original compressed staging buffer");
+    }
     GS(u32, R[29] + 0x10) = LOAD_BUF;
     u32 r = GCALL4(F_FILE_LOAD, 0x8006C6A8u, 0x8005855Cu, ENEMY_FILES, (u32)type);
     u32 d = LOAD_BUF + r * 4;
+    if (modmem_active()) d = modmem_scratch((uint64_t)GV(u32,LOAD_BUF) + 34, "later pickup decode");
     GCALL2(F_DECOMPRESS, LOAD_BUF, d);
+    if (modmem_active() && (GV(u32,d+8)<GV(u32,d+4) || GV(u32,d+8)>GV(u32,LOAD_BUF)))
+        rt_fatal("mods: invalid later pickup model span");
     return d;
 }
 
@@ -146,6 +157,7 @@ void n_enemy_PlaceAll(void) {
         if (type >= 0x5D || type < 0x5B) GCALL1(F_UPLOAD_TIMS, d + GV(u32, d + 8));
         /* the model's data, copied to model memory */
         u32 dst = mem;
+        if (modmem_active()) modmem_require(mem, (uint64_t)GV(u32,d+8)-GV(u32,d+4), "later pickup model copy");
         for (s32 i = 0; i < (GV(s32, d + 8) - GV(s32, d + 4)) / 4; i++, dst += 4)
             GV(u32, dst) = GV(u32, d + (u32)(GV(s32, d + 4) / 4 * 4) + (u32)i * 4);
         s32 size = GV(s32, d + 8) - GV(s32, d + 4);

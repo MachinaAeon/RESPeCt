@@ -23,6 +23,8 @@
  * Decompiled from the game's code; RAM-identical to the originals
  * (checked with tools/eq). */
 #include "libgs.h"
+#include "modmem.h"
+#include "rt.h"
 
 void n_enemy_InitHitParts(void);
 void n_enemy_InitPartsOne(void);
@@ -421,6 +423,7 @@ void n_hitbox_Bounds(void) {
  * root's, or (if search_head) the head part's when it has one. */
 static u32 shadow_fill(u32 e, int search_head) {
     u32 s = GV(u32, 0x800B4D78);
+    if (modmem_active()) modmem_require(s, 0xDC, "enemy shadow");
     GV(u32, e + 0x8BC) = s;
     GV(u16, s + 0xD4) = 0;
     GV(u32, s + 0xB0) = 0;
@@ -489,9 +492,15 @@ void n_shadow_Init(void) {
     FRAME(0x40);
     if (GV(u32, 0x800A0FE8) == 0) {
         GV(u32, 0x800A0FE8) = 1;
-        GS(u32, sp + 0x10) = GV(u32, 0x800B4D78);
+        u32 scratch = GV(u32, 0x800B4D78);
+        if (modmem_active()) {
+            u32 size, parts[3];
+            if (!modfs_model_request_size(0x800A0CD8u,0x6F,&size,parts)) rt_fatal("mods: missing shadow texture size");
+            scratch = modmem_scratch(size, "shadow texture load");
+        }
+        GS(u32, sp + 0x10) = scratch;
         GCALL4(F_FILE_LOAD, 0x8006C230u, 0x80058530u, 0x800A0CD8u, 0x6F);
-        GCALL1(0x8006F370u, GV(u32, 0x800B4D78));         /* tim_Load */
+        GCALL1(0x8006F370u, scratch);         /* tim_Load */
     }
     u32 req = GV(u32, 0x800B4D80);
     if (req != 0) {

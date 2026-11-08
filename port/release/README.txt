@@ -60,6 +60,18 @@ suit your CPU, and if the game still can't keep up it lowers it by itself
 1x is the PlayStation's own, 2x is four times the work, 4x sixteen. HD
 textures add a little more.
 
+MODS
+----
+Files in a "mods" folder next to RESPeCt.exe take the place of the game's,
+one folder per mod, without changing your disc image: rooms, doors,
+effects, items, 2D screens, enemies' textures and animations, music and
+voices (WAV), sound effects (WAV), the rooms' music (WAV or sequence),
+movies (a picture per frame). The PC version's files work too. To start, make an empty "extract" folder next to RESPeCt.exe and run
+the game once: every original is written there, named the way a mod
+names it. mods\README.txt (made on the first start) says the rest; the
+game says on start how many files it used, and resurv.log why any wasn't.
+More in docs/MODDING.md on the RESPeCt page.
+
 CONTROLS
 --------
 Mouse: aim and shoot (left button). In menus the mouse moves the cursor
