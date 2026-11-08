@@ -48,9 +48,21 @@ typedef struct {
 static Ff ff;
 static int ff_state;                             /* 0 not tried, 1 ready, -1 missing */
 
+/* Only from the game's folder: by bare name Windows would also search
+ * System32, the current folder and PATH for an FFmpeg to feed mods' videos
+ * to. The altered search order lets each DLL find its siblings there. */
 static HMODULE load_one(const char *const *names) {
+    char dir[MAX_PATH];
+    DWORD n = GetModuleFileNameA(NULL, dir, sizeof dir);
+    if (!n || n >= sizeof dir) return NULL;
+    char *slash = strrchr(dir, '\\');
+    if (!slash) return NULL;
+    slash[1] = 0;
     for (int i = 0; names[i]; i++) {
-        HMODULE h = LoadLibraryA(names[i]);
+        char path[MAX_PATH];
+        if (snprintf(path, sizeof path, "%s%s", dir, names[i]) >= (int)sizeof path) continue;
+        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) continue;
+        HMODULE h = LoadLibraryExA(path, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
         if (h) return h;
     }
     return NULL;

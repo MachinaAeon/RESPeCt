@@ -151,8 +151,9 @@ static const char *nac_into(const uint8_t *nac, long n, uint8_t **Ap, uint32_t *
  * starts in the script: control << 16 | command) into the HMD's
  * animation unit (B). NULL, or why not. */
 static const char *nab_seqs(const uint8_t *nab, long n, uint8_t *B, uint32_t nb) {
+    if (n < 8) return "it's cut short";
     uint64_t at = 8 + (uint64_t)rd32(nab) * 36;  /* past the vertices, materials and groups */
-    if (n < 8 || at + 4 > (uint64_t)n) return "it's cut short";
+    if (at + 4 > (uint64_t)n) return "it's cut short";
     uint32_t nm = rd32(nab + at);
     at += 4;
     for (uint32_t m = 0; m < nm && m < 64; m++) {
@@ -193,6 +194,7 @@ static const char *nab_seqs(const uint8_t *nab, long n, uint8_t *B, uint32_t nb)
         uint32_t cnt = rd32(nab + at + 12), w1 = HW(pos + 1);
         if (w1 == 0xFFFFFFFFu || (w1 >> 16) != cnt) return "its animation tables aren't the size of the PS1's (as many animations for each bone)";
         if (at + 96 + (uint64_t)cnt * 8 > (uint64_t)n) return "it's cut short";
+        if ((uint64_t)pos + 6 + cnt > hw) return "the disc's model isn't laid out as expected";
         for (uint32_t k = 0; k < cnt; k++) {
             uint32_t ctl = rd32(nab + at + 96 + 8 * k), start = rd32(nab + at + 100 + 8 * k);
             if (start > 0xFFFF || ctl > 0xFFFF) return "an animation starts past what the PS1 can point at";
