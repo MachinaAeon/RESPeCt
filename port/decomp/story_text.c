@@ -3,8 +3,9 @@
  * at a time over a picture, with its own screen set-up, fades and frame
  * callback.
  *
- * The overlay's main loop (8006C480, kept translated: it runs for the
- * whole sequence) runs one state handler a frame from the table at
+ * The overlay's main loop (8006C480; it runs for the whole sequence and
+ * keeps the original's frame and registers, so a thread switched away in
+ * it resumes in the translation after a save state) runs one state handler a frame from the table at
  * 0x8006F424 (state 0x8006FEB0), then draws the frame (8006CFD8):
  *   0  start the fade in from black
  *   1  type: every few frames (the delay of the last character) the next
@@ -33,6 +34,7 @@
 #include "poll.h"
 
 void n_story_TextCode(void);
+void n_story_MainLoop(void);
 void n_story_FadeInStart(void);
 void n_story_Typing(void);
 void n_story_EndWait(void);
@@ -617,4 +619,164 @@ void n_story_InitPromptTiles(void) {
         GV(u32, r + 0x1C) = w3;
         LOOP_POLL(0x8006F10C);
     }
+}
+
+/* until the call succeeds: a vertical blank between tries */
+#define CD_RETRY(cond, poll) for (;;) { if (cond) break; \
+        gcall_ra((poll), 0x800255F8u, 0, A1, A2, A3); LOOP_POLL(poll); }
+
+/* 8006C480: the sequence: the CD queue made ready (stopped, normal speed)
+ * and the prologue's XA track started (0x8006F518, filter channel 0)
+ * with the volume at 0; then a frame at a time: the state's handler
+ * (0x8006F424), the frame drawn, the vertical blank (a mode switch to 1)
+ * and the frame count (0x8006F438; at 0x956 the volume back to 0),
+ * until the text record says it has finished. */
+void n_story_MainLoop(void) {
+    FRAME(0x20);
+    MEM_W32(sp + 0x18, R[31]);
+    MEM_W32(sp + 0x14, R[30]);
+    MEM_W32(sp + 0x10, R[16]);
+    const u32 in_fp = R[30], in_s0 = R[16];
+    R[30] = sp;
+    CD_RETRY(gcall_ra(0x8006C4A4u, 0x80014B14u, 0x40, A1, A2, A3) == 0, 0x8006C4C0u);
+    CD_RETRY((s32)gcall_ra(0x8006C4D4u, 0x80015AE8u, 0, A1, A2, A3) >= 0, 0x8006C4F0u);
+    CD_RETRY((s32)gcall_ra(0x8006C504u, 0x80014FF4u, 0, A1, A2, A3) >= 0, 0x8006C520u);
+    CD_RETRY((s32)gcall_ra(0x8006C544u, 0x80015D44u, 0x8006F518u, 1, 0x800585CCu, A3) >= 0, 0x8006C560u);
+    CD_RETRY((s32)gcall_ra(0x8006C578u, 0x80015840u, 1, 0, A2, A3) >= 0, 0x8006C594u);
+    CD_RETRY(gcall_ra(0x8006C5A8u, 0x80014B14u, 0x40, A1, A2, A3) == 0, 0x8006C5C4u);
+    gcall_ra(0x8006C5E4u, 0x80015484u, 0, 0, 0, 0);
+    gcall_ra(0x8006C5F4u, 0x8001569Cu, 0x800585D0u, A1, A2, A3);
+    GV(u16, 0x8006FEB4u) = 0;
+    for (;;) {
+        if (MEM_R16(GV(u32, 0x80070848u) + 0x10) != 0) break;
+        R[16] = GV(u32, 0x8006F424u + (GV(u32, 0x8006FEB0u) << 2));
+        gcall_ra(0x8006C64Cu, R[16], A0, A1, A2, A3);
+        gcall_ra(0x8006C654u, 0x8006CFD8u, A0, A1, A2, A3);
+        gcall_ra(0x8006C660u, 0x8001306Cu, 1, A1, A2, A3);
+        if (GV(u32, 0x8006F438u) == 0x956) {
+            gcall_ra(0x8006C68Cu, 0x80015484u, 0, 0, 0, 0);
+            GV(u16, 0x8006FEB4u) = 0;
+        }
+        GV(u32, 0x8006F438u) += 1;
+        LOOP_POLL(0x8006C6ACu);
+    }
+    R[30] = in_fp;
+    R[16] = in_s0;
+}
+
+/* the unoptimised frame: $fp = $sp, $ra and $fp saved at the top */
+#define FP_FRAME(n) FRAME(n); MEM_W32(sp + (n) - 4, R[31]); MEM_W32(sp + (n) - 8, R[30]); \
+        const u32 in_fp_ = R[30]; R[30] = sp
+#define FP_END() R[30] = in_fp_
+
+/* 8006C314: the text record (0x8006FDE0, pointer 0x80070848) reset to
+ * the prologue (0x8006F128), its first code read; the sound bank 0x12;
+ * the state, frame count and volume cleared. */
+void n_story_Reset(void) {
+    FP_FRAME(0x18);
+    GV(u8, 0x80062E1Cu) = 0;
+    gcall_ra(0x8006C338u, 0x80011994u, 1, A1, A2, A3);
+    gcall_ra(0x8006C348u, 0x80011D24u, 2, 0x12, A2, A3);
+    GV(u32, 0x80070848u) = 0x8006FDE0u;
+    const u32 t = 0x8006FDE0u;
+    GV(u16, t + 0x10) = 0;
+    GV(u32, t) = 0x8006F128u;
+    GV(u16, t + 4) = GV(u16, 0x8006F434u);
+    GV(u16, t + 6) = 0;
+    GV(u16, t + 8) = 0x10;
+    GV(u16, t + 0xA) = 0x10;
+    GV(u16, t + 0xC) = 0;
+    const u32 c = gcall_ra(0x8006C3E0u, 0x8006C420u, 0, A1, A2, A3);
+    GV(u16, GV(u32, 0x80070848u) + 0xE) = (u16)c;
+    GV(u32, 0x8006FEB0u) = 0;
+    GV(u32, 0x8006F438u) = 0;
+    GV(u16, 0x8006F43Cu) = 0;
+    FP_END();
+}
+
+/* 8006DEB4: after the text, the opening movie: the ordering tables
+ * cleared, the prompt's tiles, the CD at double speed, the frame buffer
+ * cleared, the movie (record 0x8006FD58: sector 0x1C0, 0x483 frames)
+ * played, the display set back. */
+void n_story_Movie(void) {
+    FP_FRAME(0x30);
+    GV(u32, 0x8006F418u) = 1;
+    gcall_ra(0x8006DEE8u, 0x8002DED8u, 0, 0, 0x8006FEC0u, A3);
+    gcall_ra(0x8006DF00u, 0x8002DED8u, 0, 0, 0x8006FED4u, A3);
+    gcall_ra(0x8006DF08u, 0x8006EEDCu, A0, A1, A2, A3);
+    for (;;) {
+        if ((s32)gcall_ra(0x8006DF14u, 0x80014FF4u, 1, A1, A2, A3) >= 0) break;
+        gcall_ss(0x8006DF30u, 0x800255F8u, 0, A1, A2, A3);
+        LOOP_POLL(0x8006DF30u);
+    }
+    const u32 rc = 0x8006F508u;
+    GV(u16, rc) = 0;
+    GV(u16, rc + 2) = 0;
+    GV(u16, rc + 4) = 0x140;
+    GV(u16, rc + 6) = 0x200;
+    gcall_ra(0x8006DF7Cu, 0x800354F8u, rc, 0, 0, 0);
+    gcall_ra(0x8006DF88u, 0x80035374u, 0, A1, A2, A3);
+    gcall_ra(0x8006DF98u, 0x80014124u, 0x8006E15Cu, A1, A2, A3);
+    gcall_ra(0x8006DFA4u, 0x80038E88u, 0x80110000u, A1, A2, A3);
+    GV(u16, rc) = 0;
+    GV(u16, rc + 2) = 0;
+    GV(u16, rc + 4) = 0;
+    GV(u16, rc + 6) = 0xF0;
+    MEM_W32(sp + 0x10, 1);
+    for (u32 o = 0x14; o <= 0x20; o += 4) MEM_W32(sp + o, 0);
+    MEM_W32(sp + 0x24, 2);
+    gcall_ra(0x8006E004u, 0x80013DDCu, 0x140, 0xF0, rc, 0);
+    const u32 m = 0x8006FD58u;
+    GV(u32, m) = 0x800586B4u;
+    GV(u32, m + 8) = 1;
+    GV(u32, m + 0xC) = 0x483;
+    GV(u16, m + 0x10) = 0;
+    GV(u16, m + 0x12) = 0x18;
+    GV(u32, m + 4) = 0x1C0;
+    GV(u32, m + 0x14) = 0;
+    GV(u32, m + 0x1C) = 0x80100000u;
+    GV(u32, m + 0x18) = 0x20;
+    GV(u32, m + 0x20) = 0x80110000u;
+    GV(u32, m + 0x24) = 0x80170000u;
+    GV(u32, m + 0x28) = 0x80180000u;
+    GV(u32, m + 0x2C) = 0x80150000u;
+    GV(u32, m + 0x30) = 0x80160000u;
+    GV(u16, 0x8006FEB4u) = 0;
+    gcall_ss(0x8006E0D4u, 0x80014134u, m, 2, GV(u8, 0x80062D1Cu), 1);
+    GV(u16, rc) = 0;
+    GV(u16, rc + 2) = 0;
+    GV(u16, rc + 4) = 0;
+    GV(u16, rc + 6) = 0x100;
+    MEM_W32(sp + 0x10, 1);
+    for (u32 o = 0x14; o <= 0x20; o += 4) MEM_W32(sp + o, 0);
+    MEM_W32(sp + 0x24, GV(u8, 0x80062D1Cu) == 0);
+    gcall_ra(0x8006E144u, 0x80013DDCu, 0x140, 0xF0, rc, 0);
+    FP_END();
+}
+
+/* 8006C284: the end: the XA volume off, the sound stopped, the frame
+ * callbacks cleared, the opening movie, then TEST (mode 1). */
+void n_story_End(void) {
+    FP_FRAME(0x18);
+    gcall_ra(0x8006C2ACu, 0x80015484u, 0, 0, 0, 0);
+    gcall_ra(0x8006C2B8u, 0x80011D48u, 1, A1, A2, A3);
+    gcall_ra(0x8006C2D0u, 0x80015484u, 0, 0, 0, 0);
+    gcall_ra(0x8006C2DCu, 0x80011558u, 0, A1, A2, A3);
+    gcall_ra(0x8006C2E8u, 0x80011564u, 0, A1, A2, A3);
+    gcall_ss(0x8006C2F0u, 0x8006DEB4u, A0, A1, A2, A3);
+    gcall_ra(0x8006C2FCu, 0x80012FF4u, 1, A1, A2, A3);
+    FP_END();
+}
+
+/* 8006C22C: TYPEW's main: reset, load, set up the screen and the fade,
+ * the sequence, then the end. */
+void n_story_Main(void) {
+    FP_FRAME(0x18);
+    gcall_ra(0x8006C244u, 0x8006C314u, A0, A1, A2, A3);
+    gcall_ra(0x8006C24Cu, 0x8006D908u, A0, A1, A2, A3);
+    gcall_ra(0x8006C254u, 0x8006D530u, A0, A1, A2, A3);
+    gcall_ra(0x8006C25Cu, 0x8006DAA0u, A0, A1, A2, A3);
+    gcall_ra(0x8006C264u, 0x8006C480u, A0, A1, A2, A3);
+    gcall_ss(0x8006C26Cu, 0x8006C284u, A0, A1, A2, A3);
+    FP_END();
 }

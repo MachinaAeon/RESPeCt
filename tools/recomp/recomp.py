@@ -669,6 +669,10 @@ def main():
     global M_KERNEL, NATIVE, HOOKS
     NATIVE = load_native()
     HOOKS.update(load_hooks())
+    # a hooked function made native must call its hook itself
+    for k, h in HOOKS.items():
+        if k in NATIVE:
+            print("note: %s %08X is native; n_%s must call %s()" % (k[0], k[1], NATIVE[k], h), file=sys.stderr)
     mods, _ = M.all_modules()
     want = set(sys.argv[1:])
     os.makedirs(OUT, exist_ok=True)

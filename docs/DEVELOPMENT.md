@@ -264,6 +264,12 @@ level or two below) for an image, unpacks a `.zip` into `disc/`, and tells
 the player what's wrong with anything unusable (`port/src/setup_win32.c`).
 `tools/audit_exe.py EXE` confirms an exe holds no 32-byte run of the disc.
 
+HD texture packs in Beetle PSX HW's format (`<texture CRC>-<CLUT CRC>.png`) work
+at resolution 2x and up: `port/src/texpack.c` hashes the game's VRAM uploads
+the same way, and `render.c` draws matching primitives from the pack's
+images. Rendering only: game RAM is unchanged (`RT_TEXPACK=dir` in the
+headless runner).
+
 ### Save states
 
 F5 saves the whole running game to the selected slot (1-99) and F9 loads it

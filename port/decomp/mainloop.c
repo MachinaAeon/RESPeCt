@@ -10,6 +10,7 @@
  * Decompiled from the game's code; RAM-identical to the originals
  * (checked with tools/eq). */
 #include "libgs.h"
+#include "poll.h"
 #include "modmem.h"
 
 void n_test_InitState(void);
@@ -22,6 +23,8 @@ void n_stage_LoadTextures(void);
 void n_roomscript_Branch(void);
 void n_shot_HitPause(void);
 void n_pad_Rumble(void);
+void n_test_DisplayReset(void);
+void n_test_Main(void);
 
 #define GAME_TYPE      GV(u8, 0x80062DF4)
 #define GAME_DEMO      3
@@ -367,5 +370,268 @@ void n_pad_Rumble(void) {
     if (GAME_TYPE != GAME_DEMO) {
         if (left & 0xFF) GCALL4(0x800135A8u, 0, 0, tl & 0xFFFF, left & 0xFF);
         if (right & 0xFF) GCALL4(0x800135A8u, 0, 1, tr & 0xFFFF, right & 0xFF);
+    }
+}
+
+/* 80072F74: TEST's display reset (the demo ending, a stage change): two
+ * draw areas and display set-ups (0x800A84D0/E0, 0x800A8470/50), then
+ * twelve times three frames of black (in the demo, the music faded out
+ * over them by 16 a step while it plays, then stopped); the display off
+ * and the frame callbacks set back to TEST's (0x8006F1E4, 0x8006F1C0).
+ * Its frame waits can make save states (gcall_ss: the s registers as the
+ * original has them). */
+void n_test_DisplayReset(void) {
+    FRAME(0x40);
+    u32 in_s[8];
+    for (int i = 0; i < 8; i++) { in_s[i] = R[16 + i]; GS(u32, sp + 0x18 + 4 * i) = R[16 + i]; }
+    GS(u32, sp + 0x38) = R[31];
+    if (GAME_TYPE == GAME_DEMO) {
+        if (gcall_ra(0x80072FB4u, 0x80019268u, 0x10000, A1, A2, A3) != 0) {
+            const s32 v = (s32)GV(s16, 0x80062DB6u) * 127;
+            R[21] = (u32)((s32)(((s64)v * 0x51EB851FLL) >> 37) - (v >> 31));
+        } else R[21] = 0;
+    }
+    R[18] = 0; R[23] = 0x100; R[22] = 0x7B; R[20] = 0x100;
+    R[17] = 0x800A84E0u; R[19] = 0x800A84D0u;
+    for (;;) {
+        R[16] = R[18] << 8;
+        const u32 v = gcall_ra(0x80073024u, 0x80038188u, 2, 2, R[16], 0);
+        gcall_ra(0x80073038u, 0x80038388u, R[19], 1, 0, v & 0xFFFF);
+        gcall_ra(0x80073040u, 0x80038328u, R[17], A1, A2, A3);
+        const u32 t = R[17];
+        GV(u16, t + 0x10) = (u16)R[20];
+        R[20] -= 0x80;
+        GV(u16, t + 8) = (u16)R[16];
+        GV(u16, t + 0xA) = 0;
+        GV(u8, t + 0xC) = 0;
+        GV(u8, t + 0xD) = 0;
+        GV(u16, t + 0x12) = (u16)R[23];
+        GV(u8, t + 4) = 0x7B;
+        GV(u8, t + 5) = 0x7B;
+        GV(u8, t + 6) = 0x7B;
+        R[17] += 0x14;
+        R[18]++;
+        R[19] += 8;
+        if (!((s32)R[18] < 2)) break;
+        LOOP_POLL(0x80073074u);
+    }
+    R[17] = 0x800A8470u;
+    R[18] = 0xF0;
+    GS(u32, sp + 0x10) = 0xF0;
+    gcall_ra(0x800730A0u, 0x80038088u, R[17], 0, 0, 0x140);
+    R[16] = 0x800A8450u;
+    GS(u32, sp + 0x10) = 0xF0;
+    gcall_ra(0x800730C0u, 0x80038148u, R[16], 0, 0, 0x140);
+    gcall_ss(0x800730C8u, 0x800255F8u, 0, A1, A2, A3);
+    gcall_ra(0x800730D0u, 0x80035BA4u, R[16], A1, A2, A3);
+    gcall_ra(0x800730D8u, 0x800359D8u, R[17], A1, A2, A3);
+    R[18] = 0;
+    R[17] = 0x800A84D0u;
+    R[16] = 0x800A84E0u;
+    for (;;) {
+        if (GAME_TYPE == GAME_DEMO && R[21] != 0) {
+            const u32 a = (u32)(s32)(s16)R[21];
+            gcall_ra(0x80073118u, 0x800206B4u, 0x10, a, a, A3);
+            R[21] -= 0x10;
+            if ((s32)R[21] <= 0) {
+                R[21] = 0;
+                gcall_ra(0x80073130u, 0x8001F6A4u, 0x10, A1, A2, A3);
+            }
+        }
+        gcall_ss(0x80073138u, 0x800255F8u, 3, A1, A2, A3);
+        gcall_ra(0x80073140u, 0x8003590Cu, R[17], A1, A2, A3);
+        gcall_ra(0x80073148u, 0x8003590Cu, R[16], A1, A2, A3);
+        gcall_ra(0x80073150u, 0x8003590Cu, R[17] + 8, A1, A2, A3);
+        gcall_ra(0x80073158u, 0x8003590Cu, R[16] + 0x14, A1, A2, A3);
+        R[18]++;
+        if (!((s32)R[18] < 12)) break;
+        LOOP_POLL(0x80073160u);
+    }
+    gcall_ss(0x80073170u, 0x800255F8u, 0, A1, A2, A3);
+    gcall_ra(0x80073178u, 0x800352DCu, 0, A1, A2, A3);
+    gcall_ra(0x80073184u, 0x80011558u, 0x8006F1E4u, A1, A2, A3);
+    gcall_ra(0x80073190u, 0x80011564u, 0x8006F1C0u, A1, A2, A3);
+    for (int i = 0; i < 8; i++) R[16 + i] = in_s[i];
+}
+
+/* 8006CAA0: TEST's thread (it never returns). Set up the game (TEST's
+ * state, the checkpoint, the HUD, sounds), then for each stage: load it
+ * (events, models, the stage, its sounds and textures) and for each room:
+ * enter it (the room's set-up), then every frame: the status screen
+ * (0x800B3D20: CONPAU_E's thread, by a mode switch) or the file screen
+ * (0x800B3D38: the map/file overlay at 0x80010050 + 0xEA60) when asked,
+ * the frame's work (the player, the enemies, the scripts, the camera,
+ * the effects, the HUD), the room change test, the drawing, the
+ * controller and a vertical blank (mode switch), until the room (0x800B3E18)
+ * or the stage (0x800BB19C >= 6) changes.
+ *
+ * It runs the whole game in the mode's thread: every call is gcall_ss
+ * with the s registers and $fp as the original keeps them (s1 0x80010000,
+ * s2 1, s3 s5 fp 0x80060000, s4 s6 0x800B0000, s7 0x80058558, s0 by the
+ * place, t0 0x800B0000 at the loop's top) and its loops poll with
+ * SAVE_POLL, so save states are made in it as in the translation. */
+#define TM(ra, f) gcall_ss((ra), (f), A0, A1, A2, A3)
+void n_test_Main(void) {
+    FRAME(0x40);
+    GS(u32, sp + 0x3C) = R[31];
+    GS(u32, sp + 0x38) = R[30];
+    for (int i = 7; i >= 0; i--) GS(u32, sp + 0x18 + 4 * i) = R[16 + i];
+    TM(0x8006CAD0u, 0x8006F4B0u);
+    TM(0x8006CAD8u, 0x8006DE48u);
+    TM(0x8006CAE0u, 0x8006DD5Cu);
+    GV(u32, 0x800B608Cu) = GV(u32, 0x80062DF8u) == 1 ? 8 : 4;
+    TM(0x8006CB08u, 0x80071CF4u);
+    g_buttons = 0;
+    TM(0x8006CB14u, 0x8008F1F0u);
+    gcall_ss(0x8006CB20u, 0x8008F3BCu, 0, 0x78, A2, A3);
+    gcall_ss(0x8006CB30u, 0x8007CC74u, 0x800C3E50u, 0, A2, A3);
+    TM(0x8006CB38u, 0x80092DD0u);
+    TM(0x8006CB40u, 0x8009493Cu);
+    TM(0x8006CB48u, 0x80098AECu);
+    gcall_ss(0x8006CB54u, 0x8008F3BCu, 1, 0x3C, A2, A3);
+    gcall_ss(0x8006CB5Cu, 0x80011994u, 1, A1, A2, A3);
+    gcall_ss(0x8006CB68u, 0x80011D24u, 0, 0, A2, A3);
+    TM(0x8006CB70u, 0x8008F0E0u);
+    gcall_ss(0x8006CB7Cu, 0x8008F3BCu, 2, 0x78, A2, A3);
+    for (;;) {                                                /* a stage */
+        R[22] = 0x800B0000u;
+        TM(0x8006CB84u, 0x8008E324u);
+        R[30] = 0x80060000u;
+        TM(0x8006CB8Cu, 0x8008F6A8u);
+        R[18] = 1;
+        TM(0x8006CB94u, 0x8008DAD0u);
+        TM(0x8006CB9Cu, 0x80077F8Cu);
+        gcall_ss(0x8006CBA8u, 0x8007428Cu, 0x800C3E50u, A1, A2, A3);
+        TM(0x8006CBB0u, 0x800713F4u);
+        TM(0x8006CBB8u, 0x80092248u);
+        gcall_ss(0x8006CBC4u, 0x8008F3BCu, 3, 0xB4, A2, A3);
+        TM(0x8006CBCCu, 0x80072DC8u);
+        TM(0x8006CBD4u, 0x8006F490u);
+        gcall_ss(0x8006CBE0u, 0x80090B90u, 0, 8, A2, A3);
+        R[21] = 0x80060000u;
+        GV(u8, 0x80062DE5u) = 0;
+        GV(u32, 0x800B3D50u) = 0;
+        g_reticleX = 0xA0;
+        g_reticleY = 0x78;
+        GV(u8, 0x80062DECu) = 1;
+        GV(u32, 0x80062E10u) = 0;
+        for (;;) {                                            /* a room */
+            GV(u32, 0x800A8954u) = 0;
+            TM(0x8006CC2Cu, 0x8007CD04u);
+            R[16] = 0x80060000u;
+            TM(0x8006CC34u, 0x8008D2E4u);
+            TM(0x8006CC3Cu, 0x80082E04u);
+            TM(0x8006CC44u, 0x8006E294u);
+            TM(0x8006CC4Cu, 0x8006DB40u);
+            TM(0x8006CC54u, 0x8006F914u);
+            TM(0x8006CC5Cu, 0x80073758u);
+            TM(0x8006CC64u, 0x8009453Cu);
+            TM(0x8006CC6Cu, 0x80082F3Cu);
+            TM(0x8006CC74u, 0x8006DC24u);
+            if (GV(u8, 0x80062DE5u) == 0) {
+                TM(0x8006CC8Cu, 0x8008E4DCu);
+                GV(u8, 0x80062DE5u) = 1;
+            }
+            gcall_ss(0x8006CC9Cu, 0x800352DCu, 0, A1, A2, A3);
+            gcall_ss(0x8006CCB0u, 0x8006F40Cu, 0, 0, 0x140, 0x200);
+            gcall_ss(0x8006CCB8u, 0x800255F8u, 0, A1, A2, A3);
+            GV(u32, 0x800B3E18u) = 0;
+            GV(u8, 0x80062E1Cu) = 2;
+            gcall_ss(0x8006CCD0u, 0x800352DCu, 1, A1, A2, A3);
+            if (GV(u32, 0x800B3E18u) == 0) {
+                R[17] = 0x80010000u; R[19] = 0x80060000u; R[20] = 0x800B0000u; R[23] = 0x80058558u;
+                R[8] = 0x800B0000u;
+                for (;;) {                                    /* a frame */
+                    if (GV(u32, 0x800B3D20u) != 0) {          /* the status screen */
+                        gcall_ss(0x8006CD0Cu, 0x80035374u, 0, A1, A2, A3);
+                        TM(0x8006CD14u, 0x8006D068u);
+                        GV(u32, 0x80062DF0u) = 1;
+                        GV(u8, 0x80062DECu) = 0;
+                        gcall_ss(0x8006CD24u, 0x8001306Cu, 1, A1, A2, A3);
+                        gcall_ss(0x8006CD40u, 0x800116A4u, 0x8006C11Cu, 0x8005851Cu, 0x13, GV(u32, 0x80010050u));
+                        gcall_ss(0x8006CD54u, 0x800805F4u, 0, 2, 0x7F, 0x7F);
+                        gcall_ss(0x8006CD60u, 0x80011FF8u, (u32)(s32)GV(s16, 0x80062E78u), 0x30, A2, A3);
+                        gcall_ss(0x8006CD68u, 0x800808F4u, 0x30, A1, A2, A3);
+                        gcall_ss(0x8006CD78u, 0x8001304Cu, 1, 0x800CB7A4u, A2, A3);
+                        gcall_ss(0x8006CD80u, 0x8001306Cu, 1, A1, A2, A3);
+                        TM(0x8006CD88u, 0x800735F4u);
+                        gcall_ss(0x8006CD94u, 0x80011FF8u, (u32)(s32)GV(s16, 0x80062E78u), 0x7F, A2, A3);
+                        gcall_ss(0x8006CD9Cu, 0x800808F4u, 0x7F, A1, A2, A3);
+                        R[8] = 0x800B0000u;
+                        GV(u32, 0x800A8838u) = 4;
+                        GV(u8, 0x80062DECu) = 1;
+                        GV(u32, 0x800B3D20u) = 0;
+                        GV(u32, 0x800B3D38u) = 0;
+                        g_playerFrozen = 0;
+                    }
+                    if (GV(u32, 0x800B3D38u) != 0) {          /* the file screen */
+                        gcall_ss(0x8006CDD8u, 0x80035374u, 0, A1, A2, A3);
+                        R[16] = 0xEA60;
+                        TM(0x8006CDE0u, 0x8006D068u);
+                        GV(u32, 0x80062DF0u) = 1;
+                        GV(u8, 0x80062DECu) = 0;
+                        gcall_ss(0x8006CDF0u, 0x8001306Cu, 1, A1, A2, A3);
+                        GS(u32, sp + 0x10) = GV(u32, 0x80010050u) + 0xEA60;
+                        gcall_ss(0x8006CE1Cu, 0x800115C0u, 0x8006C130u, 0x80058558u, 0x800A261Cu, 0x14);
+                        gcall_ss(0x8006CE28u, 0x80016F78u, GV(u32, 0x80010050u) + 0xEA60, GV(u32, 0x80010050u), A2, A3);
+                        gcall_ss(0x8006CE34u, 0x80011FF8u, (u32)(s32)GV(s16, 0x80062E78u), 0x30, A2, A3);
+                        gcall_ss(0x8006CE3Cu, 0x800808F4u, 0x30, A1, A2, A3);
+                        gcall_ss(0x8006CE4Cu, 0x8001304Cu, 1, 0x800C3F58u, A2, A3);
+                        gcall_ss(0x8006CE54u, 0x8001306Cu, 1, A1, A2, A3);
+                        TM(0x8006CE5Cu, 0x800735F4u);
+                        gcall_ss(0x8006CE68u, 0x80011FF8u, (u32)(s32)GV(s16, 0x80062E78u), 0x7F, A2, A3);
+                        gcall_ss(0x8006CE70u, 0x800808F4u, 0x7F, A1, A2, A3);
+                        const u32 k = GV(u32, 0x800A866Cu);
+                        GV(u8, 0x80062DECu) = 1;
+                        GV(u32, 0x800B3D38u) = 0;
+                        if (k == 2 && GV(u32, 0x800B3F08u) == 0xE) {
+                            gcall_ss(0x8006CEB4u, 0x800116A4u, 0x8006C148u, 0x80058558u + 0x1C, 0x11, GV(u32, 0x80010050u));
+                            gcall_ss(0x8006CEC0u, 0x800927D8u, GV(u32, 0x80010050u), 0xFFFFFFFFu, A2, A3);
+                        }
+                        g_playerFrozen = 0;
+                        GV(u8, 0x800B3DF7u) = GV(u8, 0x800A8843u);
+                        GV(u8, 0x800B3DF6u) = GV(u8, 0x800A8842u);
+                    }
+                    TM(0x8006CEF0u, 0x8009016Cu);
+                    if (GV(u32, 0x800A8610u) != 0) TM(0x8006CF0Cu, 0x80078580u);
+                    TM(0x8006CF14u, 0x800705D8u);
+                    TM(0x8006CF1Cu, 0x8009358Cu);
+                    TM(0x8006CF24u, 0x8008D628u);
+                    TM(0x8006CF2Cu, 0x800800A0u);
+                    TM(0x8006CF34u, 0x8008EB18u);
+                    TM(0x8006CF3Cu, 0x80082F88u);
+                    g_fireRequest = 0;
+                    gcall_ss(0x8006CF50u, 0x80076B80u, 0x800B3E40u, A1, A2, A3);
+                    TM(0x8006CF58u, 0x8006D068u);
+                    TM(0x8006CF60u, 0x80070FA0u);
+                    if (g_inputLocked == 0) TM(0x8006CF7Cu, 0x8007F16Cu);
+                    if (TM(0x8006CF84u, 0x8008480Cu) != 0) break;
+                    TM(0x8006CF94u, 0x80085F10u);
+                    if (GV(u32, 0x800BA9F4u) != 0) TM(0x8006CFB0u, 0x8007D7FCu);
+                    else gcall_ss(0x8006CFC4u, 0x8007E064u, GV(u8, 0x80062D1Cu), A1, A2, A3);
+                    if (GV(u32, 0x800B3E18u) == 0) TM(0x8006CFDCu, 0x8006D4D0u);
+                    TM(0x8006CFE4u, 0x8007EF50u);
+                    gcall_ss(0x8006CFECu, 0x80035374u, 0, A1, A2, A3);
+                    GV(u32, 0x80062DF0u) = 1;
+                    TM(0x8006CFF4u, 0x80071584u);
+                    GV(u32, 0x800C3A94u) = 0;
+                    GV(u32, 0x800C3A90u) += 1;
+                    {
+                        const u32 c = GV(u32, 0x80063448u + 0xC);
+                        if (c != 0xFFFFFFFFu) GV(u32, 0x80063448u + 0xC) = c + 1;
+                    }
+                    gcall_ss(0x8006D030u, 0x8001306Cu, 1, A1, A2, A3);
+                    R[8] = 0x800B0000u;
+                    if (GV(u32, 0x800B3E18u) != 0) break;
+                    SAVE_POLL(0x8006D038u);
+                }
+            }
+            gcall_ss(0x8006D048u, 0x800352DCu, 0, A1, A2, A3);
+            if (!(GV(s32, 0x800BB19Cu) < 6)) break;
+            R[2] = 0x800A0000u;                       /* the loop's top stores through it */
+            SAVE_POLL(0x8006D058u);
+        }
+        GV(u32, 0x800BB19Cu) = 0;
+        SAVE_POLL(0x8006D060u);
     }
 }

@@ -529,3 +529,113 @@ void n_sound_PairStatus(void) {
 
 /* 80012DD0: the playing pairs' bits. */
 void n_sound_PairsOn(void) { V0 = (u32)(s32)GV(s16, 0x80062D4E); }
+
+/* 80011CB4 (bank, file, dest): a sound bank: the old one closed
+ * (0x80011DCC), its file (SOUND's sector table, index file) read to dest
+ * (save states can be made in the read's waits: gcall_ss, s0-s2 as the
+ * original keeps them), then opened (0x80011BBC). */
+void n_sound_LoadBank(void) {
+    FRAME(0x28);
+    GS(u32, sp + 0x18) = R[16];
+    GS(u32, sp + 0x1C) = R[17];
+    GS(u32, sp + 0x20) = R[18];
+    GS(u32, sp + 0x24) = R[31];
+    const u32 in_s0 = R[16], in_s1 = R[17], in_s2 = R[18];
+    R[16] = A0; R[17] = A1; R[18] = A2;
+    gcall_ss(0x80011CD8u, 0x80011DCCu, A0, A1, A2, A3);
+    GS(u32, sp + 0x10) = R[18];
+    gcall_ss(0x80011CFCu, 0x800115C0u, 0x8001002Cu, 0x80058510u, 0x80058D2Cu, R[17]);
+    gcall_ss(0x80011D0Cu, 0x80011BBCu, R[16], R[17], R[18], A3);
+    R[16] = in_s0; R[17] = in_s1; R[18] = in_s2;
+}
+
+/* 80011D24 (bank, file): the same into 0x80108000. */
+void n_sound_LoadBankHigh(void) {
+    FRAME(0x18);
+    GS(u32, sp + 0x10) = R[31];
+    gcall_ss(0x80011D38u, 0x80011CB4u, A0, A1, 0x80108000u, A3);
+}
+
+/* 80011994 (keep): the sound system's reset: unless keep, the SPU
+ * reset; libsnd's tables (seven sequence slots at 0x800637C0 with their
+ * buffers from 0x801F8300; the music and pair numbers -1), the voice
+ * defaults, the sound file names, mono or stereo (0x80062E20), the master
+ * volume set after 90 frames of silence (gcall_ss waits, as the original
+ * keeps s0 and s1), the CD's mix (0x80062E58) and the reverb off. */
+void n_sound_Reset(void) {
+    FRAME(0x48);
+    GS(u32, sp + 0x3C) = R[17];
+    GS(u32, sp + 0x40) = R[31];
+    GS(u32, sp + 0x38) = R[16];
+    const u32 in_s0 = R[16], in_s1 = R[17];
+    R[17] = 0x801F8300u;
+    if (A0 == 0) gcall_ss(0x800119B8u, 0x8001A9D8u, A0, A1, A2, A3);
+    gcall_ss(0x800119CCu, 0x8001D9A8u, 0x80063818u, 4, 1, A3);
+    gcall_ss(0x800119D4u, 0x8001DBC8u, 0x1000, A1, A2, A3);
+    for (u32 i = 0;;) {
+        const u32 r = 0x800637C0u + i * 12;
+        GV(u32, r + 4) = 0;
+        GV(u16, r + 8) = 0xFFFF;
+        GV(u16, r + 0xA) = 0xFFFF;
+        i++;
+        if (!((s32)i < 7)) break;
+        LOOP_POLL(0x800119F8u);
+    }
+    {
+        static const u16 step[6] = {0xC20, 0xC20, 0x1020, 0x1020, 0xC20, 0x1020};
+        GV(u32, 0x800637C0u) = R[17];
+        for (int i = 0; i < 6; i++) {
+            R[17] += step[i];
+            GV(u32, 0x800637C0u + 0xC * (u32)(i + 1)) = R[17];
+        }
+    }
+    GV(u16, 0x80062E7Au) = 0xFFFF;
+    GV(u16, 0x80062E7Cu) = 0xFFFF;
+    GV(u16, 0x80062E70u) = 0xFFFF;
+    GV(u16, 0x80062E72u) = 0xFFFF;
+    GV(u16, 0x80062E74u) = 0xFFFF;
+    GV(u16, 0x80062E76u) = 0xFFFF;
+    gcall_ss(0x80011A60u, 0x8001D5D8u, A0, A1, A2, A3);
+    gcall_ss(0x80011A68u, 0x8001E118u, 0, A1, A2, A3);
+    gcall_ss(0x80011A70u, 0x8001E0F8u, 0xFF0000u, A1, A2, A3);
+    gcall_ss(0x80011A94u, 0x800121A0u, 0x800593A0u, 0x800593C0u, 0x800593E0u, 0x80059400u);
+    if (GV(u32, 0x80062E20u) == 0) GV(u8, 0x80062D35u) = 1;
+    GV(u32, 0x80062E08u) = 0x46;
+    R[16] = 0;
+    gcall_ss(0x80011AC8u, 0x80020358u, A0, A1, A2, A3);
+    gcall_ss(0x80011AD0u, 0x80020198u, 4, A1, A2, A3);
+    gcall_ss(0x80011AD8u, 0x80020378u, A0, A1, A2, A3);
+    for (;;) {
+        gcall_ss(0x80011AE0u, 0x800255F8u, 0, A1, A2, A3);
+        R[16]++;
+        if (!((s32)R[16] < 0x5A)) break;
+        LOOP_POLL(0x80011AE8u);
+    }
+    gcall_ss(0x80011AF8u, 0x80020108u, 0x40, 0x40, A2, A3);
+    if (GV(u32, 0x80062E20u) == 0) {
+        gcall_ss(0x80011B14u, 0x80024048u, A0, A1, A2, A3);
+        GV(u8, 0x80062E58u) = 0x7F;
+        GV(u8, 0x80062E59u) = 0;
+        GV(u8, 0x80062E5Au) = 0x7F;
+        GV(u8, 0x80062E5Bu) = 0;
+    } else {
+        gcall_ss(0x80011B38u, 0x80024038u, A0, A1, A2, A3);
+        GV(u8, 0x80062D35u) = 0;
+        GV(u8, 0x80062E58u) = 0x3F;
+        GV(u8, 0x80062E59u) = 0x3F;
+        GV(u8, 0x80062E5Au) = 0x3F;
+        GV(u8, 0x80062E5Bu) = 0x3F;
+    }
+    gcall_ss(0x80011B60u, 0x800269A0u, 0x80062E58u, A1, A2, A3);
+    GS(u32, sp + 0x10) = 0x3CF;
+    GS(u16, sp + 0x14) = 0x3F80;
+    GS(u16, sp + 0x16) = 0x3F80;
+    GS(u16, sp + 0x20) = 0x3200;
+    GS(u16, sp + 0x22) = 0x3200;
+    GS(u16, sp + 0x18) = 0;
+    GS(u16, sp + 0x1A) = 0;
+    GS(u32, sp + 0x24) = 0;
+    GS(u32, sp + 0x28) = 1;
+    gcall_ss(0x80011B9Cu, 0x80019468u, sp + 0x10, A1, A2, A3);
+    R[16] = in_s0; R[17] = in_s1;
+}

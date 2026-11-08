@@ -57,6 +57,15 @@ void n_enemy_ResetMarkers(void);
  * enemy type, loading its program into a free one (as an overlay, or as
  * a file to the slot's address); the slot, or -1. Some types share
  * another's program. */
+/* RT_ENEMY_SLOT_A=1 (tests only): load enemy programs into slot A when
+ * it's free, so the tests run the slot-A copies of the programs (the same
+ * code built for 0x800F8000). The game itself always prefers slot B. */
+#include <stdlib.h>
+static int test_slot_a(void) {
+    static int v = -1;
+    if (v < 0) v = getenv("RT_ENEMY_SLOT_A") != NULL;
+    return v;
+}
 void n_enemy_ProgramSlot(void) {
     FRAME(0x20);
     u32 rec = A0, tp = A1, ovl = A2;
@@ -77,7 +86,10 @@ void n_enemy_ProgramSlot(void) {
         }
     }
     s32 n = -1;
-    if (GV(s16, slots + 6) == 0) n = 1;
+    if (test_slot_a()) {                 /* testing only: slot A first */
+        if (GV(s16, slots + 2) == 0) n = 0;
+        else if (GV(s16, slots + 6) == 0) n = 1;
+    } else if (GV(s16, slots + 6) == 0) n = 1;
     else if (GV(s16, slots + 2) == 0) n = 0;
     if (ovl) {
         if (n == 0) GCALL4(F_PROG_LOAD, 0x80058554u, 0x800A31C4u, (u32)GS(s32, tp), GV(u32, 0x80010048));

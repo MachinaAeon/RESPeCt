@@ -21,7 +21,7 @@ static uint32_t max_frames = 600, every = 60;
 static const char *outdir = "frames";
 static FILE *wav;
 static uint32_t wav_frames;
-static struct { uint32_t frame, len; uint16_t buttons; } presses[64];
+static struct { uint32_t frame, len; uint16_t buttons; } presses[512];
 static int npresses;
 
 static void put32(uint8_t *p, uint32_t v) { p[0] = v >> 24; p[1] = v >> 16; p[2] = v >> 8; p[3] = (uint8_t)v; }
@@ -392,7 +392,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--widescreen")) g_opt_widescreen = 1;
         else if (!strcmp(argv[i], "--subpixel")) g_subpixel = 1;
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc) { wav = fopen(argv[++i], "wb"); if (wav) wav_header(wav, 0); }
-        else if (!strcmp(argv[i], "--press") && i + 1 < argc && npresses < 64) {
+        else if (!strcmp(argv[i], "--press") && i + 1 < argc && npresses < 512) {
             unsigned f, b, l;
             if (sscanf(argv[++i], "%u:%x:%u", &f, &b, &l) == 3)
                 presses[npresses++] = (typeof(presses[0])){f, l, (uint16_t)b};

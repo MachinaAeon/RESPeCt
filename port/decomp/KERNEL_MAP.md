@@ -26,29 +26,68 @@ library. 1007 function entries in all.
 | 0x8003DF90-0x8004ADxx | libgs TMD polygon drivers (GsTMDfast*, GsTMDdiv*; table in models.c) | |
 | 0x8004AE64-0x8005841C+ | libgs fogged TMD drivers (the same set, with depth cueing) | |
 
-Everything from 0x800170B8 on is Sony's and stays translated. One libapi
-function is native for a port reason (`card_FirstFile`, savegame.c), not
-as decompilation.
+Everything from 0x800170B8 on is Sony's. It stays translated except for
+the library functions the game spends the most time in, decompiled for
+speed: libgs's polygon drivers and subdivision (the subdividing F/G/FT/GT
+triangle and quad drivers, the shared-vertex HMD drivers), the game's own
+water-aware drivers (which find the floor height under the player and
+splashes from the polygon they stand on), GsSortFastSprite, GsSortSprite
+and the off-screen tests (gs_drivers.c); libgte's matrix maths, matrix
+stack, rsin/rcos and SquareRoot0, and libgs's coordinate, OT, clip and
+buffer helpers (GsGetLws, GsSortOt, GsSwapDispBuff...), the HMD
+animation's coordinate interpolation, vertex mime and camera view,
+VectorNormal, GsSetFlatLight and the CORDIC angle 8002A278 (gte_math.c);
+also the fogged water triangle drivers, the lit flat triangle driver, the
+subdividing flat quad driver and its G3 edge triangle, GsInitGraph, the
+3D set-up and the TIM header reader (gs_drivers.c);
+libgpu's primitive setup, command words, ClearOTag, DrawOTag, PutDrawEnv,
+PutDispEnv, DrawSync and SetDispMask, ResetGraph and the driver's reset,
+ClearImage and StoreImage, and libpress's MDEC transfers and
+VLC decoder DecDCTvlc (lib_gpu.c); libpad's controller exchange and its
+state machine's steps, PadInitDirect and the stop (lib_pad.c); libcd's interrupt reader, stream ring,
+CdSync/CdReady (and their wait loops)/CdGetSector, the command issue
+and CdControlF, the streaming sector handler and frame ring, the
+sector DMA and CdIntToPos (lib_cd.c); libetc's
+interrupt handler, VSync and vertical blank, InterruptCallback
+(lib_etc.c); libspu's key and
+voice bit registers, the voice manager flush, SpuSetVoiceAttr and the
+transfer primitive _spu_t, SpuSetCommonAttr, SpuMalloc and its table
+tidy, SpuSetReverbModeParam and the reverb registers (lib_spu.c);
+libsnd's sequencer tick, event reader, note on and off, SsUtKeyOn,
+SsUtKeyOnV, SsUtGetVagAtr, SsUtGetProgAtr, SsUtPitchBend and the voice
+attribute setters, SsSeqOpen and the SEQ set-up, sequence and tone
+volume, SsVabOpenHead, the control change dispatcher and NRPN 98, the
+tick mode and start, the voice reset and the key bit helpers
+(lib_snd.c). Not done: the NRPN data entry handler 8001B078 (passes
+uninitialised stack bytes by value), the interrupt set-up 8002599C (its
+setjmp context resumes inside it), and the continue screen's FT4 mesh
+8002B338 (no scenario reaches it). One libapi function
+is native for a port reason (`card_FirstFile`, savegame.c), not as
+decompilation.
 
 ## The game code, 0x80010B00-0x800170B4
 
-By subsystem (native name: decompiled into port/decomp; SKIP: stays
-translated because it runs over many frames, `LIVE` >= 60; "not reached":
-no scenario runs it, so it stays translated, untested):
+By subsystem (native name: decompiled into port/decomp; "not reached":
+no scenario runs it, so it stays translated, untested). The functions
+that run over many frames (`LIVE` >= 60: the main loop, the thread
+runner, file loads, the movie player) are natives that keep save states
+possible: they call on with `gcall_ss` and the original's frame and
+registers, and their waits poll with `SAVE_POLL` (README, "Save states
+and LIVE"):
 
 **Main program, mode threads** (kernel_main.c, kernel_tasks.c).
-0x80010B08 entry / main (SKIP), 0x80010BC4 start-up (SKIP), 0x8001107C main
-loop (SKIP), 0x80012E8C runs the thread slots (SKIP), 0x80012FF4 a thread
-waiting for a mode (SKIP), 0x80013208 (SKIP). Decompiled: kernel_Nothing,
-kernel_IdleThread, kernel_ModeThread2/4 (0x80010E30/90/C0/F0, the other
-modes' threads, not reached), kernel_VSyncCallback, kernel_SetFrameCallback
+kernel_Entry (0x80010B08, crt0), kernel_Start (0x80010BC4),
+kernel_MainLoop (0x8001107C), thread_Run (0x80012E8C, the thread slots),
+kernel_ModeLoad (0x80012FF4, a mode's overlay read and started),
+kernel_ReadWait (0x80013208), kernel_Nothing, kernel_IdleThread,
+kernel_ModeThread2/4/6/7/8, kernel_VSyncCallback, kernel_SetFrameCallback
 (2), kernel_Random, kernel_ReadSectors, kernel_ModeSwitch; thread_InitSlots,
 thread_Set, thread_ModeSwitch, thread_Exit, thread_Close, thread_Return,
 thread_Hold, thread_Release. Not reached: 0x80010FF4, 0x800110D8 (GunCon
 per frame) and the jump-table helpers at 0x80011298-0x80011548.
 
-**Files** 0x800115C0 (load a file from the disc's directory, SKIP),
-0x80011994 (SKIP).
+**Files**: kernel_LoadFile (0x800115C0, a file from the disc's
+directory).
 
 **Input** (kernel_input.c): input_MapButtons, pad_ChangeNone, pad_Init,
 pad_MotorOff, pad_VibrationTick, pad_Vibrate, pad_VibrationOn/Off,
@@ -61,13 +100,13 @@ sound_StopAll, sound_CloseBank, sound_CloseSeqData, sound_CloseSeq,
 sound_FadeStart, sound_FadeStep, sound_SeqVolume, sound_SeqPlay,
 sound_SeqStop, sound_SetListener, sound_UpdatePairs, sound_SetPanTables,
 sound_PanVolumes, sound_PlayPair, sound_StopPair, sound_MovePair,
-sound_PairStatus, sound_PairsOn. SKIP: 0x80011CB4 (NOISE.BIN),
-0x80011D24. Not reached: 0x80011FE8.
+sound_PairStatus, sound_PairsOn, sound_Reset (0x80011994, with its 90
+frames of silence), sound_LoadBank (0x80011CB4), sound_LoadBankHigh
+(0x80011D24). Not reached: 0x80011FE8.
 
 **Movies** (kernel_movie.c): movie_SetScreen, movie_SetFlag,
 movie_StartStream, movie_SliceDone (MDEC callback), movie_DecodeNext,
-movie_GetFrame, movie_WaitFrame. SKIP: 0x80014134 (the player loop, LIVE
-450).
+movie_GetFrame, movie_WaitFrame, movie_Play (0x80014134, the player).
 
 **CD queue, decompressor** (kernel_files.c): cd_Init, cd_QueueFull,
 cd_QueueSpeed, cd_SetVolume, cd_QueuePlay, cd_QueueFilter, cd_QueueStop,
@@ -78,12 +117,13 @@ upload 0x80016D00 and the error handler 0x80016DA8.
 
 ### Counts
 
-The scenarios reach 563 KERNEL functions. 81 are game code: 70
-decompiled, 11 SKIP (0x80010B08, 0x80010BC4, 0x8001107C, 0x800115C0,
-0x80011994, 0x80011CB4, 0x80011D24, 0x80012E8C, 0x80012FF4, 0x80013208,
-0x80014134). 4 are the anti-modchip code (0x800170B8, 0x80017124 SKIP,
-0x80017A5C, 0x80017C30), left translated as Sony's. The other 478 are
-SDK.
+The scenarios reach 563 KERNEL functions. 81 are game code, all
+decompiled. 4 are the anti-modchip code (modchip.c): 0x800170B8,
+0x80017A5C, 0x80017C30 decompiled; its state machine 0x80017124 (runs
+during start-up) stays translated. The other 478 are SDK; of those the
+scenarios reach, these stay translated: the NRPN data entry 0x8001B078
+(passes uninitialised stack bytes by value) and the interrupt set-up's
+setjmp pair 0x8002599C / 0x80025A04 (a context resumes inside them).
 
 ## Interrupt context
 

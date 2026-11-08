@@ -28,6 +28,7 @@
  * with tools/eq). */
 #include "game_vars.h"
 #include "poll.h"
+#include "libgs.h"
 #include "modmem.h"
 #include "rt.h"
 
@@ -111,6 +112,7 @@
 
 void n_cd_RequestRead(void);
 void n_loader_Reload(void);
+void n_room_LoadAll(void);
 
 static u32 obj_addr(s32 i) { return g_objects + (u32)i * OBJ_SIZE; }
 static u32 model_addr(s32 i) { return MODELS + (u32)i * MODEL_SIZE; }
@@ -213,9 +215,9 @@ static void model_decode_check(u32 src, u32 dest) {
 }
 
 /* Initial and event/reset loading has a separate, synchronous implementation
- * at 8007428C. Keep the translated original byte-for-byte when the feature is
- * inactive. Its seven object slots and sharing rules differ from Begin/Run. */
-void f_test_8007428C(void);
+ * at 8007428C. Without mods it's room_LoadAll, the decompiled original (it
+ * keeps the original's frame, so save states made inside it continue). Its
+ * seven object slots and sharing rules differ from Begin/Run. */
 static void sync_busy_leave(int *busy) { (void)busy; modmem_sync_end(); }
 static u32 sync_file(u32 sp,u32 name,u32 table,s32 index,u32 dest) {
     u32 parts[3],bytes=model_sizes(table,index,parts);
@@ -250,7 +252,7 @@ static void sync_packed_record(u32 entry,u32 data) {
     g_modelCount++;
 }
 void n_loader_LoadSync(void) {
-    if (!modmem_enabled() || !modfs_dynamic_models()) { f_test_8007428C(); return; }
+    if (!modmem_enabled() || !modfs_dynamic_models()) { n_room_LoadAll(); return; }
     modmem_sync_begin();
     __attribute__((cleanup(sync_busy_leave))) int busy=1;
     FRAME(0x48);
@@ -1256,4 +1258,252 @@ void n_loader_ExtraObject(void) {
         LOOP_POLL(0x8007718C);
     }
     V0 = e;
+}
+
+/* 8007428C (the work area): the room's enemies, all at once (the loader
+ * of a stage's first room; later rooms use the step machine above): the
+ * object array carved off the memory before 0x800BBCD0 (0xF57 words,
+ * cleared) and its template (0x800B42D0) taken from its first record;
+ * the lists and the heap (0x80150000) reset; then for each placement not
+ * flagged done: its model loaded (type 0x9A, 0x1F-0x21: animation packs
+ * from the enemy files; 0x32+: an enemy program and its model; same type
+ * as the last: its data copied; others: a model from the stage's file,
+ * unpacked, its textures uploaded unless the last type shares them), a
+ * model record (0x800B3F10, 0x1C bytes), the object record set up and,
+ * for an enemy (type below 0x32), its program slot, its sounds and
+ * effects. The file reads wait over frames: every call is gcall_ss with
+ * the s registers and $fp as the original keeps them (s3 s6 s7
+ * 0x800B0000, fp 0x800B3F10, s5 the placement, s1 its type, s0 the last
+ * type, s2 and s4 by the step). */
+void n_room_LoadAll(void) {
+    FRAME(0x48);
+    GS(u32, sp + 0x48) = A0;
+    GS(u32, sp + 0x28) = R[18];
+    GS(u32, sp + 0x44) = R[31];
+    GS(u32, sp + 0x40) = R[30];
+    GS(u32, sp + 0x3C) = R[23];
+    GS(u32, sp + 0x38) = R[22];
+    GS(u32, sp + 0x34) = R[21];
+    GS(u32, sp + 0x30) = R[20];
+    GS(u32, sp + 0x2C) = R[19];
+    GS(u32, sp + 0x24) = R[17];
+    GS(u32, sp + 0x20) = R[16];
+    u32 in_s[8];
+    for (int i = 0; i < 8; i++) in_s[i] = R[16 + i];
+    const u32 in_fp = R[30];
+#define HEAP GV(u32, 0x800B4D78u)
+#define NMOD GV(u32, 0x800B4D7Cu)
+#define MOD(i) (0x800B3F10u + (u32)(i) * 0x1C)
+    GV(u32, 0x800AF56Cu) = 0xF57;
+    {
+        const u32 base = GV(u32, 0x800BBCD0u) - 0x3D5C;
+        GV(u32, 0x800AB510u) = base;
+        for (u32 i = 0;;) {
+            GV(u32, base + i * 4) = 0;
+            i++;
+            if (!((s32)i < 0xF57)) break;
+            LOOP_POLL(0x800742F4u);
+        }
+    }
+    copy_record_polled(0x800B42D0u, GV(u32, 0x800AB510u), 0x80074334u);
+    for (s32 i = 0xB;;) {
+        GV(u32, 0x800A8850u + (u32)i * 4) = 0;
+        i--;
+        if (i < 0) break;
+        LOOP_POLL(0x80074360u);
+    }
+    GV(u32, 0x800AB51Cu) = 0;
+    for (s32 i = 4;;) {
+        GV(u16, 0x800B3EA8u + (u32)i * 0xC) = 0xFFFF;
+        i--;
+        if (i < 0) break;
+        LOOP_POLL(0x8007438Cu);
+    }
+    GV(u32, 0x800BB018u) = 0;
+    GV(u16, 0x800BB026u) = 0;
+    GV(u16, 0x800BB022u) = 0;
+    GV(u32, 0x800B6090u) = 0xFFFFFFFFu;
+    R[22] = 0x800B0000u;
+    GV(u32, 0x800AF530u) = 0;
+    R[19] = 0x800B0000u;
+    GV(u32, 0x800BAA30u) = 0;
+    HEAP = 0x80150000u;
+    NMOD = 0;
+    GV(u32, 0x800B4D80u) = 0;
+    R[18] = 0;
+    gcall_ss(0x800743E8u, 0x80073F88u, A0, A1, A2, A3);
+    R[20] = 0;
+    R[18] = 0;
+    R[21] = GV(u32, 0x800BBB88u) + 4;
+    R[17] = (u32)(s32)GV(s16, R[21]);
+    R[16] = 0xFFFFFFFFu;
+    if ((R[17] & 0xF000) != 0xF000) {
+        R[30] = 0x800B3F10u;
+        R[23] = R[22];
+        for (;;) {
+            const s32 kind = (s32)R[17];
+            if (gcall_ss(0x80074430u, 0x8008F64Cu, 0x80062F60u, (u32)(s32)GV(s16, R[21] + 2), A2, A3) != 0) {
+                R[21] += 0x18;
+                goto next;
+            }
+            u32 v;                                   /* the size to add to the heap, in words */
+            if (kind >= 0x32) {                      /* an enemy program and its model */
+                R[16] = (u32)(kind - 0x32) * 3;
+                if (kind == 0x9A) goto anim;
+                GS(u32, sp + 0x10) = 0x800C3E50u;
+                gcall_ss(0x800744ACu, 0x800115C0u, 0x8006C21Cu, 0x80058534u, 0x800A195Cu, R[16] + 1);
+                gcall_ss(0x800744B8u, 0x8006F370u, GS(u32, sp + 0x48), A1, A2, A3);
+                R[20] = HEAP;
+                GS(u32, sp + 0x10) = R[20];
+                v = gcall_ss(0x800744E0u, 0x800115C0u, 0x8006C21Cu, 0x80058534u, 0x800A195Cu, R[16]);
+                {
+                    const u32 a3 = R[16] + 2;
+                    R[16] = HEAP + (v << 2);
+                    HEAP = R[16];
+                    GS(u32, sp + 0x10) = R[16];
+                    v = gcall_ss(0x80074518u, 0x800115C0u, 0x8006C21Cu, 0x80058534u, 0x800A195Cu, a3);
+                }
+                goto model;
+            }
+            if ((u32)(kind - 0x1F) < 3) {            /* an animation pack (and 0x9A's) */
+            anim: {
+                const u32 a3 = kind == 0x9A ? R[16] : (u32)kind + 0x171;
+                {
+                    const u32 m = MOD(NMOD);
+                    GV(u32, m + 0x10) = HEAP;
+                    GS(u32, sp + 0x10) = HEAP;
+                }
+                v = gcall_ss(0x80074568u, 0x800115C0u, 0x8006C21Cu, 0x80058534u, 0x800A195Cu, a3);
+                }
+                {
+                    u32 m = MOD(NMOD);
+                    const u32 pk = GV(u32, m + 0x10);
+                    HEAP = HEAP + (v << 2);
+                    const u32 r = gcall_ss(0x80074598u, 0x8007C558u, pk, 3, A2, A3);
+                    m = MOD(NMOD);
+                    const u32 a0 = GV(u32, m + 0x10);
+                    GV(u32, m) = (u32)(s32)GV(s16, R[21]);
+                    const u32 a1 = a0 + (GV(u32, r + 4) << 2);
+                    GV(u32, m + 8) = a0 + (GV(u32, a1 + 0xC) << 2);
+                    GV(u32, m + 4) = 0;
+                    GV(u32, m + 0xC) = a0 + (GV(u32, a1 + 0x10) << 2);
+                    const u32 r2 = gcall_ss(0x800745FCu, 0x8007C558u, a0, 2, A2, A3);
+                    const u32 n = NMOD;
+                    m = MOD(n);
+                    GV(u32, m + 0x14) = r2;
+                    const u32 hp = HEAP, st = GV(u32, m + 0x10);
+                    NMOD = n + 1;
+                    GV(u32, m + 0x18) = hp - st;
+                }
+                goto record;
+            }
+            if ((s32)R[17] == (s32)R[16]) {          /* the same type again: copy */
+                const u32 m = MOD(NMOD - 1);
+                u32 a0 = GV(u32, m + 0x10);
+                R[16] = a0 + ((GV(u32, m + 0x18) >> 2) << 2);
+                for (;;) {
+                    GV(u32, HEAP) = GV(u32, a0);
+                    HEAP += 4;
+                    a0 += 4;
+                    if (!(a0 < R[16])) break;
+                    LOOP_POLL(0x80074908u);
+                }
+                R[18]++;
+                goto record;
+            }
+            {                                        /* a model from the stage's file */
+                R[18] = 0x80108000u;
+                GS(u32, sp + 0x10) = R[18];
+                if (kind == 0x1E) gcall_ss(0x80074694u, 0x800115C0u, 0x8006C21Cu, 0x80058534u, 0x800A195Cu, 0x196);
+                else gcall_ss(0x80074694u, 0x800115C0u, 0x8006C230u, 0x80058530u, 0x800A0CD8u, (u32)kind);
+                const u32 a0 = R[18] + GV(u32, R[18] + 8);
+                const s32 last = (s32)R[16];
+                int share = 0;                       /* textures shared with the last type: skip them */
+                if (kind < 3 || kind == 8 || kind == 9) {
+                    if (last != -1 && !((u32)(last - 3) < 5) && last < 0xA) share = 1;
+                } else if ((u32)(kind - 4) < 3) {
+                    if ((u32)(last - 4) < 3) share = 1;
+                } else if ((u32)(kind - 0xD) < 2) {
+                    if ((u32)(last - 0xD) < 2) share = 1;
+                } else {
+                    if (R[17] == 0x22) R[17] = 0x10;
+                    if (R[17] == 0x23) R[17] = 0x10;
+                }
+                if (!share) {
+                    R[20] = HEAP;
+                    const u32 r = gcall_ss(0x80074754u, 0x80016F78u, a0, R[20], A2, A3);
+                    HEAP = HEAP + ((r >> 2) << 2);
+                }
+                const s32 k = (s32)R[17];
+                int keep = 0;                        /* the last type's textures still loaded */
+                if (k < 7) {
+                    if ((last == 0 && k == 4) || (last == 1 && k == 5) || (last == 2 && k == 6)
+                        || (last == 4 && k == 0) || (last == 5 && k == 1) || (last == 6 && k == 2)) keep = 1;
+                }
+                if (!(k < 7) || !keep) {
+                    gcall_ss(0x800747F0u, 0x80016F78u, R[18] + GV(u32, R[18] + 4), GS(u32, sp + 0x48), A2, A3);
+                    gcall_ss(0x800747FCu, 0x8006F370u, GS(u32, sp + 0x48), A1, A2, A3);
+                }
+                R[16] = HEAP;
+                v = gcall_ss(0x80074810u, 0x80016F78u, R[18] + GV(u32, R[18] + 0xC), R[16], A2, A3) >> 2;
+            }
+        model:
+            {
+                HEAP = HEAP + (v << 2);
+                const u32 n = NMOD;
+                const u32 m = MOD(n);
+                GV(u32, m) = (u32)(s32)GV(s16, R[21]);
+                GV(u32, m + 8) = R[20] + ((GV(u32, R[20] + 4) >> 2) << 2);
+                NMOD = n + 1;
+                GV(u32, m + 0xC) = R[20] + ((GV(u32, R[20] + 8) >> 2) << 2);
+                GV(u32, m + 4) = R[16] + ((GV(u32, R[16] + 4) >> 2) << 2);
+                const u32 hp = HEAP;
+                R[18] = 0;
+                GV(u32, m + 0x14) = 0;
+                const u32 st = R[16] + ((GV(u32, R[16] + 8) >> 2) << 2);
+                GV(u32, m + 0x10) = st;
+                GV(u32, m + 0x18) = hp - st;
+            }
+        record:
+            {
+                R[16] = GV(u32, 0x800AB510u) + GV(u32, 0x800AF530u) * 0x8C4;
+                copy_record_polled(R[16], 0x800B42D0u, 0x80074970u);
+                R[22] = 0x800B0000u;
+                const u32 o = R[16];
+                GV(u8, o + 0x314) = GV(u8, 0x800AF530u);
+                GV(u8, o + 0x315) = GV(u8, R[21]);
+                const u32 n = NMOD;
+                GV(u32, o + 0x88C) = 0x800B3EF4u + n * 0x1C;
+                const u32 m = MOD(n - 1);
+                GV(u32, o + 0x848) = R[21];
+                GV(u32, o + 0x890) = GV(u32, m + 0x10) + (((GV(u32, m + 0x18) * R[18]) >> 2) << 2);
+                if (GV(u8, o + 0x315) < 0x32) {
+                    GS(u32, sp + 0x18) = R[17];
+                    const u32 slot = gcall_ss(0x80074A18u, 0x8008DC94u, o, sp + 0x18, 0, A3);
+                    const u32 rec = 0x800BB020u + slot * 4;
+                    const u32 a1 = GS(u32, sp + 0x18);
+                    const u16 a2 = GS(u16, sp + 0x18);
+                    GV(u16, rec + 2) = 1;
+                    GV(u16, rec) = a2;
+                    GV(u16, o + 0x84E) = (u16)slot;
+                    gcall_ss(0x80074A48u, 0x80080A28u, slot, a1, a2, A3);
+                    gcall_ss(0x80074A58u, 0x80098100u, GS(u32, sp + 0x18), 0x800C3E50u, A2, A3);
+                }
+                R[21] += 0x18;
+                GV(u32, 0x800AF530u) += 1;
+                R[16] = R[17];
+                R[17] = (u32)(s32)GV(s16, R[21]);
+                if (R[17] == 0x22) R[17] = 0x10;
+                if (R[17] == 0x23) R[17] = 0x10;
+            }
+        next:
+            if ((GV(s16, R[21]) & 0xF000) == 0xF000) break;
+            LOOP_POLL(0x80074A98u);
+        }
+    }
+#undef HEAP
+#undef NMOD
+#undef MOD
+    for (int i = 0; i < 8; i++) R[16 + i] = in_s[i];
+    R[30] = in_fp;
 }

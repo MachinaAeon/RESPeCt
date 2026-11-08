@@ -2,8 +2,9 @@
 
 **RESPeCt** is a free, unofficial PC version of *Resident Evil Survivor*
 (PlayStation, USA, `SLUS-01087`). It adds full mouse-and-keyboard aiming,
-widescreen and high resolutions, controller support, HD texture pack
-support, and quick saves.
+widescreen and high resolutions up to 8x (drawn on your graphics card or
+CPU), controller support, HD texture pack support, mod support, and quick
+saves.
 
 It contains **no code or data from the game**. You supply your own copy of
 the disc, and RESPeCt installs what it needs from it.
@@ -130,6 +131,10 @@ make -C port dist        # Linux headless runner, for testing
 
 ## Credits
 
+- Graphics card renderer (up to 8x), steadier 3D, smooth textures, 24-bit
+  colour, the depth and close-up fixes, full-motion mouse turning, and mod
+  support (the `mods` folder, the PC version's files, game data as text,
+  plugins): **[Trigger117](https://github.com/Trigger117)**
 - HD texture pack: [RE Survivor HQ Texture Pack](https://www.moddb.com/mods/re-survivor-hq-texture-pack/downloads/re-survivor-hq-textures)
   by **Leigiboy** (separate download; not affiliated with RESPeCt).
 

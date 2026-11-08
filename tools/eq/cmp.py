@@ -2,7 +2,8 @@
 outside the stacks, and where. Frames (PNGs) are compared too."""
 import os, sys, glob
 a, b = sys.argv[1], sys.argv[2]
-IGNORE = [(0x1FD000, 0x200000)]          # stacks: main (801FFFA0) and threads (801FFA00, 801FF200, 801FEF00), growing down; enemy records sit lower in 801Fxxxx
+IGNORE = [(0x1FD000, 0x200000),          # stacks: main (801FFFA0) and threads (801FFA00, 801FF200, 801FEF00), growing down; enemy records sit lower in 801Fxxxx
+          (0x05A2A0, 0x05B250)]          # libetc's interrupt handler stack (top 8005B24C, its HookEntryInt buffer just below at 8005A26C)
 def ignored(o): return any(lo <= o < hi for lo, hi in IGNORE)
 frames = sorted(os.path.basename(p) for p in glob.glob(a + "/r*.bin"))
 bad = None

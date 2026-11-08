@@ -2,6 +2,8 @@
 # Differential test: run scenarios with two builds and compare RAM every
 # 50 frames.  usage: run.sh BIN_BASE BIN_NEW OUTDIR [scenario...]
 # Scenarios replay fixed input from a new game (needs the disc image).
+# EQ_SIDES=base runs only the first build; EQ_NODUMP=1 makes no RAM dumps
+# (profile.sh uses both).
 set -u
 # The original build has no Close-up 3D change to the split threshold (rt.c),
 export RT_KEEP_SPLIT=1
@@ -12,7 +14,7 @@ DISC=${DISC:-/root/resurv/disc/image/survivor.bin}
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=""; for f in $(seq 1600 90 3400); do P="$P --press $f:8:4"; done
 P="$P --press 3600:4000:4 --press 3630:4000:4 --press 3660:8:4"   # title -> new game -> play
-declare -A ENV ARGS FRAMES
+declare -A ENV ARGS FRAMES NOSTART   # NOSTART[s]=1: the scenario scripts the title itself
 ENV[intro]="";                                   ARGS[intro]="";  FRAMES[intro]=6000
 ENV[weapons]="RT_CHEATS=ammo RT_GIVE_AT=3850 RT_WEAPON_AT=3900:2,3960:3,4020:4,4080:5,4140:6,4200:7,4260:8,4320:9,4380:1,4440:10,4500:11,4560:9,4620:5,4680:9,4740:1 RT_CLICK=3905,4800 RT_CLICK_EVERY=6 RT_MOUSE=3,0,3905,4800"
 ARGS[weapons]=""; FRAMES[weapons]=4800
@@ -174,13 +176,36 @@ ENV[area61]="RT_LOAD=$SAVES/area61.sav RT_CLICK=70060,71550 RT_CLICK_EVERY=9 RT_
 ARGS[area61]="--press 70060:10:700 --press 70860:40:300"; FRAMES[area61]=71550
 ENV[area62]="RT_LOAD=$SAVES/area62.sav RT_CLICK=74471,75961 RT_CLICK_EVERY=9 RT_MOUSE=2,1,74471,75961"
 ARGS[area62]="--press 74471:10:700 --press 75271:40:300"; FRAMES[area62]=75961
-AREAS="area6 area7 area8 area9 area10 area11 area12 area13 area14 area19 area21 area22 area23 area24 area25 area98 area99 area26 area27 area28 area29 area30 area31 area32 area33 area34 area35 area37 area39 area40 area41 area42 area43 area44 area45 area46 area47 area48 area49 area50 area51 area52 area53 area54 area55 area56 area57 area58 area59 area60 area61 area62"
+# the ending: staff credits, skipped with start, and the results screen
+# coming up (area67); the results screen, its "save
+# the weapons?" prompt, the memory card save and back to the title (area68)
+ENV[area67]="RT_GDIR=. RT_LOAD=$SAVES/area67.sav RT_MOUSE=0,0,0,1"
+ARGS[area67]="--press 204700:8:4 --press 205600:4000:4 --press 205700:4000:4"; FRAMES[area67]=205900
+RP=""; for f in $(seq 205000 60 206200); do RP="$RP --press $f:4000:4"; done
+ENV[area68]="RT_GDIR=. RT_LOAD=$SAVES/area68.sav RT_MOUSE=0,0,0,1"
+ARGS[area68]="$RP"; FRAMES[area68]=206300
+# Option menus (not in the default list: they need over 64 presses, so
+# both builds must be from 2026-11-01 or later; compare with such a build)
+# the title screen's Option menu from boot: sound, monitor tuning, key
+# config (each changed), back out, then Load Game with no saves (needs
+# the press limit raised past 64: port builds after 2026-11-01)
+ENV[options]="RT_MOUSE=0,0,0,1"; NOSTART[options]=1
+ARGS[options]="--press 1650:8:4 --press 1750:20:4 --press 1850:20:4 --press 1950:4000:4 --press 2100:20:4 --press 2140:4000:4 --press 2170:40:4 --press 2200:20:4 --press 2230:20:4 --press 2260:80:4 --press 2290:40:4 --press 2320:20:4 --press 2350:80:4 --press 2380:80:4 --press 2410:20:4 --press 2440:40:4 --press 2470:4000:4 --press 2500:10:4 --press 2530:10:4 --press 2560:10:4 --press 2590:20:4 --press 2620:4000:4 --press 2650:40:4 --press 2680:40:4 --press 2710:40:4 --press 2740:40:4 --press 2770:80:4 --press 2800:20:4 --press 2830:4000:4 --press 2860:40:4 --press 2890:40:4 --press 2920:40:4 --press 2950:4000:4 --press 2980:1000:4 --press 3010:2000:4 --press 3080:20:4 --press 3120:4000:4 --press 3150:40:4 --press 3180:20:4 --press 3210:20:4 --press 3240:80:4 --press 3270:40:4 --press 3300:20:4 --press 3330:80:4 --press 3360:80:4 --press 3390:20:4 --press 3420:40:4 --press 3450:4000:4 --press 3480:10:4 --press 3510:10:4 --press 3540:10:4 --press 3570:20:4 --press 3600:4000:4 --press 3630:40:4 --press 3660:40:4 --press 3690:40:4 --press 3720:40:4 --press 3750:80:4 --press 3780:20:4 --press 3810:4000:4 --press 3840:40:4 --press 3870:40:4 --press 3900:40:4 --press 3930:4000:4 --press 3960:1000:4 --press 3990:2000:4 --press 4060:20:4 --press 4100:4000:4 --press 4130:40:4 --press 4160:20:4 --press 4190:20:4 --press 4220:80:4 --press 4250:40:4 --press 4280:20:4 --press 4310:80:4 --press 4340:80:4 --press 4370:20:4 --press 4400:40:4 --press 4430:4000:4 --press 4460:10:4 --press 4490:10:4 --press 4520:10:4 --press 4550:20:4 --press 4580:4000:4 --press 4610:40:4 --press 4640:40:4 --press 4670:40:4 --press 4700:40:4 --press 4730:80:4 --press 4760:20:4 --press 4790:4000:4 --press 4820:40:4 --press 4850:40:4 --press 4880:40:4 --press 4910:4000:4 --press 4940:1000:4 --press 4970:2000:4 --press 5040:20:4 --press 5080:4000:4 --press 5110:40:4 --press 5140:20:4 --press 5170:20:4 --press 5200:80:4 --press 5230:40:4 --press 5260:20:4 --press 5290:80:4 --press 5320:80:4 --press 5350:20:4 --press 5380:40:4 --press 5410:4000:4 --press 5440:10:4 --press 5470:10:4 --press 5500:10:4 --press 5530:20:4 --press 5560:4000:4 --press 5590:40:4 --press 5620:40:4 --press 5650:40:4 --press 5680:40:4 --press 5710:80:4 --press 5740:20:4 --press 5770:4000:4 --press 5800:40:4 --press 5830:40:4 --press 5860:40:4 --press 5890:4000:4 --press 5920:1000:4 --press 5950:2000:4 --press 6020:20:4 --press 6060:4000:4"; FRAMES[options]=6560
+# the in-game Option menu (select): sound, game reset (no), key config,
+# monitor tuning, adjust screen, each changed and backed out of
+ENV[options_game]="RT_MOUSE=0,0,0,1"
+ARGS[options_game]="--press 3900:1:4 --press 4050:20:4 --press 4090:4000:4 --press 4120:40:4 --press 4150:20:4 --press 4180:20:4 --press 4210:80:4 --press 4240:40:4 --press 4270:20:4 --press 4300:80:4 --press 4330:80:4 --press 4360:20:4 --press 4390:40:4 --press 4420:4000:4 --press 4450:10:4 --press 4480:10:4 --press 4510:10:4 --press 4540:20:4 --press 4570:4000:4 --press 4600:40:4 --press 4630:40:4 --press 4660:40:4 --press 4690:40:4 --press 4720:80:4 --press 4750:20:4 --press 4780:4000:4 --press 4810:40:4 --press 4840:40:4 --press 4870:40:4 --press 4900:4000:4 --press 4930:1000:4 --press 4960:2000:4 --press 5050:1:4 --press 5170:20:4 --press 5210:4000:4 --press 5240:40:4 --press 5270:20:4 --press 5300:20:4 --press 5330:80:4 --press 5360:40:4 --press 5390:20:4 --press 5420:80:4 --press 5450:80:4 --press 5480:20:4 --press 5510:40:4 --press 5540:4000:4 --press 5570:10:4 --press 5600:10:4 --press 5630:10:4 --press 5660:20:4 --press 5690:4000:4 --press 5720:40:4 --press 5750:40:4 --press 5780:40:4 --press 5810:40:4 --press 5840:80:4 --press 5870:20:4 --press 5900:4000:4 --press 5930:40:4 --press 5960:40:4 --press 5990:40:4 --press 6020:4000:4 --press 6050:1000:4 --press 6080:2000:4 --press 6170:1:4 --press 6290:20:4 --press 6330:4000:4 --press 6360:40:4 --press 6390:20:4 --press 6420:20:4 --press 6450:80:4 --press 6480:40:4 --press 6510:20:4 --press 6540:80:4 --press 6570:80:4 --press 6600:20:4 --press 6630:40:4 --press 6660:4000:4 --press 6690:10:4 --press 6720:10:4 --press 6750:10:4 --press 6780:20:4 --press 6810:4000:4 --press 6840:40:4 --press 6870:40:4 --press 6900:40:4 --press 6930:40:4 --press 6960:80:4 --press 6990:20:4 --press 7020:4000:4 --press 7050:40:4 --press 7080:40:4 --press 7110:40:4 --press 7140:4000:4 --press 7170:1000:4 --press 7200:2000:4 --press 7290:1:4 --press 7410:80:4 --press 7450:4000:4 --press 7480:40:4 --press 7510:20:4 --press 7540:20:4 --press 7570:80:4 --press 7600:40:4 --press 7630:20:4 --press 7660:80:4 --press 7690:80:4 --press 7720:20:4 --press 7750:40:4 --press 7780:4000:4 --press 7810:10:4 --press 7840:10:4 --press 7870:10:4 --press 7900:20:4 --press 7930:4000:4 --press 7960:40:4 --press 7990:40:4 --press 8020:40:4 --press 8050:40:4 --press 8080:80:4 --press 8110:20:4 --press 8140:4000:4 --press 8170:40:4 --press 8200:40:4 --press 8230:40:4 --press 8260:4000:4 --press 8290:1000:4 --press 8320:2000:4 --press 8410:1:4 --press 8530:80:4 --press 8570:4000:4 --press 8600:40:4 --press 8630:20:4 --press 8660:20:4 --press 8690:80:4 --press 8720:40:4 --press 8750:20:4 --press 8780:80:4 --press 8810:80:4 --press 8840:20:4 --press 8870:40:4 --press 8900:4000:4 --press 8930:10:4 --press 8960:10:4 --press 8990:10:4 --press 9020:20:4 --press 9050:4000:4 --press 9080:40:4 --press 9110:40:4 --press 9140:40:4 --press 9170:40:4 --press 9200:80:4 --press 9230:20:4 --press 9260:4000:4 --press 9290:40:4 --press 9320:40:4 --press 9350:40:4 --press 9380:4000:4 --press 9410:1000:4 --press 9440:2000:4 --press 9530:1:4"; FRAMES[options_game]=9950
+# the attract demos: start at the title, then left alone
+ENV[demo]="RT_MOUSE=0,0,0,1"; NOSTART[demo]=1
+ARGS[demo]="--press 1650:8:4"; FRAMES[demo]=20000
+AREAS="demo area67 area68 area6 area7 area8 area9 area10 area11 area12 area13 area14 area19 area21 area22 area23 area24 area25 area98 area99 area26 area27 area28 area29 area30 area31 area32 area33 area34 area35 area37 area39 area40 area41 area42 area43 area44 area45 area46 area47 area48 area49 area50 area51 area52 area53 area54 area55 area56 area57 area58 area59 area60 area61 area62"
 LIST=${*:-intro weapons walk menu ammo launcher reloads heavy fight1 hurt1 fight2 fight1s fight1g door death phone gload $AREAS}
 for s in $LIST; do
-  for side in base new; do
+  for side in ${EQ_SIDES:-base new}; do
     BIN=$A; [ $side = new ] && BIN=$B
     D=$OUT/$s/$side; rm -rf $D; mkdir -p $D
-    ( cd $D && env ${ENV[$s]} RT_RAMDUMP=50:. timeout 1800 $BIN $DISC --frames ${FRAMES[$s]} --every 100 --out . $P ${ARGS[$s]} > /dev/null 2> log.txt ) &
+    DUMP="RT_RAMDUMP=50:."; [ -n "${EQ_NODUMP:-}" ] && DUMP="RT_X=1"
+    ( cd $D && env ${ENV[$s]} $DUMP timeout 1800 $BIN $DISC --frames ${FRAMES[$s]} --every 100 --out . $([ -n "${NOSTART[$s]:-}" ] || echo $P) ${ARGS[$s]} > /dev/null 2> log.txt ) &
   done
 done
 wait

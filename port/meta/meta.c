@@ -19,28 +19,97 @@ void n_aim_SnapReticle(void);
 void n_aim_TargetVisible(void);
 void n_aim_UpdateTarget(void);
 void n_alligator_AnimEvent(void);
+void n_alligator_AnimEvent_A(void);
 void n_alligator_Damage(void);
+void n_alligator_Damage_A(void);
 void n_alligator_Dive(void);
 void n_alligator_DivePre(void);
+void n_alligator_DivePre_A(void);
+void n_alligator_Dive_A(void);
 void n_alligator_EntranceA(void);
 void n_alligator_EntranceAPre(void);
+void n_alligator_EntranceAPre_A(void);
+void n_alligator_EntranceA_A(void);
 void n_alligator_EntranceB(void);
 void n_alligator_EntranceBPre(void);
+void n_alligator_EntranceBPre_A(void);
+void n_alligator_EntranceB_A(void);
 void n_alligator_Lunge(void);
 void n_alligator_LungePre(void);
+void n_alligator_LungePre_A(void);
+void n_alligator_Lunge_A(void);
 void n_alligator_OnHit(void);
+void n_alligator_OnHit_A(void);
 void n_alligator_PlayerInCone(void);
+void n_alligator_PlayerInCone_A(void);
 void n_alligator_StateActive(void);
+void n_alligator_StateActive_A(void);
 void n_alligator_StateDying(void);
+void n_alligator_StateDying_A(void);
 void n_alligator_StateNone(void);
+void n_alligator_StateNone_A(void);
 void n_alligator_Swim(void);
 void n_alligator_SwimPre(void);
+void n_alligator_SwimPre_A(void);
+void n_alligator_Swim_A(void);
 void n_alligator_Tire(void);
+void n_alligator_Tire_A(void);
 void n_alligator_TryLunge(void);
+void n_alligator_TryLunge_A(void);
 void n_alligator_Update(void);
+void n_alligator_Update_A(void);
 void n_anim_InterpolateCoord(void);
 void n_anim_NextKey(void);
 void n_anim_UpdateTracks(void);
+void n_api_A0_13(void);
+void n_api_A0_15(void);
+void n_api_A0_18(void);
+void n_api_A0_19(void);
+void n_api_A0_27(void);
+void n_api_A0_28(void);
+void n_api_A0_2A(void);
+void n_api_A0_2B(void);
+void n_api_A0_2F(void);
+void n_api_A0_30(void);
+void n_api_A0_39(void);
+void n_api_A0_3F(void);
+void n_api_A0_44(void);
+void n_api_A0_49(void);
+void n_api_A0_70(void);
+void n_api_A0_72(void);
+void n_api_A0_9F(void);
+void n_api_A0_AB(void);
+void n_api_A0_AC(void);
+void n_api_A0_AD(void);
+void n_api_B0_07(void);
+void n_api_B0_08(void);
+void n_api_B0_09(void);
+void n_api_B0_0A(void);
+void n_api_B0_0B(void);
+void n_api_B0_0C(void);
+void n_api_B0_0E(void);
+void n_api_B0_0F(void);
+void n_api_B0_10(void);
+void n_api_B0_17(void);
+void n_api_B0_19(void);
+void n_api_B0_32(void);
+void n_api_B0_33(void);
+void n_api_B0_35(void);
+void n_api_B0_36(void);
+void n_api_B0_3F(void);
+void n_api_B0_43(void);
+void n_api_B0_4A(void);
+void n_api_B0_4B(void);
+void n_api_B0_5B(void);
+void n_api_B0_5D(void);
+void n_api_C0_02(void);
+void n_api_C0_03(void);
+void n_api_C0_0A(void);
+void n_api_EnterCritical(void);
+void n_api_ExitCritical(void);
+void n_api_GetGp(void);
+void n_api_GetSp(void);
+void n_api_SetSp(void);
 void n_body_CirclePush(void);
 void n_camera_AimAt(void);
 void n_camera_LevelPitch(void);
@@ -66,107 +135,205 @@ void n_cd_SetVolume(void);
 void n_cd_Update(void);
 void n_cd_WaitCommand(void);
 void n_cerberus_AvoidWalls(void);
+void n_cerberus_AvoidWalls_A(void);
 void n_cerberus_BiteStep(void);
+void n_cerberus_BiteStep_A(void);
 void n_cerberus_BlockedSides(void);
+void n_cerberus_BlockedSides_A(void);
 void n_cerberus_CanLeap(void);
+void n_cerberus_CanLeap_A(void);
 void n_cerberus_ChaseStep(void);
+void n_cerberus_ChaseStep_A(void);
 void n_cerberus_Circle(void);
+void n_cerberus_Circle_A(void);
 void n_cerberus_CrossedWall(void);
+void n_cerberus_CrossedWall_A(void);
 void n_cerberus_JointHook(void);
+void n_cerberus_JointHook_A(void);
 void n_cerberus_KnockStep(void);
+void n_cerberus_KnockStep_A(void);
 void n_cerberus_LeapStep(void);
+void n_cerberus_LeapStep_A(void);
 void n_cerberus_OnHit(void);
+void n_cerberus_OnHit_A(void);
 void n_cerberus_PlaceInRoom(void);
+void n_cerberus_PlaceInRoom_A(void);
 void n_cerberus_RoamStep(void);
+void n_cerberus_RoamStep_A(void);
 void n_cerberus_Setup(void);
+void n_cerberus_Setup_A(void);
 void n_cerberus_StateActive(void);
+void n_cerberus_StateActive_A(void);
 void n_cerberus_Steer(void);
 void n_cerberus_SteerTo(void);
+void n_cerberus_SteerTo_A(void);
+void n_cerberus_Steer_A(void);
 void n_cerberus_TargetInCone(void);
+void n_cerberus_TargetInCone_A(void);
 void n_cerberus_TrackPos(void);
+void n_cerberus_TrackPos_A(void);
 void n_cerberus_Update(void);
+void n_cerberus_Update_A(void);
 void n_cerberus_Wander(void);
+void n_cerberus_Wander_A(void);
 void n_checkpoint_Make(void);
 void n_checkpoint_NewGameItems(void);
 void n_checkpoint_Restore(void);
 void n_children_Act11Pre(void);
+void n_children_Act11Pre_A(void);
 void n_children_Act11Step(void);
+void n_children_Act11Step_A(void);
 void n_children_Act12Pre(void);
+void n_children_Act12Pre_A(void);
 void n_children_Act12Step(void);
+void n_children_Act12Step_A(void);
 void n_children_Act3Pre(void);
+void n_children_Act3Pre_A(void);
 void n_children_Act3Step(void);
+void n_children_Act3Step_A(void);
 void n_children_Act5Pre(void);
+void n_children_Act5Pre_A(void);
 void n_children_Act5Step(void);
+void n_children_Act5Step_A(void);
 void n_children_Act8Pre(void);
+void n_children_Act8Pre_A(void);
 void n_children_Act8Step(void);
+void n_children_Act8Step_A(void);
 void n_children_AnimEvent(void);
+void n_children_AnimEvent_A(void);
 void n_children_CallPre(void);
+void n_children_CallPre_A(void);
 void n_children_CallStep(void);
+void n_children_CallStep_A(void);
 void n_children_CrossedWall(void);
+void n_children_CrossedWall_A(void);
 void n_children_HoldPlayer(void);
+void n_children_HoldPlayer_A(void);
 void n_children_IdlePre(void);
+void n_children_IdlePre_A(void);
 void n_children_IdleStep(void);
+void n_children_IdleStep_A(void);
 void n_children_JointHook(void);
+void n_children_JointHook_A(void);
 void n_children_KeepOffWalls(void);
+void n_children_KeepOffWalls_A(void);
 void n_children_LeftBehind(void);
+void n_children_LeftBehind_A(void);
 void n_children_NotFacing(void);
+void n_children_NotFacing_A(void);
 void n_children_Offset(void);
+void n_children_Offset_A(void);
 void n_children_OnHit(void);
+void n_children_OnHit_A(void);
 void n_children_PickMove(void);
+void n_children_PickMove_A(void);
 void n_children_PlayVoice(void);
+void n_children_PlayVoice_A(void);
 void n_children_PlayerInCone(void);
+void n_children_PlayerInCone_A(void);
 void n_children_PlayerSide(void);
+void n_children_PlayerSide_A(void);
 void n_children_PuffAnim(void);
+void n_children_PuffAnim_A(void);
 void n_children_ReturnPre(void);
+void n_children_ReturnPre_A(void);
 void n_children_ReturnStep(void);
+void n_children_ReturnStep_A(void);
 void n_children_SetAnimDir(void);
+void n_children_SetAnimDir_A(void);
 void n_children_SideOfPlayer(void);
+void n_children_SideOfPlayer_A(void);
 void n_children_SidestepPre(void);
+void n_children_SidestepPre_A(void);
 void n_children_SidestepStep(void);
+void n_children_SidestepStep_A(void);
 void n_children_SpawnMark(void);
+void n_children_SpawnMark_A(void);
 void n_children_SpawnPuff(void);
+void n_children_SpawnPuff_A(void);
 void n_children_StartAnim(void);
+void n_children_StartAnim_A(void);
 void n_children_StartCall(void);
+void n_children_StartCall_A(void);
 void n_children_StartSidestep(void);
+void n_children_StartSidestep_A(void);
 void n_children_StartVanish(void);
+void n_children_StartVanish_A(void);
 void n_children_StartWalk(void);
+void n_children_StartWalk_A(void);
 void n_children_State4(void);
+void n_children_State4_A(void);
 void n_children_StateActive(void);
+void n_children_StateActive_A(void);
 void n_children_StateDying(void);
+void n_children_StateDying_A(void);
 void n_children_StateHit(void);
+void n_children_StateHit_A(void);
 void n_children_SteerAroundWall(void);
+void n_children_SteerAroundWall_A(void);
 void n_children_TurnTo(void);
+void n_children_TurnTo_A(void);
 void n_children_Update(void);
+void n_children_Update_A(void);
 void n_children_VanishPre(void);
+void n_children_VanishPre_A(void);
 void n_children_VanishStep(void);
+void n_children_VanishStep_A(void);
 void n_children_VoiceStop(void);
+void n_children_VoiceStop_A(void);
 void n_children_VoiceTimer(void);
+void n_children_VoiceTimer_A(void);
 void n_children_WalkPre(void);
+void n_children_WalkPre_A(void);
 void n_children_WalkStep(void);
+void n_children_WalkStep_A(void);
 void n_children_WallAhead(void);
+void n_children_WallAhead_A(void);
 void n_children_WallDistance(void);
+void n_children_WallDistance_A(void);
 void n_children_WallToPlayer(void);
+void n_children_WallToPlayer_A(void);
 void n_children_WantsGo(void);
+void n_children_WantsGo_A(void);
 void n_children_ZoneCheck(void);
+void n_children_ZoneCheck_A(void);
 void n_clut_CopyRow(void);
 void n_cockroach_CeilingStep(void);
+void n_cockroach_CeilingStep_A(void);
 void n_cockroach_ClimbStep(void);
+void n_cockroach_ClimbStep_A(void);
 void n_cockroach_ClingStep(void);
+void n_cockroach_ClingStep_A(void);
 void n_cockroach_CrawlStep(void);
+void n_cockroach_CrawlStep_A(void);
 void n_cockroach_CrossedEdge(void);
+void n_cockroach_CrossedEdge_A(void);
 void n_cockroach_CrouchStep(void);
+void n_cockroach_CrouchStep_A(void);
 void n_cockroach_DescendStep(void);
+void n_cockroach_DescendStep_A(void);
 void n_cockroach_DieStep(void);
+void n_cockroach_DieStep_A(void);
 void n_cockroach_FallDead(void);
+void n_cockroach_FallDead_A(void);
 void n_cockroach_FloorStep(void);
+void n_cockroach_FloorStep_A(void);
 void n_cockroach_IdleStep(void);
+void n_cockroach_IdleStep_A(void);
 void n_cockroach_LeapCeiling(void);
+void n_cockroach_LeapCeiling_A(void);
 void n_cockroach_LeapFloor(void);
+void n_cockroach_LeapFloor_A(void);
 void n_cockroach_LeapStep(void);
+void n_cockroach_LeapStep_A(void);
 void n_cockroach_OntoWall(void);
+void n_cockroach_OntoWall_A(void);
 void n_cockroach_StateActive(void);
+void n_cockroach_StateActive_A(void);
 void n_cockroach_Steer(void);
+void n_cockroach_Steer_A(void);
 void n_cockroach_Update(void);
+void n_cockroach_Update_A(void);
 void n_continue_LoadImages(void);
 void n_continue_Setup(void);
 void n_continue_Update(void);
@@ -175,36 +342,65 @@ void n_coord_SetMatrix(void);
 void n_coord_Update(void);
 void n_credits_DrawLines(void);
 void n_credits_DrawText(void);
+void n_credits_End(void);
+void n_credits_Entry(void);
 void n_credits_Fade(void);
+void n_credits_FadeFlags(void);
+void n_credits_FadeOutWait(void);
+void n_credits_FadeStart(void);
 void n_credits_Flip(void);
 void n_credits_FrameBegin(void);
 void n_credits_Init(void);
 void n_credits_InitFade(void);
 void n_credits_LoadImage(void);
+void n_credits_Main(void);
+void n_credits_Reset(void);
 void n_credits_Scroll(void);
 void n_credits_UploadTim(void);
 void n_crow_Approach(void);
+void n_crow_Approach_A(void);
 void n_crow_Circle(void);
+void n_crow_Circle_A(void);
 void n_crow_DeadFallStep(void);
+void n_crow_DeadFallStep_A(void);
 void n_crow_DieStep(void);
+void n_crow_DieStep_A(void);
 void n_crow_FallStep(void);
+void n_crow_FallStep_A(void);
 void n_crow_FlyStep(void);
+void n_crow_FlyStep_A(void);
 void n_crow_Hop(void);
+void n_crow_Hop_A(void);
 void n_crow_LandStep(void);
+void n_crow_LandStep_A(void);
 void n_crow_PeckStep(void);
+void n_crow_PeckStep_A(void);
 void n_crow_PerchStep(void);
+void n_crow_PerchStep_A(void);
 void n_crow_PickFlight(void);
+void n_crow_PickFlight_A(void);
 void n_crow_RoomEvent(void);
+void n_crow_RoomEvent_A(void);
 void n_crow_StateActive(void);
+void n_crow_StateActive_A(void);
 void n_crow_Steer(void);
+void n_crow_Steer_A(void);
 void n_crow_SwoopStep(void);
+void n_crow_SwoopStep_A(void);
 void n_crow_TakeHits(void);
+void n_crow_TakeHits_A(void);
 void n_crow_TakeoffStep(void);
+void n_crow_TakeoffStep_A(void);
 void n_crow_TurnTo(void);
+void n_crow_TurnTo_A(void);
 void n_crow_Update(void);
+void n_crow_Update_A(void);
 void n_crow_WallAhead(void);
+void n_crow_WallAhead_A(void);
 void n_crow_WallBetween(void);
+void n_crow_WallBetween_A(void);
 void n_crow_WatchStep(void);
+void n_crow_WatchStep_A(void);
 void n_death_LoadImage(void);
 void n_death_Setup(void);
 void n_death_Update(void);
@@ -273,50 +469,95 @@ void n_files_Register(void);
 void n_files_Screen(void);
 void n_files_Start(void);
 void n_finalboss_AirAct(void);
+void n_finalboss_AirAct_A(void);
 void n_finalboss_Anim(void);
 void n_finalboss_AnimEvent(void);
+void n_finalboss_AnimEvent_A(void);
+void n_finalboss_Anim_A(void);
 void n_finalboss_CheckClose(void);
+void n_finalboss_CheckClose_A(void);
 void n_finalboss_CheckMid(void);
+void n_finalboss_CheckMid_A(void);
 void n_finalboss_CheckRange(void);
+void n_finalboss_CheckRange_A(void);
 void n_finalboss_Close2Act(void);
+void n_finalboss_Close2Act_A(void);
 void n_finalboss_CloseAct(void);
+void n_finalboss_CloseAct_A(void);
 void n_finalboss_CrossedWall(void);
+void n_finalboss_CrossedWall_A(void);
 void n_finalboss_GloatAct(void);
+void n_finalboss_GloatAct_A(void);
 void n_finalboss_Grab(void);
+void n_finalboss_Grab_A(void);
 void n_finalboss_IdleAct(void);
+void n_finalboss_IdleAct_A(void);
 void n_finalboss_IdleWait(void);
+void n_finalboss_IdleWait_A(void);
 void n_finalboss_IdleWake(void);
+void n_finalboss_IdleWake_A(void);
 void n_finalboss_InPlayerCone(void);
+void n_finalboss_InPlayerCone_A(void);
 void n_finalboss_Land(void);
 void n_finalboss_LandAct(void);
+void n_finalboss_LandAct_A(void);
+void n_finalboss_Land_A(void);
 void n_finalboss_LeapAct(void);
+void n_finalboss_LeapAct_A(void);
 void n_finalboss_LeapIn(void);
+void n_finalboss_LeapIn_A(void);
 void n_finalboss_LeapUp(void);
+void n_finalboss_LeapUp_A(void);
 void n_finalboss_Lift(void);
+void n_finalboss_Lift_A(void);
 void n_finalboss_ModelHook(void);
+void n_finalboss_ModelHook_A(void);
 void n_finalboss_NotFacing(void);
+void n_finalboss_NotFacing_A(void);
 void n_finalboss_Nothing(void);
+void n_finalboss_Nothing_A(void);
 void n_finalboss_OnHit(void);
+void n_finalboss_OnHit_A(void);
 void n_finalboss_PickSwipe(void);
+void n_finalboss_PickSwipe_A(void);
 void n_finalboss_PlayerInCone(void);
+void n_finalboss_PlayerInCone_A(void);
 void n_finalboss_PlayerSide(void);
+void n_finalboss_PlayerSide_A(void);
 void n_finalboss_PlayerWalls(void);
+void n_finalboss_PlayerWalls_A(void);
 void n_finalboss_RunAct(void);
+void n_finalboss_RunAct_A(void);
 void n_finalboss_RushStep(void);
+void n_finalboss_RushStep_A(void);
 void n_finalboss_StalkStep(void);
+void n_finalboss_StalkStep_A(void);
 void n_finalboss_StartGloat(void);
+void n_finalboss_StartGloat_A(void);
 void n_finalboss_StartMoving(void);
+void n_finalboss_StartMoving_A(void);
 void n_finalboss_StateActive(void);
+void n_finalboss_StateActive_A(void);
 void n_finalboss_StateNone(void);
+void n_finalboss_StateNone_A(void);
 void n_finalboss_StepSound(void);
+void n_finalboss_StepSound_A(void);
 void n_finalboss_Swipe2Act(void);
+void n_finalboss_Swipe2Act_A(void);
 void n_finalboss_SwipeAct(void);
+void n_finalboss_SwipeAct_A(void);
 void n_finalboss_TakeHits(void);
+void n_finalboss_TakeHits_A(void);
 void n_finalboss_TryGrab(void);
+void n_finalboss_TryGrab_A(void);
 void n_finalboss_TurnBeside(void);
+void n_finalboss_TurnBeside_A(void);
 void n_finalboss_TurnTo(void);
+void n_finalboss_TurnTo_A(void);
 void n_finalboss_Update(void);
+void n_finalboss_Update_A(void);
 void n_finalboss_WalkAct(void);
+void n_finalboss_WalkAct_A(void);
 void n_fire_AtScreen(void);
 void n_flag_Set(void);
 void n_flag_Test(void);
@@ -356,6 +597,7 @@ void n_fx_Hit(void);
 void n_fx_HitChunksAt(void);
 void n_fx_HitPuff(void);
 void n_fx_HitPuffAt(void);
+void n_fx_LoadBuiltin(void);
 void n_fx_LoadCommonSet(void);
 void n_fx_LoadSet(void);
 void n_fx_LoadStageSet(void);
@@ -385,11 +627,203 @@ void n_geom_SnapToAxisLine(void);
 void n_gfx_InitLibGs(void);
 void n_gl_Fire(void);
 void n_gl_GrenadeUpdate(void);
+void n_gs_AddScaled(void);
+void n_gs_ApplyClip(void);
+void n_gs_BitWidth(void);
+void n_gs_BitWidth_800302C4(void);
+void n_gs_BitWidth_8003092C(void);
+void n_gs_BitWidth_80030FB0(void);
+void n_gs_CallObj28(void);
+void n_gs_CenterOffset(void);
+void n_gs_ClearOt(void);
+void n_gs_CopyRuns(void);
+void n_gs_DefDispBuff(void);
+void n_gs_DefDispBuff2(void);
+void n_gs_DivMidpoint(void);
+void n_gs_DivMidpoint2(void);
+void n_gs_DivMidpoint3(void);
+void n_gs_DivMidpoint4(void);
+void n_gs_DivMidpointF(void);
+void n_gs_DivMidpointF2(void);
+void n_gs_DivMidpointF3(void);
+void n_gs_DivMidpointF4(void);
+void n_gs_DivMidpointF5(void);
+void n_gs_DivMidpointF_8004ED58(void);
+void n_gs_DivMidpointF_80055E34(void);
+void n_gs_DivMidpointF_800575DC(void);
+void n_gs_DivMidpoint_8004957C(void);
+void n_gs_DivMidpoint_80050610(void);
+void n_gs_DivMidpoint_80056A28(void);
+void n_gs_DivMidpoint_8005841C(void);
+void n_gs_DivOffscreen(void);
+void n_gs_DivOffscreenF(void);
+void n_gs_DivOffscreenF4(void);
+void n_gs_DivOffscreenF_800464FC(void);
+void n_gs_DivOffscreenF_80049F84(void);
+void n_gs_DivOffscreenF_80052700(void);
+void n_gs_DivOffscreenF_800535F4(void);
+void n_gs_DivOffscreenF_8005741C(void);
+void n_gs_DivOffscreen_8004ABBC(void);
+void n_gs_DivOffscreen_80055168(void);
+void n_gs_DivOffscreen_8005825C(void);
+void n_gs_DivQuadFT4(void);
+void n_gs_DivQuadFT4b(void);
+void n_gs_DivQuadFT4f(void);
+void n_gs_DivQuadG4(void);
+void n_gs_DivQuadGT4(void);
+void n_gs_DivQuadGT4c(void);
+void n_gs_DivQuadGT4f(void);
+void n_gs_DivTriF3R(void);
+void n_gs_DivTriFT3(void);
+void n_gs_DivTriFT3R(void);
+void n_gs_DivTriFT3b(void);
+void n_gs_DivTriGT3(void);
+void n_gs_DivTriGT3R(void);
+void n_gs_DivTriGT3S(void);
+void n_gs_DivTriGT3b(void);
+void n_gs_DrawOt(void);
+void n_gs_DriverF3(void);
+void n_gs_DriverF4Div(void);
+void n_gs_DriverF4Lit(void);
+void n_gs_DriverFT3Div(void);
+void n_gs_DriverFT3Lit(void);
+void n_gs_DriverFT4Div(void);
+void n_gs_DriverFT4Lit(void);
+void n_gs_DriverG3Lit(void);
+void n_gs_DriverG4Div(void);
+void n_gs_DriverG4Lit(void);
+void n_gs_DriverGT3Div(void);
+void n_gs_DriverGT3Lit(void);
+void n_gs_DriverGT4Div(void);
+void n_gs_DriverGT4Lit(void);
+void n_gs_DriverSharedG3Lit(void);
+void n_gs_Fit16(void);
+void n_gs_Fit16At8(void);
+void n_gs_FogGT3Lit(void);
+void n_gs_FogGT4Lit(void);
+void n_gs_Get60D54(void);
+void n_gs_GetActiveBuff(void);
+void n_gs_GetLs(void);
+void n_gs_GetLw(void);
+void n_gs_GetLws(void);
+void n_gs_GetTimInfo(void);
+void n_gs_HmdBlocks(void);
+void n_gs_HmdLoadImages(void);
+void n_gs_HmdLoadImagesClut(void);
+void n_gs_HmdMap(void);
+void n_gs_HmdNext(void);
+void n_gs_Init3D(void);
+void n_gs_InitGeomAll(void);
+void n_gs_InitGraph(void);
+void n_gs_InitGraphAll(void);
+void n_gs_InterpBlock(void);
+void n_gs_LerpCoord(void);
+void n_gs_LerpCoordRT(void);
+void n_gs_LerpCoordYXZ(void);
+void n_gs_MaxAbs6(void);
+void n_gs_MaxAbs6At8(void);
+void n_gs_MidpointG(void);
+void n_gs_MimeBlock(void);
+void n_gs_NextBlock(void);
+void n_gs_PatchBios(void);
+void n_gs_PopModelList(void);
+void n_gs_ProjectVerts(void);
+void n_gs_RotTransPers4Z(void);
+void n_gs_RotateZDeg(void);
+void n_gs_ScanUnit(void);
+void n_gs_ScreenBlock(void);
+void n_gs_SetAmbient(void);
+void n_gs_SetClipRect(void);
+void n_gs_SetDrawOffset(void);
+void n_gs_SetOffset(void);
+void n_gs_SetProjectionMode(void);
+void n_gs_SetRefView2(void);
+void n_gs_SetRefViewL(void);
+void n_gs_SetScreenSize(void);
+void n_gs_SetWorkBase(void);
+void n_gs_SharedGT3(void);
+void n_gs_SharedGT4(void);
+void n_gs_SortBoxFill(void);
+void n_gs_SortClear(void);
+void n_gs_SortFastSprite(void);
+void n_gs_SortOt(void);
+void n_gs_SortPacket(void);
+void n_gs_SortSprite(void);
+void n_gs_SortUnit(void);
+void n_gs_SwapDispBuff(void);
+void n_gs_TriFT3Packet(void);
+void n_gs_TriFT3Packet_8004EC24(void);
+void n_gs_TriG3Packet(void);
+void n_gs_TriGT3Packet(void);
+void n_gs_TriGT3Packet_800504C4(void);
+void n_gs_TriOffscreen(void);
+void n_gs_TriOffscreen8(void);
+void n_gs_TriOffscreen8_80048A04(void);
+void n_gs_TriOffscreen8_8004EAD4(void);
+void n_gs_TriOffscreen8_80055CE4(void);
+void n_gs_TriOffscreen_8004942C(void);
+void n_gs_TriOffscreen_80050374(void);
+void n_gs_TriOffscreen_800568D8(void);
+void n_gs_WaterFT3(void);
+void n_gs_WaterFT3Fog(void);
+void n_gs_WaterFT4(void);
+void n_gs_WaterFT4Fog(void);
+void n_gs_WaterGT3(void);
+void n_gs_WaterGT3Fog(void);
+void n_gs_WaterGT4(void);
+void n_gs_WaterGT4Fog(void);
+void n_gte_ApplyMatrix(void);
+void n_gte_ApplyMatrixLV(void);
+void n_gte_AxisMatrix(void);
+void n_gte_CompMatrix(void);
+void n_gte_CompMatrixLV(void);
+void n_gte_CordicAngle(void);
+void n_gte_InitGeom(void);
+void n_gte_MulMatrixA(void);
+void n_gte_MulMatrixB(void);
+void n_gte_OuterProduct0(void);
+void n_gte_PopMatrix(void);
+void n_gte_PushMatrix(void);
+void n_gte_ReadColorMatrix(void);
+void n_gte_ReadGeomScreen(void);
+void n_gte_RotMatrix(void);
+void n_gte_RotMatrixGPF(void);
+void n_gte_RotMatrixY(void);
+void n_gte_RotMatrixYXZ(void);
+void n_gte_RotMatrixYZX(void);
+void n_gte_RotTrans(void);
+void n_gte_RotTransPers(void);
+void n_gte_RotTransPers3(void);
+void n_gte_RotTransPers4(void);
+void n_gte_ScaleMatrix(void);
+void n_gte_SetBackColor(void);
+void n_gte_SetBackColor2(void);
+void n_gte_SetColorMatrix(void);
+void n_gte_SetColorMatrixRaw(void);
+void n_gte_SetFlatLight(void);
+void n_gte_SetGeomOffset(void);
+void n_gte_SetGeomScreen(void);
+void n_gte_SetLightMatrix(void);
+void n_gte_SetLocalLight(void);
+void n_gte_SetLsMatrix(void);
+void n_gte_SetRotMatrix(void);
+void n_gte_SetTransMatrix(void);
+void n_gte_SquareRoot0(void);
+void n_gte_TransMatrix(void);
+void n_gte_TransposeMatrix(void);
+void n_gte_VectorNormalD(void);
+void n_gte_Wrap2D818(void);
+void n_gte_ratan2(void);
+void n_gte_rcos(void);
+void n_gte_rsin(void);
+void n_gte_sin_1(void);
 void n_heap_Alloc(void);
 void n_heap_Top(void);
 void n_himem_Alloc(void);
 void n_himem_Reset(void);
 void n_hint_DrawIcon(void);
+void n_hint_LoadImage(void);
+void n_hint_Setup(void);
 void n_hitbox_Bounds(void);
 void n_hitbox_Project(void);
 void n_hitbox_ReticleTest(void);
@@ -446,94 +880,467 @@ void n_hud_UnpackImages(void);
 void n_hud_UpdatePanels(void);
 void n_hud_WeaponCtl(void);
 void n_hunter_Advance(void);
+void n_hunter_Advance_A(void);
 void n_hunter_Anim(void);
 void n_hunter_AnimEvent(void);
+void n_hunter_AnimEvent_A(void);
+void n_hunter_Anim_A(void);
 void n_hunter_Cooldown(void);
+void n_hunter_Cooldown_A(void);
 void n_hunter_CrossedWall(void);
+void n_hunter_CrossedWall_A(void);
 void n_hunter_GrabStep(void);
+void n_hunter_GrabStep_A(void);
 void n_hunter_IdleAct(void);
+void n_hunter_IdleAct_A(void);
 void n_hunter_InPlayerCone(void);
+void n_hunter_InPlayerCone_A(void);
 void n_hunter_Land(void);
+void n_hunter_Land_A(void);
 void n_hunter_LeapAct(void);
+void n_hunter_LeapAct_A(void);
 void n_hunter_LeapFarStep(void);
+void n_hunter_LeapFarStep_A(void);
 void n_hunter_LeapStart(void);
+void n_hunter_LeapStart_A(void);
 void n_hunter_LeapStep(void);
+void n_hunter_LeapStep_A(void);
 void n_hunter_Lift(void);
+void n_hunter_Lift_A(void);
 void n_hunter_Lunge(void);
+void n_hunter_Lunge_A(void);
 void n_hunter_Near(void);
+void n_hunter_Near_A(void);
 void n_hunter_NotFacing(void);
+void n_hunter_NotFacing_A(void);
 void n_hunter_OnHit(void);
+void n_hunter_OnHit_A(void);
 void n_hunter_PickSide(void);
+void n_hunter_PickSide_A(void);
 void n_hunter_PlayerHasRoom(void);
+void n_hunter_PlayerHasRoom_A(void);
 void n_hunter_PlayerInCone(void);
+void n_hunter_PlayerInCone_A(void);
 void n_hunter_PlayerWalls(void);
+void n_hunter_PlayerWalls_A(void);
 void n_hunter_ProwlStep(void);
+void n_hunter_ProwlStep_A(void);
 void n_hunter_RiseAct(void);
+void n_hunter_RiseAct_A(void);
 void n_hunter_Room1Retreat(void);
+void n_hunter_Room1Retreat_A(void);
 void n_hunter_RunAct(void);
+void n_hunter_RunAct_A(void);
 void n_hunter_RushStep(void);
+void n_hunter_RushStep_A(void);
 void n_hunter_SidestepStep(void);
+void n_hunter_SidestepStep_A(void);
 void n_hunter_SlashAct(void);
+void n_hunter_SlashAct_A(void);
 void n_hunter_Stage4Check(void);
+void n_hunter_Stage4Check_A(void);
 void n_hunter_StageCheck(void);
+void n_hunter_StageCheck_A(void);
 void n_hunter_StateActive(void);
+void n_hunter_StateActive_A(void);
 void n_hunter_Status(void);
+void n_hunter_Status_A(void);
 void n_hunter_StepSound(void);
+void n_hunter_StepSound_A(void);
 void n_hunter_TryPounce(void);
+void n_hunter_TryPounce_A(void);
 void n_hunter_TurnTo(void);
+void n_hunter_TurnTo_A(void);
 void n_hunter_Update(void);
+void n_hunter_Update_A(void);
 void n_hunter_WaitStep(void);
+void n_hunter_WaitStep_A(void);
 void n_hunter_WalkAct(void);
+void n_hunter_WalkAct_A(void);
 void n_hunter_WallAhead(void);
+void n_hunter_WallAhead_A(void);
 void n_hunter_WallToPlayer(void);
+void n_hunter_WallToPlayer_A(void);
 void n_hunter_Wander(void);
+void n_hunter_Wander_A(void);
 void n_hypnos_Setup(void);
+void n_hypnos_Setup_B(void);
 void n_input_MapButtons(void);
 void n_input_SampleFrame(void);
+void n_item_InitListC(void);
 void n_item_RemoveB(void);
 void n_item_RemoveC(void);
 void n_item_RemoveCarried(void);
+void n_kernel_Entry(void);
 void n_kernel_IdleThread(void);
+void n_kernel_LoadFile(void);
+void n_kernel_MainLoop(void);
+void n_kernel_ModeLoad(void);
 void n_kernel_ModeSwitch(void);
 void n_kernel_ModeThread2(void);
 void n_kernel_ModeThread4(void);
+void n_kernel_ModeThread6(void);
+void n_kernel_ModeThread7(void);
+void n_kernel_ModeThread8(void);
 void n_kernel_Nothing(void);
 void n_kernel_Random(void);
 void n_kernel_ReadSectors(void);
+void n_kernel_ReadWait(void);
+void n_kernel_RegionCheck(void);
 void n_kernel_SetFrameCallback(void);
 void n_kernel_SetFrameCallback2(void);
+void n_kernel_Start(void);
 void n_kernel_VSyncCallback(void);
+void n_libcard_ClearState(void);
+void n_libcard_CopyLow(void);
+void n_libcard_Init(void);
+void n_libcard_Patch(void);
+void n_libcard_PatchPad(void);
+void n_libcard_Stop(void);
+void n_libcd_CdControl(void);
+void n_libcd_CdGetSector(void);
+void n_libcd_CdInit(void);
+void n_libcd_CdIntToPos(void);
+void n_libcd_CdIntr(void);
+void n_libcd_CdMix(void);
+void n_libcd_CdPosToInt(void);
+void n_libcd_CdReady(void);
+void n_libcd_CdSync(void);
+void n_libcd_Command(void);
+void n_libcd_ControlF(void);
+void n_libcd_DmaSector(void);
+void n_libcd_DmaStart(void);
+void n_libcd_IntrCallback(void);
+void n_libcd_Ready(void);
+void n_libcd_Reset(void);
+void n_libcd_SetCb35C(void);
+void n_libcd_SetCb3F4(void);
+void n_libcd_SetCb3F8(void);
+void n_libcd_SetCb3FC(void);
+void n_libcd_SetDmaCallback(void);
+void n_libcd_SpuCdOn(void);
+void n_libcd_StCallback(void);
+void n_libcd_StClearFrames(void);
+void n_libcd_StFrameDone(void);
+void n_libcd_StFreeFrame(void);
+void n_libcd_StGetNext(void);
+void n_libcd_StReset(void);
+void n_libcd_StSector(void);
+void n_libcd_StSetRing(void);
+void n_libcd_StSetStream(void);
+void n_libcd_StSetValues(void);
+void n_libcd_StStart(void);
+void n_libcd_StUnhook(void);
+void n_libcd_Sync(void);
+void n_libcd_Wrap26378(void);
+void n_libcd_Wrap269A0(void);
+void n_libetc_CheckCallback(void);
+void n_libetc_ClearWords1(void);
+void n_libetc_ClearWords2(void);
+void n_libetc_ClearWords3(void);
+void n_libetc_CounterInit(void);
+void n_libetc_DMACallback(void);
+void n_libetc_DmaInit(void);
+void n_libetc_DmaIntr(void);
+void n_libetc_Entry14(void);
+void n_libetc_GetVideoMode(void);
+void n_libetc_InterruptCallback(void);
+void n_libetc_IntrHandler(void);
+void n_libetc_ResetCallback(void);
+void n_libetc_SetCounterCallback(void);
+void n_libetc_SetDmaCallback(void);
+void n_libetc_SetIntrMask(void);
+void n_libetc_VBlank(void);
+void n_libetc_VSync(void);
+void n_libetc_VSyncCallbacks(void);
+void n_libetc_VSyncWait(void);
+void n_libgpu_AddPrim(void);
+void n_libgpu_CheckRect(void);
+void n_libgpu_ClearImage(void);
+void n_libgpu_ClearImageQ(void);
+void n_libgpu_ClearOTag(void);
+void n_libgpu_ClipEndCmd(void);
+void n_libgpu_ClipStartCmd(void);
+void n_libgpu_Ctrl(void);
+void n_libgpu_DmaClearOT(void);
+void n_libgpu_DmaOt(void);
+void n_libgpu_DrawOTag(void);
+void n_libgpu_DrawPrim(void);
+void n_libgpu_DrawSync(void);
+void n_libgpu_DriverLoadImage(void);
+void n_libgpu_DriverReset(void);
+void n_libgpu_DriverStoreImage(void);
+void n_libgpu_DriverSync(void);
+void n_libgpu_Enqueue(void);
+void n_libgpu_GetClut(void);
+void n_libgpu_GetInfo(void);
+void n_libgpu_GetTPage(void);
+void n_libgpu_GpuType(void);
+void n_libgpu_LoadImage(void);
+void n_libgpu_LoadImage2(void);
+void n_libgpu_Memset(void);
+void n_libgpu_ModeCmd(void);
+void n_libgpu_MoveImage(void);
+void n_libgpu_OffsetCmd(void);
+void n_libgpu_PutDispEnv(void);
+void n_libgpu_PutDrawEnv(void);
+void n_libgpu_ResetGraph(void);
+void n_libgpu_RunQueue(void);
+void n_libgpu_SendWords(void);
+void n_libgpu_SetDefDispEnv(void);
+void n_libgpu_SetDefDrawEnv(void);
+void n_libgpu_SetDispMask(void);
+void n_libgpu_SetDrawEnv(void);
+void n_libgpu_SetDrawMode(void);
+void n_libgpu_SetDrawMode2(void);
+void n_libgpu_SetDrawStp(void);
+void n_libgpu_SetPolyF4(void);
+void n_libgpu_SetPolyFT4(void);
+void n_libgpu_SetPolyG4(void);
+void n_libgpu_SetSemiTrans(void);
+void n_libgpu_SetShadeTex(void);
+void n_libgpu_SetSprt(void);
+void n_libgpu_SetTile(void);
+void n_libgpu_SetTimeout(void);
+void n_libgpu_TexWindowCmd(void);
+void n_libgpu_TimedOut(void);
+void n_libpad_ActByte(void);
+void n_libpad_ActPower(void);
+void n_libpad_Close(void);
+void n_libpad_EndCommand(void);
+void n_libpad_Exchange(void);
+void n_libpad_Get62A5C(void);
+void n_libpad_GetState(void);
+void n_libpad_InitDirect(void);
+void n_libpad_IrqCheck(void);
+void n_libpad_LatchMode(void);
+void n_libpad_NextPort(void);
+void n_libpad_PatchBios(void);
+void n_libpad_PortBuf(void);
+void n_libpad_ResetPort(void);
+void n_libpad_Send(void);
+void n_libpad_SendReady(void);
+void n_libpad_SetCommand(void);
+void n_libpad_SetGp234(void);
+void n_libpad_SetHandlers(void);
+void n_libpad_SetHandlers2(void);
+void n_libpad_SetPending(void);
+void n_libpad_SetPortPending(void);
+void n_libpad_Start(void);
+void n_libpad_StartCom(void);
+void n_libpad_StartExchange(void);
+void n_libpad_Step(void);
+void n_libpad_StepAnswer(void);
+void n_libpad_StepBegin(void);
+void n_libpad_StepCommand(void);
+void n_libpad_StepExtra(void);
+void n_libpad_StepIdent(void);
+void n_libpad_StepPoll(void);
+void n_libpad_Stop(void);
+void n_libpad_TakeFlag(void);
+void n_libpad_TakeFlagW(void);
+void n_libpad_Tick(void);
+void n_libpad_TimedOut(void);
+void n_libpad_TimerStart(void);
+void n_libpad_Update(void);
+void n_libpad_WaitAck(void);
+void n_libpad_WaitTx(void);
+void n_libpress_BufSize(void);
+void n_libpress_DecDCTReset(void);
+void n_libpress_DecDCTin(void);
+void n_libpress_DecDCTvlc(void);
+void n_libpress_DmaIn(void);
+void n_libpress_DmaOutCmd(void);
+void n_libpress_InSync(void);
+void n_libpress_MdecReset(void);
+void n_libpress_OutSync(void);
+void n_libpress_SendIn(void);
+void n_libpress_SetOutCallback(void);
+void n_libpress_UnpackTable(void);
+void n_libsnd_BendAll(void);
+void n_libsnd_ByteHook(void);
+void n_libsnd_ChannelPan(void);
+void n_libsnd_ChannelVolume(void);
+void n_libsnd_Clear656D8(void);
+void n_libsnd_ControlChange(void);
+void n_libsnd_DataEntry(void);
+void n_libsnd_FindTones(void);
+void n_libsnd_InitTail(void);
+void n_libsnd_KeyOnBits(void);
+void n_libsnd_Lock(void);
+void n_libsnd_NoteHook(void);
+void n_libsnd_NoteOff(void);
+void n_libsnd_NoteOn(void);
+void n_libsnd_NotePitch(void);
+void n_libsnd_Nrpn98(void);
+void n_libsnd_Pitch(void);
+void n_libsnd_ProgIndex(void);
+void n_libsnd_ProgramChange(void);
+void n_libsnd_ResetVoices(void);
+void n_libsnd_SelectProg(void);
+void n_libsnd_SeqAttrInit(void);
+void n_libsnd_SeqCalledTbyT(void);
+void n_libsnd_SeqDelta(void);
+void n_libsnd_SeqEvent(void);
+void n_libsnd_SeqGetVol(void);
+void n_libsnd_SeqOpen(void);
+void n_libsnd_SeqPlay(void);
+void n_libsnd_SeqPlayTick(void);
+void n_libsnd_SeqSetVol(void);
+void n_libsnd_SeqTick(void);
+void n_libsnd_SeqVoicesOff(void);
+void n_libsnd_SetInputVol(void);
+void n_libsnd_SetMVol(void);
+void n_libsnd_SetReserved(void);
+void n_libsnd_SetStereo(void);
+void n_libsnd_SetTempo(void);
+void n_libsnd_SetTickMode(void);
+void n_libsnd_SetVoiceVol(void);
+void n_libsnd_SsSeqClose(void);
+void n_libsnd_SsSeqOpen(void);
+void n_libsnd_SsSeqSetVol(void);
+void n_libsnd_SsSeqStop(void);
+void n_libsnd_SsVabOpenHead(void);
+void n_libsnd_TickStart(void);
+void n_libsnd_TickStart1(void);
+void n_libsnd_TickStop(void);
+void n_libsnd_ToneBasePitch(void);
+void n_libsnd_ToneSetVol(void);
+void n_libsnd_Unlock(void);
+void n_libsnd_UtGetProgAtr(void);
+void n_libsnd_UtGetVagAtr(void);
+void n_libsnd_UtKeyOn(void);
+void n_libsnd_UtKeyOnV(void);
+void n_libsnd_UtPitchBend(void);
+void n_libsnd_UtSetReverbDepth(void);
+void n_libsnd_UtSetReverbType(void);
+void n_libsnd_UtVoiceOff(void);
+void n_libsnd_VabAlloc(void);
+void n_libsnd_VabClose(void);
+void n_libsnd_VabOpenHead(void);
+void n_libsnd_VabTransBody(void);
+void n_libsnd_VagAddr(void);
+void n_libsnd_VoiceAlloc(void);
+void n_libsnd_VoiceClear(void);
+void n_libsnd_VoiceFlagBits(void);
+void n_libsnd_VoiceInit(void);
+void n_libsnd_VoiceKeyOn(void);
+void n_libsnd_VoiceOff(void);
+void n_libsnd_VoiceSetAttr(void);
+void n_libsnd_VoiceSetVol(void);
+void n_libsnd_VoiceSetup(void);
+void n_libsnd_Wrap1C708(void);
+void n_libsnd_Wrap1D118(void);
+void n_libsnd_Wrap1D838(void);
+void n_libsnd_Wrap1DEA0(void);
+void n_libsnd_Wrap20358(void);
+void n_libsnd_Wrap20378(void);
+void n_libsnd_Wrap24D48(void);
+void n_libspu_ClearReverbWorkArea(void);
+void n_libspu_Delay(void);
+void n_libspu_DmaPriority(void);
+void n_libspu_Free(void);
+void n_libspu_GcSPU(void);
+void n_libspu_GetEnvelope(void);
+void n_libspu_GetNoiseVoice(void);
+void n_libspu_GetReverbVoice(void);
+void n_libspu_GetVoiceBits(void);
+void n_libspu_Init(void);
+void n_libspu_InitBody(void);
+void n_libspu_InitMalloc(void);
+void n_libspu_InitTail(void);
+void n_libspu_IsAllocated(void);
+void n_libspu_IsBusy(void);
+void n_libspu_IsTransferCompleted(void);
+void n_libspu_KeyStatus(void);
+void n_libspu_Malloc(void);
+void n_libspu_SetAddr(void);
+void n_libspu_SetBusy(void);
+void n_libspu_SetCommonAttr(void);
+void n_libspu_SetKey(void);
+void n_libspu_SetNoiseVoice(void);
+void n_libspu_SetReverb(void);
+void n_libspu_SetReverbModeParam(void);
+void n_libspu_SetReverbRegs(void);
+void n_libspu_SetReverbVoice(void);
+void n_libspu_SetTransferCallback(void);
+void n_libspu_SetTransferMode(void);
+void n_libspu_SetTransferStartAddr(void);
+void n_libspu_SetVoiceAttr(void);
+void n_libspu_SetVoiceBits(void);
+void n_libspu_SetVoiceVol(void);
+void n_libspu_Start(void);
+void n_libspu_Transfer(void);
+void n_libspu_TransferDone(void);
+void n_libspu_VmFlush(void);
+void n_libspu_Wrap1A834(void);
+void n_libspu_Wrap1AA18(void);
+void n_libspu_Write(void);
+void n_libspu_WriteByHand(void);
+void n_libspu_WriteData(void);
+void n_libspu_WriteReg(void);
 void n_licker_AnimEvent(void);
+void n_licker_AnimEvent_A(void);
 void n_licker_AvoidWalls(void);
+void n_licker_AvoidWalls_A(void);
 void n_licker_CalmDown(void);
+void n_licker_CalmDown_A(void);
 void n_licker_CrossedEdge(void);
+void n_licker_CrossedEdge_A(void);
 void n_licker_CrossedWall(void);
+void n_licker_CrossedWall_A(void);
 void n_licker_EdgeAhead(void);
+void n_licker_EdgeAhead_A(void);
 void n_licker_HuntPre(void);
+void n_licker_HuntPre_A(void);
 void n_licker_HuntStep(void);
+void n_licker_HuntStep_A(void);
 void n_licker_IdlePre(void);
+void n_licker_IdlePre_A(void);
 void n_licker_IdleThink(void);
+void n_licker_IdleThink_A(void);
 void n_licker_IntroPre(void);
+void n_licker_IntroPre_A(void);
 void n_licker_IntroStep(void);
+void n_licker_IntroStep_A(void);
 void n_licker_LeapPre(void);
+void n_licker_LeapPre_A(void);
 void n_licker_LeapStep(void);
+void n_licker_LeapStep_A(void);
 void n_licker_Marker(void);
+void n_licker_Marker_A(void);
 void n_licker_PlayerInCone(void);
+void n_licker_PlayerInCone_A(void);
 void n_licker_RoomPre(void);
+void n_licker_RoomPre_A(void);
 void n_licker_RoomSetup(void);
+void n_licker_RoomSetup_A(void);
 void n_licker_Setup(void);
+void n_licker_Setup_A(void);
 void n_licker_ShowParts(void);
+void n_licker_ShowParts_A(void);
 void n_licker_SpeedByDistance(void);
+void n_licker_SpeedByDistance_A(void);
 void n_licker_Spot(void);
+void n_licker_Spot_A(void);
 void n_licker_StateActive(void);
+void n_licker_StateActive_A(void);
 void n_licker_StepSound(void);
+void n_licker_StepSound_A(void);
 void n_licker_Tongue(void);
+void n_licker_Tongue_A(void);
 void n_licker_TryDrop(void);
+void n_licker_TryDrop_A(void);
 void n_licker_TryLeap(void);
+void n_licker_TryLeap_A(void);
 void n_licker_TurnStep(void);
+void n_licker_TurnStep_A(void);
 void n_licker_Update(void);
+void n_licker_Update_A(void);
 void n_licker_WakeHit(void);
+void n_licker_WakeHit_A(void);
 void n_licker_WallAhead(void);
+void n_licker_WallAhead_A(void);
 void n_line_Blocks(void);
 void n_line_FirstCrossing(void);
 void n_load_FindSave(void);
@@ -543,9 +1350,9 @@ void n_loader_CopyModelWork(void);
 void n_loader_EnemyRecord(void);
 void n_loader_ExtraObject(void);
 void n_loader_Idle(void);
-void n_loader_LoadSync(void);
 void n_loader_ItemFileDone(void);
 void n_loader_ListSounds(void);
+void n_loader_LoadSync(void);
 void n_loader_ModelRecord(void);
 void n_loader_NextEnemy(void);
 void n_loader_NextItem(void);
@@ -570,6 +1377,8 @@ void n_map_LoadFloor(void);
 void n_map_ShadeRooms(void);
 void n_map_SlideFloor(void);
 void n_map_SlideIn(void);
+void n_modchk_CdPoll(void);
+void n_modchk_CdSend(void);
 void n_model_AnimateTextures(void);
 void n_model_Bind(void);
 void n_model_BindAnimDrivers(void);
@@ -580,22 +1389,37 @@ void n_model_DriverShared(void);
 void n_model_FindUnit(void);
 void n_model_PolyDriver(void);
 void n_moth_CrossedWall(void);
+void n_moth_CrossedWall_A(void);
 void n_moth_DieStep(void);
+void n_moth_DieStep_A(void);
 void n_moth_Drop(void);
+void n_moth_Drop_A(void);
 void n_moth_FloorStep(void);
+void n_moth_FloorStep_A(void);
 void n_moth_FlyStep(void);
+void n_moth_FlyStep_A(void);
 void n_moth_Glide(void);
+void n_moth_Glide_A(void);
 void n_moth_Grab(void);
 void n_moth_GrabStep(void);
+void n_moth_GrabStep_A(void);
+void n_moth_Grab_A(void);
 void n_moth_OnHit(void);
+void n_moth_OnHit_A(void);
 void n_moth_StateActive(void);
+void n_moth_StateActive_A(void);
 void n_moth_Swoop(void);
 void n_moth_SwoopStep(void);
+void n_moth_SwoopStep_A(void);
+void n_moth_Swoop_A(void);
 void n_moth_TurnTo(void);
+void n_moth_TurnTo_A(void);
 void n_moth_Update(void);
+void n_moth_Update_A(void);
 void n_move_Collide(void);
 void n_movie_DecodeNext(void);
 void n_movie_GetFrame(void);
+void n_movie_Play(void);
 void n_movie_SetFlag(void);
 void n_movie_SetScreen(void);
 void n_movie_SliceDone(void);
@@ -662,6 +1486,46 @@ void n_op_Wait(void);
 void n_op_WhiteIn(void);
 void n_op_WhiteOut(void);
 void n_opening_SetupText(void);
+void n_option_AdjustScreen(void);
+void n_option_AllocSprite(void);
+void n_option_ArrowPair(void);
+void n_option_AttachedText(void);
+void n_option_Carousel(void);
+void n_option_ClearMarks(void);
+void n_option_DimUnlessCurrent(void);
+void n_option_DimUnlessCurrentB(void);
+void n_option_Draw(void);
+void n_option_DrawBigText(void);
+void n_option_DrawSprites(void);
+void n_option_DrawText(void);
+void n_option_DrawTextEx(void);
+void n_option_EdgeSprite(void);
+void n_option_EndMouseDrag(void);
+void n_option_Frame(void);
+void n_option_HideOnClose(void);
+void n_option_InitCursors(void);
+void n_option_InitSprite(void);
+void n_option_ItemLabel(void);
+void n_option_KeyConfig(void);
+void n_option_KeyGlyph(void);
+void n_option_ListEntry(void);
+void n_option_LoadText(void);
+void n_option_MouseShown(void);
+void n_option_NumberText(void);
+void n_option_Open(void);
+void n_option_Pressed(void);
+void n_option_ResetScreen(void);
+void n_option_RowMarker(void);
+void n_option_RowNumber(void);
+void n_option_RunSprites(void);
+void n_option_ScrollArrow(void);
+void n_option_SlideOnEdit(void);
+void n_option_SoundScreen(void);
+void n_option_ValueBox(void);
+void n_option_ValueButton(void);
+void n_option_ValueSlider(void);
+void n_option_ValueText(void);
+void n_option_Wheel(void);
 void n_overlay_Draw(void);
 void n_overlay_Init(void);
 void n_pad_AxesNone(void);
@@ -716,6 +1580,33 @@ void n_render_InitOts(void);
 void n_render_SetLights(void);
 void n_render_SortFrame(void);
 void n_render_SortModels(void);
+void n_results_Begin(void);
+void n_results_Compute(void);
+void n_results_Digits4(void);
+void n_results_Digits6(void);
+void n_results_DrawBackground(void);
+void n_results_DrawText(void);
+void n_results_DrawTexts(void);
+void n_results_Exit(void);
+void n_results_Fade(void);
+void n_results_FadeFlags(void);
+void n_results_FadeInStart(void);
+void n_results_FadeOutStart(void);
+void n_results_Flip(void);
+void n_results_Frame(void);
+void n_results_Init(void);
+void n_results_InitFade(void);
+void n_results_Load(void);
+void n_results_Loop(void);
+void n_results_Main(void);
+void n_results_Pow(void);
+void n_results_Rank(void);
+void n_results_StateFadeIn(void);
+void n_results_StateFadeOut(void);
+void n_results_StatePad(void);
+void n_results_StateWaitFade(void);
+void n_results_TimeDigits(void);
+void n_results_UploadTim(void);
 void n_reticle_Draw(void);
 void n_reticle_LoadImage(void);
 void n_rl_Fire(void);
@@ -769,6 +1660,7 @@ void n_script_MusicStart(void);
 void n_script_MusicStop(void);
 void n_script_ResetThread(void);
 void n_script_RunThreads(void);
+void n_script_StageOp(void);
 void n_script_Start(void);
 void n_script_StartAt(void);
 void n_script_StartPc(void);
@@ -812,12 +1704,15 @@ void n_sound_CloseSeqData(void);
 void n_sound_FadeStart(void);
 void n_sound_FadeStep(void);
 void n_sound_FileNames(void);
+void n_sound_LoadBank(void);
+void n_sound_LoadBankHigh(void);
 void n_sound_MovePair(void);
 void n_sound_OpenBank(void);
 void n_sound_PairStatus(void);
 void n_sound_PairsOn(void);
 void n_sound_PanVolumes(void);
 void n_sound_PlayPair(void);
+void n_sound_Reset(void);
 void n_sound_SeqPlay(void);
 void n_sound_SeqStop(void);
 void n_sound_SeqVolume(void);
@@ -827,30 +1722,53 @@ void n_sound_StopAll(void);
 void n_sound_StopPair(void);
 void n_sound_UpdatePairs(void);
 void n_spider_Attack(void);
+void n_spider_Attack_A(void);
 void n_spider_CrawlPre(void);
+void n_spider_CrawlPre_A(void);
 void n_spider_CrawlStep(void);
+void n_spider_CrawlStep_A(void);
 void n_spider_CrossedWall(void);
+void n_spider_CrossedWall_A(void);
 void n_spider_DiePre(void);
+void n_spider_DiePre_A(void);
 void n_spider_DieStep(void);
+void n_spider_DieStep_A(void);
 void n_spider_EdgeCheck(void);
+void n_spider_EdgeCheck_A(void);
 void n_spider_LandPre(void);
+void n_spider_LandPre_A(void);
 void n_spider_LandStep(void);
+void n_spider_LandStep_A(void);
 void n_spider_MoveCheck(void);
+void n_spider_MoveCheck_A(void);
 void n_spider_MoveStep(void);
+void n_spider_MoveStep_A(void);
 void n_spider_OnHit(void);
+void n_spider_OnHit_A(void);
 void n_spider_PlayerInCone(void);
+void n_spider_PlayerInCone_A(void);
 void n_spider_ShadowHeight(void);
+void n_spider_ShadowHeight_A(void);
 void n_spider_StateActive(void);
+void n_spider_StateActive_A(void);
 void n_spider_StateBoth(void);
+void n_spider_StateBoth_A(void);
 void n_spider_Sway(void);
+void n_spider_Sway_A(void);
 void n_spider_TakeHits(void);
+void n_spider_TakeHits_A(void);
 void n_spider_Update(void);
+void n_spider_Update_A(void);
 void n_spider_Wake(void);
+void n_spider_Wake_A(void);
 void n_sprite_AddShadow(void);
 void n_sprite_Alloc(void);
 void n_sprite_SetImage(void);
 void n_sprites_Clear(void);
+void n_stage15_InitHooks(void);
+void n_stage15_RoomEnter(void);
 void n_stage15_RoomFrame(void);
+void n_stage15_RoomTable(void);
 void n_stage17_RoomFrame(void);
 void n_stage18_Room13Sequence(void);
 void n_stage18_RoomFrame(void);
@@ -872,8 +1790,12 @@ void n_stage23_MusicBack(void);
 void n_stage23_RoomFrame(void);
 void n_stage23_TargetBreak(void);
 void n_stage23_TargetHit(void);
+void n_stage24_InitHooks(void);
+void n_stage24_MusicCheck(void);
 void n_stage24_Room3Blink(void);
+void n_stage24_RoomEnter(void);
 void n_stage24_RoomFrame(void);
+void n_stage24_RoomTable(void);
 void n_stage25_RoomFrame(void);
 void n_stage26_HumUpdate(void);
 void n_stage26_NotFiring(void);
@@ -892,6 +1814,7 @@ void n_stage28_RoomFrame(void);
 void n_stage29_Update(void);
 void n_stage31_RoomFrame(void);
 void n_stage32_OpBlank(void);
+void n_stage32_OpModel(void);
 void n_stage32_RoomFrame(void);
 void n_stage_LoadTextures(void);
 void n_stage_Run(void);
@@ -924,6 +1847,7 @@ void n_status_ItemsInput(void);
 void n_status_ItemsSlideIn(void);
 void n_status_ListItems(void);
 void n_status_Load(void);
+void n_status_Main(void);
 void n_status_MarkerRow(void);
 void n_status_MenuInput(void);
 void n_status_MenuReset(void);
@@ -943,6 +1867,7 @@ void n_status_Wait(void);
 void n_story_CheckSkip(void);
 void n_story_DrawFrame(void);
 void n_story_DrawPrompt(void);
+void n_story_End(void);
 void n_story_EndWait(void);
 void n_story_FadeDraw(void);
 void n_story_FadeFromBlack(void);
@@ -956,13 +1881,19 @@ void n_story_InitPromptTiles(void);
 void n_story_InitScreen(void);
 void n_story_LoadData(void);
 void n_story_LoadTim(void);
+void n_story_Main(void);
+void n_story_MainLoop(void);
+void n_story_Movie(void);
 void n_story_NextChar(void);
 void n_story_PutChar(void);
+void n_story_Reset(void);
 void n_story_SkipFade(void);
 void n_story_TextCode(void);
 void n_story_Typing(void);
 void n_stub_ReturnZero(void);
+void n_test_DisplayReset(void);
 void n_test_InitState(void);
+void n_test_Main(void);
 void n_text_Clear(void);
 void n_text_Cursor(void);
 void n_text_Set(void);
@@ -975,6 +1906,7 @@ void n_thread_InitSlots(void);
 void n_thread_ModeSwitch(void);
 void n_thread_Release(void);
 void n_thread_Return(void);
+void n_thread_Run(void);
 void n_thread_Set(void);
 void n_tim_Load(void);
 void n_title_ArrowUpdate(void);
@@ -983,9 +1915,13 @@ void n_title_Draw(void);
 void n_title_DrawSprites(void);
 void n_title_DrawText(void);
 void n_title_DrawWindow(void);
+void n_title_Entry0(void);
+void n_title_Entry2(void);
+void n_title_Entry3(void);
 void n_title_FadeIn(void);
 void n_title_FadeOut(void);
 void n_title_FadeToStart(void);
+void n_title_Frame(void);
 void n_title_FrameEnd(void);
 void n_title_Glyph(void);
 void n_title_Init(void);
@@ -996,18 +1932,24 @@ void n_title_LoadImages(void);
 void n_title_LoadItemUpdate(void);
 void n_title_LoadMenu(void);
 void n_title_LoadPics(void);
+void n_title_Logos(void);
+void n_title_Main(void);
 void n_title_MainMenu(void);
 void n_title_MenuBuild(void);
 void n_title_MouseArrowUpdate(void);
+void n_title_Movie(void);
+void n_title_Picture(void);
 void n_title_PointerUpdate(void);
 void n_title_Pressed(void);
 void n_title_RunSprites(void);
 void n_title_Set1Update(void);
+void n_title_Setup(void);
 void n_title_ShadowUpdate(void);
 void n_title_Sound(void);
 void n_title_StartPressed(void);
 void n_title_Text(void);
 void n_title_TextFadeOut(void);
+void n_title_ToDemo(void);
 void n_title_UnlockedUpdate(void);
 void n_title_UploadTim(void);
 void n_title_Wait1(void);
@@ -1019,45 +1961,86 @@ void n_trigger_Outside(void);
 void n_trigger_Reset(void);
 void n_tyrant_Anim(void);
 void n_tyrant_AnimEvent(void);
+void n_tyrant_AnimEvent_A(void);
+void n_tyrant_Anim_A(void);
 void n_tyrant_CanCharge(void);
+void n_tyrant_CanCharge_A(void);
 void n_tyrant_CrossedWall(void);
+void n_tyrant_CrossedWall_A(void);
 void n_tyrant_DodgeAct(void);
+void n_tyrant_DodgeAct_A(void);
 void n_tyrant_Flinch1Act(void);
+void n_tyrant_Flinch1Act_A(void);
 void n_tyrant_Flinch2Act(void);
+void n_tyrant_Flinch2Act_A(void);
 void n_tyrant_Grab(void);
+void n_tyrant_Grab_A(void);
 void n_tyrant_IdleAct(void);
+void n_tyrant_IdleAct_A(void);
 void n_tyrant_JointHook(void);
+void n_tyrant_JointHook_A(void);
 void n_tyrant_LungeAct(void);
+void n_tyrant_LungeAct_A(void);
 void n_tyrant_MorphFilter(void);
+void n_tyrant_MorphFilter_A(void);
 void n_tyrant_MorphPick(void);
+void n_tyrant_MorphPick_A(void);
 void n_tyrant_MorphPush(void);
+void n_tyrant_MorphPush_A(void);
 void n_tyrant_NotFacing(void);
+void n_tyrant_NotFacing_A(void);
 void n_tyrant_OnHit(void);
+void n_tyrant_OnHit_A(void);
 void n_tyrant_PickAttack(void);
+void n_tyrant_PickAttack_A(void);
 void n_tyrant_PlayerFiring(void);
+void n_tyrant_PlayerFiring_A(void);
 void n_tyrant_PlayerInCone(void);
+void n_tyrant_PlayerInCone_A(void);
 void n_tyrant_PlayerSide(void);
+void n_tyrant_PlayerSide_A(void);
 void n_tyrant_PunchAct(void);
+void n_tyrant_PunchAct_A(void);
 void n_tyrant_ReelAct(void);
+void n_tyrant_ReelAct_A(void);
 void n_tyrant_ScriptCheck(void);
+void n_tyrant_ScriptCheck_A(void);
 void n_tyrant_SetPartsDir(void);
+void n_tyrant_SetPartsDir_A(void);
 void n_tyrant_Setup(void);
+void n_tyrant_Setup_A(void);
 void n_tyrant_SlamAct(void);
+void n_tyrant_SlamAct_A(void);
 void n_tyrant_Stage2Check(void);
+void n_tyrant_Stage2Check_A(void);
 void n_tyrant_StageCheck(void);
+void n_tyrant_StageCheck_A(void);
 void n_tyrant_Standoff(void);
+void n_tyrant_Standoff_A(void);
 void n_tyrant_StateActive(void);
+void n_tyrant_StateActive_A(void);
 void n_tyrant_StateNone(void);
+void n_tyrant_StateNone_A(void);
 void n_tyrant_Steer(void);
+void n_tyrant_Steer_A(void);
 void n_tyrant_SwingAct(void);
+void n_tyrant_SwingAct_A(void);
 void n_tyrant_TurnTo(void);
+void n_tyrant_TurnTo_A(void);
 void n_tyrant_Update(void);
+void n_tyrant_Update_A(void);
 void n_tyrant_WalkAct(void);
+void n_tyrant_WalkAct_A(void);
 void n_tyrant_WalkStep(void);
+void n_tyrant_WalkStep_A(void);
 void n_tyrant_WallAhead(void);
+void n_tyrant_WallAhead_A(void);
 void n_tyrant_WallDist(void);
+void n_tyrant_WallDist_A(void);
 void n_tyrant_WallToPlayer(void);
+void n_tyrant_WallToPlayer_A(void);
 void n_tyrant_Wander(void);
+void n_tyrant_Wander_A(void);
 void n_view_Handgun(void);
 void n_view_Init(void);
 void n_view_Launcher(void);
@@ -1081,65 +2064,125 @@ void n_weapon_Stat(void);
 void n_white_Draw(void);
 void n_white_Init(void);
 void n_zombie_AnimEvent(void);
+void n_zombie_AnimEvent_A(void);
 void n_zombie_ApplyDamage(void);
+void n_zombie_ApplyDamage_A(void);
 void n_zombie_ArmourBonus(void);
+void n_zombie_ArmourBonus_A(void);
 void n_zombie_AvoidWalls(void);
+void n_zombie_AvoidWalls_A(void);
 void n_zombie_BitePre(void);
+void n_zombie_BitePre_A(void);
 void n_zombie_BiteStep(void);
+void n_zombie_BiteStep_A(void);
 void n_zombie_CanGrab(void);
+void n_zombie_CanGrab_A(void);
 void n_zombie_CollapsePre(void);
+void n_zombie_CollapsePre_A(void);
 void n_zombie_CollapseStep(void);
+void n_zombie_CollapseStep_A(void);
 void n_zombie_CrossedEdge(void);
+void n_zombie_CrossedEdge_A(void);
 void n_zombie_CrossedWall(void);
+void n_zombie_CrossedWall_A(void);
 void n_zombie_DiePre(void);
+void n_zombie_DiePre_A(void);
 void n_zombie_DieStep(void);
+void n_zombie_DieStep_A(void);
 void n_zombie_DropLimb(void);
+void n_zombie_DropLimb_A(void);
 void n_zombie_EaseSway(void);
+void n_zombie_EaseSway_A(void);
 void n_zombie_GrabCooldown(void);
+void n_zombie_GrabCooldown_A(void);
 void n_zombie_GrabPre(void);
+void n_zombie_GrabPre_A(void);
 void n_zombie_GrabStep(void);
+void n_zombie_GrabStep_A(void);
 void n_zombie_IdlePre(void);
+void n_zombie_IdlePre_A(void);
 void n_zombie_IdleStep(void);
+void n_zombie_IdleStep_A(void);
 void n_zombie_IdleThink(void);
+void n_zombie_IdleThink_A(void);
 void n_zombie_JointHook(void);
+void n_zombie_JointHook_A(void);
 void n_zombie_KnockPre(void);
+void n_zombie_KnockPre_A(void);
 void n_zombie_KnockStep(void);
+void n_zombie_KnockStep_A(void);
 void n_zombie_LoseLimbs(void);
+void n_zombie_LoseLimbs_A(void);
 void n_zombie_LurkPre(void);
+void n_zombie_LurkPre_A(void);
 void n_zombie_LurkStep(void);
+void n_zombie_LurkStep_A(void);
 void n_zombie_NoDeathEvent(void);
+void n_zombie_NoDeathEvent_A(void);
 void n_zombie_OnHit(void);
+void n_zombie_OnHit_A(void);
 void n_zombie_PickFatalReaction(void);
+void n_zombie_PickFatalReaction_A(void);
 void n_zombie_PickHitReaction(void);
+void n_zombie_PickHitReaction_A(void);
 void n_zombie_PlayerInCone(void);
 void n_zombie_PlayerInConeCached(void);
+void n_zombie_PlayerInConeCached_A(void);
+void n_zombie_PlayerInCone_A(void);
 void n_zombie_PlayerSide(void);
+void n_zombie_PlayerSide_A(void);
 void n_zombie_SetPartsDir(void);
+void n_zombie_SetPartsDir_A(void);
 void n_zombie_Setup(void);
+void n_zombie_Setup_A(void);
 void n_zombie_Sound(void);
 void n_zombie_SoundAt(void);
+void n_zombie_SoundAt_A(void);
+void n_zombie_Sound_A(void);
 void n_zombie_SpeedByDistance(void);
+void n_zombie_SpeedByDistance_A(void);
 void n_zombie_StateActive(void);
+void n_zombie_StateActive_A(void);
 void n_zombie_StateDying(void);
+void n_zombie_StateDying_A(void);
 void n_zombie_StateHit(void);
+void n_zombie_StateHit_A(void);
 void n_zombie_StatePad(void);
+void n_zombie_StatePad_A(void);
 void n_zombie_StepSound(void);
+void n_zombie_StepSound_A(void);
 void n_zombie_SwayToPlayer(void);
+void n_zombie_SwayToPlayer_A(void);
 void n_zombie_SyncWalkAnim(void);
+void n_zombie_SyncWalkAnim_A(void);
 void n_zombie_TryGrab(void);
+void n_zombie_TryGrab_A(void);
 void n_zombie_Update(void);
 void n_zombie_UpdateLostHead(void);
+void n_zombie_UpdateLostHead_A(void);
+void n_zombie_Update_A(void);
 void n_zombie_Voice(void);
 void n_zombie_VoiceAt(void);
+void n_zombie_VoiceAt_A(void);
+void n_zombie_Voice_A(void);
 void n_zombie_WalkAnim(void);
 void n_zombie_WalkAnimFor(void);
+void n_zombie_WalkAnimFor_A(void);
+void n_zombie_WalkAnim_A(void);
 void n_zombie_WalkPre(void);
+void n_zombie_WalkPre_A(void);
 void n_zombie_WalkStep(void);
+void n_zombie_WalkStep_A(void);
 void n_zombie_WalkThink(void);
+void n_zombie_WalkThink_A(void);
 void n_zombie_WallAhead(void);
+void n_zombie_WallAhead_A(void);
 void n_zombie_WallDistance(void);
+void n_zombie_WallDistance_A(void);
 void n_zombie_ZoneCheck(void);
+void n_zombie_ZoneCheck_A(void);
 void n_zombie_ZoneTrack(void);
+void n_zombie_ZoneTrack_A(void);
 void sg_hook_mode_switch(void);
 void sg_hook_restore(void);
 void sg_hook_title(void);
@@ -2181,19 +3224,19 @@ static const InFunc in_kernel[] = {
 };
 static const RtFunc tab_kernel[] = {
     {0x80010B00u, n_kernel_Nothing, 0, &in_kernel[0]},
-    {0x80010B08u, 0, 0, &in_kernel[1]},
-    {0x80010BC4u, 0, 0, &in_kernel[2]},
+    {0x80010B08u, n_kernel_Entry, 0, &in_kernel[1]},
+    {0x80010BC4u, n_kernel_Start, 0, &in_kernel[2]},
     {0x80010DD8u, n_kernel_IdleThread, 0, &in_kernel[3]},
     {0x80010E00u, n_kernel_ModeThread2, 0, &in_kernel[4]},
     {0x80010E30u, 0, 0, &in_kernel[5]},
     {0x80010E60u, n_kernel_ModeThread4, 0, &in_kernel[6]},
-    {0x80010E90u, 0, 0, &in_kernel[7]},
-    {0x80010EC0u, 0, 0, &in_kernel[8]},
-    {0x80010EF0u, 0, 0, &in_kernel[9]},
+    {0x80010E90u, n_kernel_ModeThread6, 0, &in_kernel[7]},
+    {0x80010EC0u, n_kernel_ModeThread7, 0, &in_kernel[8]},
+    {0x80010EF0u, n_kernel_ModeThread8, 0, &in_kernel[9]},
     {0x80010F20u, n_kernel_VSyncCallback, 0, &in_kernel[10]},
     {0x80010FF4u, 0, 0, &in_kernel[11]},
     {0x8001101Cu, 0, 0, &in_kernel[12]},
-    {0x8001107Cu, 0, 0, &in_kernel[13]},
+    {0x8001107Cu, n_kernel_MainLoop, 0, &in_kernel[13]},
     {0x800110D8u, 0, 0, &in_kernel[14]},
     {0x800110E0u, 0, 0, &in_kernel[15]},
     {0x80011298u, 0, 0, &in_kernel[16]},
@@ -2204,15 +3247,15 @@ static const RtFunc tab_kernel[] = {
     {0x80011558u, n_kernel_SetFrameCallback, 0, &in_kernel[21]},
     {0x80011564u, n_kernel_SetFrameCallback2, 0, &in_kernel[22]},
     {0x80011570u, n_kernel_Random, 0, &in_kernel[23]},
-    {0x800115C0u, 0, 0, &in_kernel[24]},
+    {0x800115C0u, n_kernel_LoadFile, 0, &in_kernel[24]},
     {0x800116A4u, n_kernel_ReadSectors, 0, &in_kernel[25]},
     {0x80011734u, n_kernel_ModeSwitch, 0, &in_kernel[26]},
     {0x8001189Cu, n_input_MapButtons, 0, &in_kernel[27]},
-    {0x80011994u, 0, 0, &in_kernel[28]},
+    {0x80011994u, n_sound_Reset, 0, &in_kernel[28]},
     {0x80011BB0u, n_sound_FileNames, 0, &in_kernel[29]},
     {0x80011BBCu, n_sound_OpenBank, 0, &in_kernel[30]},
-    {0x80011CB4u, 0, 0, &in_kernel[31]},
-    {0x80011D24u, 0, 0, &in_kernel[32]},
+    {0x80011CB4u, n_sound_LoadBank, 0, &in_kernel[31]},
+    {0x80011D24u, n_sound_LoadBankHigh, 0, &in_kernel[32]},
     {0x80011D48u, n_sound_StopAll, 0, &in_kernel[33]},
     {0x80011DCCu, n_sound_CloseBank, 0, &in_kernel[34]},
     {0x80011E24u, n_sound_CloseSeqData, 0, &in_kernel[35]},
@@ -2233,9 +3276,9 @@ static const RtFunc tab_kernel[] = {
     {0x80012D6Cu, n_sound_PairStatus, 0, &in_kernel[50]},
     {0x80012DD0u, n_sound_PairsOn, 0, &in_kernel[51]},
     {0x80012DDCu, n_thread_InitSlots, 0, &in_kernel[52]},
-    {0x80012E8Cu, 0, 0, &in_kernel[53]},
+    {0x80012E8Cu, n_thread_Run, 0, &in_kernel[53]},
     {0x80012F8Cu, 0, 0, &in_kernel[54]},
-    {0x80012FF4u, 0, 0, &in_kernel[55]},
+    {0x80012FF4u, n_kernel_ModeLoad, 0, &in_kernel[55]},
     {0x8001304Cu, n_thread_Set, 0, &in_kernel[56]},
     {0x8001306Cu, n_thread_ModeSwitch, 0, &in_kernel[57]},
     {0x800130B4u, n_thread_Exit, 0, &in_kernel[58]},
@@ -2244,7 +3287,7 @@ static const RtFunc tab_kernel[] = {
     {0x800131A4u, n_thread_Hold, 0, &in_kernel[61]},
     {0x800131C8u, n_thread_Release, 0, &in_kernel[62]},
     {0x800131ECu, 0, 0, &in_kernel[63]},
-    {0x80013208u, 0, 0, &in_kernel[64]},
+    {0x80013208u, n_kernel_ReadWait, 0, &in_kernel[64]},
     {0x80013258u, n_pad_ChangeNone, 0, &in_kernel[65]},
     {0x80013260u, n_pad_Init, 0, &in_kernel[66]},
     {0x8001331Cu, 0, 0, &in_kernel[67]},
@@ -2270,7 +3313,7 @@ static const RtFunc tab_kernel[] = {
     {0x80013D7Cu, 0, 0, &in_kernel[87]},
     {0x80013DDCu, n_movie_SetScreen, 0, &in_kernel[88]},
     {0x80014124u, n_movie_SetFlag, 0, &in_kernel[89]},
-    {0x80014134u, 0, 0, &in_kernel[90]},
+    {0x80014134u, n_movie_Play, 0, &in_kernel[90]},
     {0x800144BCu, n_movie_StartStream, 0, &in_kernel[91]},
     {0x8001456Cu, n_movie_SliceDone, 0, &in_kernel[92]},
     {0x8001473Cu, n_movie_DecodeNext, 0, &in_kernel[93]},
@@ -2311,71 +3354,71 @@ static const RtFunc tab_kernel[] = {
     {0x80016D00u, 0, 0, &in_kernel[128]},
     {0x80016DA8u, 0, 0, &in_kernel[129]},
     {0x80016F78u, n_lz_Unpack, 0, &in_kernel[130]},
-    {0x800170B8u, 0, 0, &in_kernel[131]},
+    {0x800170B8u, n_kernel_RegionCheck, 0, &in_kernel[131]},
     {0x80017124u, 0, 0, &in_kernel[132]},
-    {0x80017A5Cu, 0, 0, &in_kernel[133]},
-    {0x80017C30u, 0, 0, &in_kernel[134]},
+    {0x80017A5Cu, n_modchk_CdPoll, 0, &in_kernel[133]},
+    {0x80017C30u, n_modchk_CdSend, 0, &in_kernel[134]},
     {0x80017D20u, 0, 0, &in_kernel[135]},
     {0x80017E8Cu, 0, 0, &in_kernel[136]},
     {0x80018000u, 0, 0, &in_kernel[137]},
     {0x800181B4u, 0, 0, &in_kernel[138]},
     {0x80018248u, 0, 0, &in_kernel[139]},
-    {0x800183D8u, 0, 0, &in_kernel[140]},
-    {0x80018598u, 0, 0, &in_kernel[141]},
-    {0x80018818u, 0, 0, &in_kernel[142]},
-    {0x800189D8u, 0, 0, &in_kernel[143]},
+    {0x800183D8u, n_libspu_SetKey, 0, &in_kernel[140]},
+    {0x80018598u, n_libspu_Init, 0, &in_kernel[141]},
+    {0x80018818u, n_libspu_WriteByHand, 0, &in_kernel[142]},
+    {0x800189D8u, n_libspu_TransferDone, 0, &in_kernel[143]},
     {0x80018A94u, 0, 0, &in_kernel[144]},
-    {0x80018B3Cu, 0, 0, &in_kernel[145]},
-    {0x80018DBCu, 0, 0, &in_kernel[146]},
+    {0x80018B3Cu, n_libspu_Transfer, 0, &in_kernel[145]},
+    {0x80018DBCu, n_libspu_WriteData, 0, &in_kernel[146]},
     {0x80018E40u, 0, 0, &in_kernel[147]},
-    {0x80018EA4u, 0, 0, &in_kernel[148]},
-    {0x80018EE8u, 0, 0, &in_kernel[149]},
+    {0x80018EA4u, n_libspu_WriteReg, 0, &in_kernel[148]},
+    {0x80018EE8u, n_libspu_SetAddr, 0, &in_kernel[149]},
     {0x80018F8Cu, 0, 0, &in_kernel[150]},
     {0x80018FC8u, 0, 0, &in_kernel[151]},
-    {0x80019020u, 0, 0, &in_kernel[152]},
+    {0x80019020u, n_libspu_DmaPriority, 0, &in_kernel[152]},
     {0x80019048u, 0, 0, &in_kernel[153]},
-    {0x80019070u, 0, 0, &in_kernel[154]},
-    {0x800190D8u, 0, 0, &in_kernel[155]},
-    {0x800191C0u, 0, 0, &in_kernel[156]},
-    {0x80019238u, 0, 0, &in_kernel[157]},
-    {0x80019268u, 0, 0, &in_kernel[158]},
-    {0x800192F8u, 0, 0, &in_kernel[159]},
-    {0x80019358u, 0, 0, &in_kernel[160]},
-    {0x800193B8u, 0, 0, &in_kernel[161]},
-    {0x80019468u, 0, 0, &in_kernel[162]},
-    {0x800197E8u, 0, 0, &in_kernel[163]},
-    {0x80019868u, 0, 0, &in_kernel[164]},
+    {0x80019070u, n_libspu_Delay, 0, &in_kernel[154]},
+    {0x800190D8u, n_libspu_InitBody, 0, &in_kernel[155]},
+    {0x800191C0u, n_libspu_Start, 0, &in_kernel[156]},
+    {0x80019238u, n_libspu_SetTransferCallback, 0, &in_kernel[157]},
+    {0x80019268u, n_libspu_KeyStatus, 0, &in_kernel[158]},
+    {0x800192F8u, n_libspu_Write, 0, &in_kernel[159]},
+    {0x80019358u, n_libspu_SetTransferStartAddr, 0, &in_kernel[160]},
+    {0x800193B8u, n_libspu_IsTransferCompleted, 0, &in_kernel[161]},
+    {0x80019468u, n_libspu_SetCommonAttr, 0, &in_kernel[162]},
+    {0x800197E8u, n_libspu_SetVoiceVol, 0, &in_kernel[163]},
+    {0x80019868u, n_libsnd_SeqCalledTbyT, 0, &in_kernel[164]},
     {0x80019AD8u, 0, 0, &in_kernel[165]},
     {0x80019CE8u, 0, 0, &in_kernel[166]},
-    {0x80019D88u, 0, 0, &in_kernel[167]},
-    {0x80019DB8u, 0, 0, &in_kernel[168]},
+    {0x80019D88u, n_libsnd_SeqPlayTick, 0, &in_kernel[167]},
+    {0x80019DB8u, n_libsnd_SeqTick, 0, &in_kernel[168]},
     {0x80019EB4u, 0, 0, &in_kernel[169]},
-    {0x8001A0F8u, 0, 0, &in_kernel[170]},
-    {0x8001A4A8u, 0, 0, &in_kernel[171]},
+    {0x8001A0F8u, n_libsnd_SeqEvent, 0, &in_kernel[170]},
+    {0x8001A4A8u, n_libsnd_SeqDelta, 0, &in_kernel[171]},
     {0x8001A558u, 0, 0, &in_kernel[172]},
     {0x8001A658u, 0, 0, &in_kernel[173]},
-    {0x8001A6B8u, 0, 0, &in_kernel[174]},
-    {0x8001A834u, 0, 0, &in_kernel[175]},
+    {0x8001A6B8u, n_libsnd_SsSeqClose, 0, &in_kernel[174]},
+    {0x8001A834u, n_libspu_Wrap1A834, 0, &in_kernel[175]},
     {0x8001A858u, 0, 0, &in_kernel[176]},
-    {0x8001A888u, 0, 0, &in_kernel[177]},
-    {0x8001A938u, 0, 0, &in_kernel[178]},
-    {0x8001A9D8u, 0, 0, &in_kernel[179]},
-    {0x8001AA18u, 0, 0, &in_kernel[180]},
-    {0x8001AA38u, 0, 0, &in_kernel[181]},
+    {0x8001A888u, n_libsnd_TickStop, 0, &in_kernel[177]},
+    {0x8001A938u, n_libsnd_InitTail, 0, &in_kernel[178]},
+    {0x8001A9D8u, n_libspu_InitTail, 0, &in_kernel[179]},
+    {0x8001AA18u, n_libspu_Wrap1AA18, 0, &in_kernel[180]},
+    {0x8001AA38u, n_libspu_ClearReverbWorkArea, 0, &in_kernel[181]},
     {0x8001ABD8u, 0, 0, &in_kernel[182]},
-    {0x8001AC58u, 0, 0, &in_kernel[183]},
+    {0x8001AC58u, n_libspu_IsAllocated, 0, &in_kernel[183]},
     {0x8001ACE8u, 0, 0, &in_kernel[184]},
     {0x8001AD28u, 0, 0, &in_kernel[185]},
-    {0x8001AD68u, 0, 0, &in_kernel[186]},
+    {0x8001AD68u, n_libsnd_SsSeqOpen, 0, &in_kernel[186]},
     {0x8001AFF8u, 0, 0, &in_kernel[187]},
     {0x8001B078u, 0, 0, &in_kernel[188]},
-    {0x8001B3F8u, 0, 0, &in_kernel[189]},
-    {0x8001B4C8u, 0, 0, &in_kernel[190]},
+    {0x8001B3F8u, n_libsnd_ChannelVolume, 0, &in_kernel[189]},
+    {0x8001B4C8u, n_libsnd_ChannelPan, 0, &in_kernel[190]},
     {0x8001B598u, 0, 0, &in_kernel[191]},
     {0x8001B688u, 0, 0, &in_kernel[192]},
     {0x8001B738u, 0, 0, &in_kernel[193]},
-    {0x8001B7C8u, 0, 0, &in_kernel[194]},
-    {0x8001B8C8u, 0, 0, &in_kernel[195]},
+    {0x8001B7C8u, n_libsnd_DataEntry, 0, &in_kernel[194]},
+    {0x8001B8C8u, n_libsnd_Nrpn98, 0, &in_kernel[195]},
     {0x8001BA08u, 0, 0, &in_kernel[196]},
     {0x8001BA78u, 0, 0, &in_kernel[197]},
     {0x8001BAE8u, 0, 0, &in_kernel[198]},
@@ -2397,166 +3440,166 @@ static const RtFunc tab_kernel[] = {
     {0x8001C598u, 0, 0, &in_kernel[214]},
     {0x8001C638u, 0, 0, &in_kernel[215]},
     {0x8001C6D8u, 0, 0, &in_kernel[216]},
-    {0x8001C708u, 0, 0, &in_kernel[217]},
+    {0x8001C708u, n_libsnd_Wrap1C708, 0, &in_kernel[217]},
     {0x8001C738u, 0, 0, &in_kernel[218]},
     {0x8001C768u, 0, 0, &in_kernel[219]},
     {0x8001C798u, 0, 0, &in_kernel[220]},
-    {0x8001C7C8u, 0, 0, &in_kernel[221]},
-    {0x8001C878u, 0, 0, &in_kernel[222]},
-    {0x8001CAA8u, 0, 0, &in_kernel[223]},
-    {0x8001CC78u, 0, 0, &in_kernel[224]},
-    {0x8001CD58u, 0, 0, &in_kernel[225]},
-    {0x8001CDC8u, 0, 0, &in_kernel[226]},
-    {0x8001D118u, 0, 0, &in_kernel[227]},
+    {0x8001C7C8u, n_libsnd_ByteHook, 0, &in_kernel[221]},
+    {0x8001C878u, n_libsnd_ControlChange, 0, &in_kernel[222]},
+    {0x8001CAA8u, n_libsnd_SetTempo, 0, &in_kernel[223]},
+    {0x8001CC78u, n_libsnd_NoteHook, 0, &in_kernel[224]},
+    {0x8001CD58u, n_libsnd_ProgramChange, 0, &in_kernel[225]},
+    {0x8001CDC8u, n_libsnd_SeqOpen, 0, &in_kernel[226]},
+    {0x8001D118u, n_libsnd_Wrap1D118, 0, &in_kernel[227]},
     {0x8001D150u, 0, 0, &in_kernel[228]},
     {0x8001D198u, 0, 0, &in_kernel[229]},
     {0x8001D1B8u, 0, 0, &in_kernel[230]},
-    {0x8001D238u, 0, 0, &in_kernel[231]},
-    {0x8001D358u, 0, 0, &in_kernel[232]},
-    {0x8001D3A8u, 0, 0, &in_kernel[233]},
-    {0x8001D5D8u, 0, 0, &in_kernel[234]},
+    {0x8001D238u, n_libsnd_SeqPlay, 0, &in_kernel[231]},
+    {0x8001D358u, n_libsnd_SetMVol, 0, &in_kernel[232]},
+    {0x8001D3A8u, n_libsnd_TickStart, 0, &in_kernel[233]},
+    {0x8001D5D8u, n_libsnd_TickStart1, 0, &in_kernel[234]},
     {0x8001D5F8u, 0, 0, &in_kernel[235]},
     {0x8001D618u, 0, 0, &in_kernel[236]},
     {0x8001D664u, 0, 0, &in_kernel[237]},
-    {0x8001D6B8u, 0, 0, &in_kernel[238]},
-    {0x8001D838u, 0, 0, &in_kernel[239]},
+    {0x8001D6B8u, n_libsnd_SsSeqStop, 0, &in_kernel[238]},
+    {0x8001D838u, n_libsnd_Wrap1D838, 0, &in_kernel[239]},
     {0x8001D860u, 0, 0, &in_kernel[240]},
-    {0x8001D898u, 0, 0, &in_kernel[241]},
-    {0x8001D9A8u, 0, 0, &in_kernel[242]},
-    {0x8001DBC8u, 0, 0, &in_kernel[243]},
+    {0x8001D898u, n_libsnd_SetInputVol, 0, &in_kernel[241]},
+    {0x8001D9A8u, n_libsnd_SeqAttrInit, 0, &in_kernel[242]},
+    {0x8001DBC8u, n_libsnd_SetTickMode, 0, &in_kernel[243]},
     {0x8001DD18u, 0, 0, &in_kernel[244]},
-    {0x8001DDA8u, 0, 0, &in_kernel[245]},
+    {0x8001DDA8u, n_libsnd_SsSeqSetVol, 0, &in_kernel[245]},
     {0x8001DE10u, 0, 0, &in_kernel[246]},
-    {0x8001DEA0u, 0, 0, &in_kernel[247]},
+    {0x8001DEA0u, n_libsnd_Wrap1DEA0, 0, &in_kernel[247]},
     {0x8001DED8u, 0, 0, &in_kernel[248]},
-    {0x8001E0F8u, 0, 0, &in_kernel[249]},
+    {0x8001E0F8u, n_libsnd_SetReserved, 0, &in_kernel[249]},
     {0x8001E104u, 0, 0, &in_kernel[250]},
-    {0x8001E118u, 0, 0, &in_kernel[251]},
-    {0x8001E268u, 0, 0, &in_kernel[252]},
+    {0x8001E118u, n_libsnd_ResetVoices, 0, &in_kernel[251]},
+    {0x8001E268u, n_libspu_SetVoiceAttr, 0, &in_kernel[252]},
     {0x8001E868u, 0, 0, &in_kernel[253]},
     {0x8001E938u, 0, 0, &in_kernel[254]},
-    {0x8001EA68u, 0, 0, &in_kernel[255]},
-    {0x8001EB78u, 0, 0, &in_kernel[256]},
-    {0x8001EDB8u, 0, 0, &in_kernel[257]},
-    {0x8001EEA8u, 0, 0, &in_kernel[258]},
+    {0x8001EA68u, n_libsnd_UtGetProgAtr, 0, &in_kernel[255]},
+    {0x8001EB78u, n_libsnd_UtGetVagAtr, 0, &in_kernel[256]},
+    {0x8001EDB8u, n_libsnd_VagAddr, 0, &in_kernel[257]},
+    {0x8001EEA8u, n_libsnd_UtKeyOn, 0, &in_kernel[258]},
     {0x8001F200u, 0, 0, &in_kernel[259]},
-    {0x8001F348u, 0, 0, &in_kernel[260]},
-    {0x8001F6A4u, 0, 0, &in_kernel[261]},
+    {0x8001F348u, n_libsnd_UtKeyOnV, 0, &in_kernel[260]},
+    {0x8001F6A4u, n_libsnd_UtVoiceOff, 0, &in_kernel[261]},
     {0x8001F718u, 0, 0, &in_kernel[262]},
-    {0x8001F758u, 0, 0, &in_kernel[263]},
-    {0x8001FC38u, 0, 0, &in_kernel[264]},
-    {0x80020108u, 0, 0, &in_kernel[265]},
-    {0x80020198u, 0, 0, &in_kernel[266]},
+    {0x8001F758u, n_libspu_SetReverbModeParam, 0, &in_kernel[263]},
+    {0x8001FC38u, n_libspu_SetReverbRegs, 0, &in_kernel[264]},
+    {0x80020108u, n_libsnd_UtSetReverbDepth, 0, &in_kernel[265]},
+    {0x80020198u, n_libsnd_UtSetReverbType, 0, &in_kernel[266]},
     {0x80020234u, 0, 0, &in_kernel[267]},
-    {0x80020248u, 0, 0, &in_kernel[268]},
+    {0x80020248u, n_libspu_SetReverb, 0, &in_kernel[268]},
     {0x80020318u, 0, 0, &in_kernel[269]},
-    {0x80020358u, 0, 0, &in_kernel[270]},
-    {0x80020378u, 0, 0, &in_kernel[271]},
+    {0x80020358u, n_libsnd_Wrap20358, 0, &in_kernel[270]},
+    {0x80020378u, n_libsnd_Wrap20378, 0, &in_kernel[271]},
     {0x80020398u, 0, 0, &in_kernel[272]},
     {0x80020568u, 0, 0, &in_kernel[273]},
     {0x800205A4u, 0, 0, &in_kernel[274]},
     {0x80020608u, 0, 0, &in_kernel[275]},
-    {0x800206B4u, 0, 0, &in_kernel[276]},
+    {0x800206B4u, n_libsnd_SetVoiceVol, 0, &in_kernel[276]},
     {0x80020738u, 0, 0, &in_kernel[277]},
-    {0x80020798u, 0, 0, &in_kernel[278]},
-    {0x80020A08u, 0, 0, &in_kernel[279]},
-    {0x80020BD8u, 0, 0, &in_kernel[280]},
+    {0x80020798u, n_libsnd_VoiceAlloc, 0, &in_kernel[278]},
+    {0x80020A08u, n_libsnd_VoiceSetup, 0, &in_kernel[279]},
+    {0x80020BD8u, n_libsnd_Clear656D8, 0, &in_kernel[280]},
     {0x80020BE8u, 0, 0, &in_kernel[281]},
-    {0x80020BF8u, 0, 0, &in_kernel[282]},
-    {0x800210C8u, 0, 0, &in_kernel[283]},
-    {0x800210F8u, 0, 0, &in_kernel[284]},
-    {0x800213B8u, 0, 0, &in_kernel[285]},
-    {0x800213E8u, 0, 0, &in_kernel[286]},
-    {0x80021418u, 0, 0, &in_kernel[287]},
-    {0x80021448u, 0, 0, &in_kernel[288]},
-    {0x80021478u, 0, 0, &in_kernel[289]},
-    {0x80021498u, 0, 0, &in_kernel[290]},
-    {0x800217E8u, 0, 0, &in_kernel[291]},
-    {0x80021848u, 0, 0, &in_kernel[292]},
-    {0x80021870u, 0, 0, &in_kernel[293]},
-    {0x80021888u, 0, 0, &in_kernel[294]},
-    {0x80021DA4u, 0, 0, &in_kernel[295]},
+    {0x80020BF8u, n_libspu_VmFlush, 0, &in_kernel[282]},
+    {0x800210C8u, n_libspu_SetNoiseVoice, 0, &in_kernel[283]},
+    {0x800210F8u, n_libspu_SetVoiceBits, 0, &in_kernel[284]},
+    {0x800213B8u, n_libspu_GetNoiseVoice, 0, &in_kernel[285]},
+    {0x800213E8u, n_libspu_GetVoiceBits, 0, &in_kernel[286]},
+    {0x80021418u, n_libspu_SetReverbVoice, 0, &in_kernel[287]},
+    {0x80021448u, n_libspu_GetReverbVoice, 0, &in_kernel[288]},
+    {0x80021478u, n_libspu_GetEnvelope, 0, &in_kernel[289]},
+    {0x80021498u, n_libsnd_VoiceInit, 0, &in_kernel[290]},
+    {0x800217E8u, n_libspu_InitMalloc, 0, &in_kernel[291]},
+    {0x80021848u, n_libspu_SetBusy, 0, &in_kernel[292]},
+    {0x80021870u, n_libspu_IsBusy, 0, &in_kernel[293]},
+    {0x80021888u, n_libsnd_NoteOn, 0, &in_kernel[294]},
+    {0x80021DA4u, n_libsnd_NoteOff, 0, &in_kernel[295]},
     {0x80021F04u, 0, 0, &in_kernel[296]},
     {0x80021FF0u, 0, 0, &in_kernel[297]},
     {0x80022024u, 0, 0, &in_kernel[298]},
-    {0x80022038u, 0, 0, &in_kernel[299]},
-    {0x80022084u, 0, 0, &in_kernel[300]},
-    {0x800220ECu, 0, 0, &in_kernel[301]},
+    {0x80022038u, n_libsnd_ToneBasePitch, 0, &in_kernel[299]},
+    {0x80022084u, n_libsnd_NotePitch, 0, &in_kernel[300]},
+    {0x800220ECu, n_libsnd_Pitch, 0, &in_kernel[301]},
     {0x80022218u, 0, 0, &in_kernel[302]},
     {0x80022788u, 0, 0, &in_kernel[303]},
-    {0x800227D8u, 0, 0, &in_kernel[304]},
-    {0x80022818u, 0, 0, &in_kernel[305]},
-    {0x800228D8u, 0, 0, &in_kernel[306]},
-    {0x80022DA8u, 0, 0, &in_kernel[307]},
-    {0x80022F94u, 0, 0, &in_kernel[308]},
+    {0x800227D8u, n_libsnd_VoiceClear, 0, &in_kernel[304]},
+    {0x80022818u, n_libsnd_VoiceOff, 0, &in_kernel[305]},
+    {0x800228D8u, n_libsnd_VoiceKeyOn, 0, &in_kernel[306]},
+    {0x80022DA8u, n_libsnd_UtPitchBend, 0, &in_kernel[307]},
+    {0x80022F94u, n_libsnd_BendAll, 0, &in_kernel[308]},
     {0x80023078u, 0, 0, &in_kernel[309]},
     {0x800230E8u, 0, 0, &in_kernel[310]},
     {0x80023138u, 0, 0, &in_kernel[311]},
     {0x800231A8u, 0, 0, &in_kernel[312]},
-    {0x800231F8u, 0, 0, &in_kernel[313]},
-    {0x80023764u, 0, 0, &in_kernel[314]},
+    {0x800231F8u, n_libsnd_SeqSetVol, 0, &in_kernel[313]},
+    {0x80023764u, n_libsnd_SeqGetVol, 0, &in_kernel[314]},
     {0x800237C8u, 0, 0, &in_kernel[315]},
     {0x80023810u, 0, 0, &in_kernel[316]},
-    {0x80023858u, 0, 0, &in_kernel[317]},
-    {0x80023908u, 0, 0, &in_kernel[318]},
-    {0x800239D8u, 0, 0, &in_kernel[319]},
-    {0x80023F78u, 0, 0, &in_kernel[320]},
+    {0x80023858u, n_libsnd_SeqVoicesOff, 0, &in_kernel[317]},
+    {0x80023908u, n_libsnd_FindTones, 0, &in_kernel[318]},
+    {0x800239D8u, n_libsnd_ToneSetVol, 0, &in_kernel[319]},
+    {0x80023F78u, n_libsnd_SelectProg, 0, &in_kernel[320]},
     {0x80024038u, 0, 0, &in_kernel[321]},
-    {0x80024048u, 0, 0, &in_kernel[322]},
-    {0x80024058u, 0, 0, &in_kernel[323]},
-    {0x80024108u, 0, 0, &in_kernel[324]},
-    {0x80024188u, 0, 0, &in_kernel[325]},
-    {0x80024488u, 0, 0, &in_kernel[326]},
-    {0x800244BCu, 0, 0, &in_kernel[327]},
-    {0x80024528u, 0, 0, &in_kernel[328]},
+    {0x80024048u, n_libsnd_SetStereo, 0, &in_kernel[322]},
+    {0x80024058u, n_libsnd_VabClose, 0, &in_kernel[323]},
+    {0x80024108u, n_libspu_Free, 0, &in_kernel[324]},
+    {0x80024188u, n_libspu_GcSPU, 0, &in_kernel[325]},
+    {0x80024488u, n_libsnd_SsVabOpenHead, 0, &in_kernel[326]},
+    {0x800244BCu, n_libsnd_VabAlloc, 0, &in_kernel[327]},
+    {0x80024528u, n_libspu_Malloc, 0, &in_kernel[328]},
     {0x800247F8u, 0, 0, &in_kernel[329]},
     {0x8002482Cu, 0, 0, &in_kernel[330]},
     {0x80024860u, 0, 0, &in_kernel[331]},
-    {0x80024868u, 0, 0, &in_kernel[332]},
-    {0x80024C58u, 0, 0, &in_kernel[333]},
-    {0x80024D18u, 0, 0, &in_kernel[334]},
-    {0x80024D48u, 0, 0, &in_kernel[335]},
-    {0x80024D78u, 0, 0, &in_kernel[336]},
-    {0x80024DA4u, 0, 0, &in_kernel[337]},
+    {0x80024868u, n_libsnd_VabOpenHead, 0, &in_kernel[332]},
+    {0x80024C58u, n_libsnd_VabTransBody, 0, &in_kernel[333]},
+    {0x80024D18u, n_libspu_SetTransferMode, 0, &in_kernel[334]},
+    {0x80024D48u, n_libsnd_Wrap24D48, 0, &in_kernel[335]},
+    {0x80024D78u, n_libsnd_Lock, 0, &in_kernel[336]},
+    {0x80024DA4u, n_libsnd_Unlock, 0, &in_kernel[337]},
     {0x80024DD0u, 0, 0, &in_kernel[338]},
-    {0x800250C8u, 0, 0, &in_kernel[339]},
-    {0x80025194u, 0, 0, &in_kernel[340]},
-    {0x80025264u, 0, 0, &in_kernel[341]},
-    {0x80025460u, 0, 0, &in_kernel[342]},
-    {0x800254C0u, 0, 0, &in_kernel[343]},
+    {0x800250C8u, n_libsnd_KeyOnBits, 0, &in_kernel[339]},
+    {0x80025194u, n_libsnd_VoiceFlagBits, 0, &in_kernel[340]},
+    {0x80025264u, n_libsnd_VoiceSetVol, 0, &in_kernel[341]},
+    {0x80025460u, n_libsnd_ProgIndex, 0, &in_kernel[342]},
+    {0x800254C0u, n_libsnd_VoiceSetAttr, 0, &in_kernel[343]},
     {0x80025580u, 0, 0, &in_kernel[344]},
-    {0x800255F8u, 0, 0, &in_kernel[345]},
-    {0x80025770u, 0, 0, &in_kernel[346]},
-    {0x80025808u, 0, 0, &in_kernel[347]},
-    {0x80025838u, 0, 0, &in_kernel[348]},
-    {0x80025868u, 0, 0, &in_kernel[349]},
-    {0x80025898u, 0, 0, &in_kernel[350]},
+    {0x800255F8u, n_libetc_VSync, 0, &in_kernel[345]},
+    {0x80025770u, n_libetc_VSyncWait, 0, &in_kernel[346]},
+    {0x80025808u, n_libetc_ResetCallback, 0, &in_kernel[347]},
+    {0x80025838u, n_libetc_VSyncCallbacks, 0, &in_kernel[348]},
+    {0x80025868u, n_libetc_DMACallback, 0, &in_kernel[349]},
+    {0x80025898u, n_libetc_Entry14, 0, &in_kernel[350]},
     {0x800258CCu, 0, 0, &in_kernel[351]},
     {0x800258FCu, 0, 0, &in_kernel[352]},
     {0x8002592Cu, 0, 0, &in_kernel[353]},
-    {0x8002595Cu, 0, 0, &in_kernel[354]},
+    {0x8002595Cu, n_libetc_CheckCallback, 0, &in_kernel[354]},
     {0x8002596Cu, 0, 0, &in_kernel[355]},
-    {0x80025984u, 0, 0, &in_kernel[356]},
+    {0x80025984u, n_libetc_SetIntrMask, 0, &in_kernel[356]},
     {0x8002599Cu, 0, 0, &in_kernel[357]},
     {0x80025A04u, 0, 0, &in_kernel[358]},
-    {0x80025A74u, 0, 0, &in_kernel[359]},
-    {0x80025C44u, 0, 0, &in_kernel[360]},
+    {0x80025A74u, n_libetc_IntrHandler, 0, &in_kernel[359]},
+    {0x80025C44u, n_libetc_InterruptCallback, 0, &in_kernel[360]},
     {0x80025D8Cu, 0, 0, &in_kernel[361]},
     {0x80025E2Cu, 0, 0, &in_kernel[362]},
-    {0x80025EA4u, 0, 0, &in_kernel[363]},
-    {0x80025EC8u, 0, 0, &in_kernel[364]},
-    {0x80025F20u, 0, 0, &in_kernel[365]},
-    {0x80025F8Cu, 0, 0, &in_kernel[366]},
-    {0x80025FB8u, 0, 0, &in_kernel[367]},
-    {0x80025FE8u, 0, 0, &in_kernel[368]},
-    {0x80026034u, 0, 0, &in_kernel[369]},
-    {0x800261B4u, 0, 0, &in_kernel[370]},
-    {0x80026260u, 0, 0, &in_kernel[371]},
+    {0x80025EA4u, n_libetc_ClearWords1, 0, &in_kernel[363]},
+    {0x80025EC8u, n_libetc_DmaInit, 0, &in_kernel[364]},
+    {0x80025F20u, n_libetc_VBlank, 0, &in_kernel[365]},
+    {0x80025F8Cu, n_libetc_SetDmaCallback, 0, &in_kernel[366]},
+    {0x80025FB8u, n_libetc_ClearWords2, 0, &in_kernel[367]},
+    {0x80025FE8u, n_libetc_CounterInit, 0, &in_kernel[368]},
+    {0x80026034u, n_libetc_DmaIntr, 0, &in_kernel[369]},
+    {0x800261B4u, n_libetc_SetCounterCallback, 0, &in_kernel[370]},
+    {0x80026260u, n_libetc_ClearWords3, 0, &in_kernel[371]},
     {0x80026288u, 0, 0, &in_kernel[372]},
-    {0x8002629Cu, 0, 0, &in_kernel[373]},
-    {0x800262B8u, 0, 0, &in_kernel[374]},
-    {0x800262E8u, 0, 0, &in_kernel[375]},
-    {0x80026378u, 0, 0, &in_kernel[376]},
+    {0x8002629Cu, n_libetc_GetVideoMode, 0, &in_kernel[373]},
+    {0x800262B8u, n_libcd_StSetRing, 0, &in_kernel[374]},
+    {0x800262E8u, n_libcd_CdInit, 0, &in_kernel[375]},
+    {0x80026378u, n_libcd_Wrap26378, 0, &in_kernel[376]},
     {0x800263B4u, 0, 0, &in_kernel[377]},
     {0x800263DCu, 0, 0, &in_kernel[378]},
     {0x80026404u, 0, 0, &in_kernel[379]},
@@ -2566,35 +3609,35 @@ static const RtFunc tab_kernel[] = {
     {0x80026468u, 0, 0, &in_kernel[383]},
     {0x80026474u, 0, 0, &in_kernel[384]},
     {0x800264E0u, 0, 0, &in_kernel[385]},
-    {0x80026500u, 0, 0, &in_kernel[386]},
+    {0x80026500u, n_libcd_SetCb3FC, 0, &in_kernel[386]},
     {0x80026514u, 0, 0, &in_kernel[387]},
     {0x80026548u, 0, 0, &in_kernel[388]},
-    {0x8002657Cu, 0, 0, &in_kernel[389]},
-    {0x8002659Cu, 0, 0, &in_kernel[390]},
-    {0x800265BCu, 0, 0, &in_kernel[391]},
-    {0x800265D0u, 0, 0, &in_kernel[392]},
-    {0x800265E4u, 0, 0, &in_kernel[393]},
-    {0x80026720u, 0, 0, &in_kernel[394]},
+    {0x8002657Cu, n_libcd_CdSync, 0, &in_kernel[389]},
+    {0x8002659Cu, n_libcd_CdReady, 0, &in_kernel[390]},
+    {0x800265BCu, n_libcd_SetCb3F4, 0, &in_kernel[391]},
+    {0x800265D0u, n_libcd_SetCb3F8, 0, &in_kernel[392]},
+    {0x800265E4u, n_libcd_CdControl, 0, &in_kernel[393]},
+    {0x80026720u, n_libcd_ControlF, 0, &in_kernel[394]},
     {0x80026854u, 0, 0, &in_kernel[395]},
-    {0x800269A0u, 0, 0, &in_kernel[396]},
-    {0x800269C0u, 0, 0, &in_kernel[397]},
+    {0x800269A0u, n_libcd_Wrap269A0, 0, &in_kernel[396]},
+    {0x800269C0u, n_libcd_CdGetSector, 0, &in_kernel[397]},
     {0x800269E0u, 0, 0, &in_kernel[398]},
-    {0x80026A00u, 0, 0, &in_kernel[399]},
+    {0x80026A00u, n_libcd_SetDmaCallback, 0, &in_kernel[399]},
     {0x80026A24u, 0, 0, &in_kernel[400]},
-    {0x80026A48u, 0, 0, &in_kernel[401]},
-    {0x80026FACu, 0, 0, &in_kernel[402]},
-    {0x8002722Cu, 0, 0, &in_kernel[403]},
-    {0x800274F4u, 0, 0, &in_kernel[404]},
-    {0x80027900u, 0, 0, &in_kernel[405]},
+    {0x80026A48u, n_libcd_CdIntr, 0, &in_kernel[401]},
+    {0x80026FACu, n_libcd_Sync, 0, &in_kernel[402]},
+    {0x8002722Cu, n_libcd_Ready, 0, &in_kernel[403]},
+    {0x800274F4u, n_libcd_Command, 0, &in_kernel[404]},
+    {0x80027900u, n_libcd_CdMix, 0, &in_kernel[405]},
     {0x80027988u, 0, 0, &in_kernel[406]},
-    {0x80027A5Cu, 0, 0, &in_kernel[407]},
+    {0x80027A5Cu, n_libcd_SpuCdOn, 0, &in_kernel[407]},
     {0x80027B4Cu, 0, 0, &in_kernel[408]},
-    {0x80027B98u, 0, 0, &in_kernel[409]},
+    {0x80027B98u, n_libcd_Reset, 0, &in_kernel[409]},
     {0x80027D78u, 0, 0, &in_kernel[410]},
-    {0x80027EE0u, 0, 0, &in_kernel[411]},
+    {0x80027EE0u, n_libcd_DmaSector, 0, &in_kernel[411]},
     {0x80027FE0u, 0, 0, &in_kernel[412]},
     {0x800280CCu, 0, 0, &in_kernel[413]},
-    {0x800280D8u, 0, 0, &in_kernel[414]},
+    {0x800280D8u, n_libcd_IntrCallback, 0, &in_kernel[414]},
     {0x800281B8u, 0, 0, &in_kernel[415]},
     {0x800281ECu, 0, 0, &in_kernel[416]},
     {0x80028460u, 0, 0, &in_kernel[417]},
@@ -2602,44 +3645,44 @@ static const RtFunc tab_kernel[] = {
     {0x80028718u, 0, 0, &in_kernel[419]},
     {0x800288B8u, 0, 0, &in_kernel[420]},
     {0x80028A54u, 0, 0, &in_kernel[421]},
-    {0x80028B58u, 0, 0, &in_kernel[422]},
+    {0x80028B58u, n_libcd_SetCb35C, 0, &in_kernel[422]},
     {0x80028B6Cu, 0, 0, &in_kernel[423]},
-    {0x80028B88u, 0, 0, &in_kernel[424]},
-    {0x80028C0Cu, 0, 0, &in_kernel[425]},
+    {0x80028B88u, n_libcd_StStart, 0, &in_kernel[424]},
+    {0x80028C0Cu, n_libcd_StCallback, 0, &in_kernel[425]},
     {0x80028C38u, 0, 0, &in_kernel[426]},
     {0x80028D74u, 0, 0, &in_kernel[427]},
-    {0x80028EE8u, 0, 0, &in_kernel[428]},
-    {0x80028F48u, 0, 0, &in_kernel[429]},
-    {0x80028FC8u, 0, 0, &in_kernel[430]},
+    {0x80028EE8u, n_libcd_StReset, 0, &in_kernel[428]},
+    {0x80028F48u, n_libcd_StUnhook, 0, &in_kernel[429]},
+    {0x80028FC8u, n_libcd_StFrameDone, 0, &in_kernel[430]},
     {0x80029054u, 0, 0, &in_kernel[431]},
-    {0x800290B8u, 0, 0, &in_kernel[432]},
-    {0x80029148u, 0, 0, &in_kernel[433]},
-    {0x800291F8u, 0, 0, &in_kernel[434]},
-    {0x80029238u, 0, 0, &in_kernel[435]},
-    {0x800292F8u, 0, 0, &in_kernel[436]},
-    {0x80029318u, 0, 0, &in_kernel[437]},
+    {0x800290B8u, n_libcd_StSetStream, 0, &in_kernel[432]},
+    {0x80029148u, n_libcd_StFreeFrame, 0, &in_kernel[433]},
+    {0x800291F8u, n_libcd_StClearFrames, 0, &in_kernel[434]},
+    {0x80029238u, n_libcd_StGetNext, 0, &in_kernel[435]},
+    {0x800292F8u, n_libcd_StSetValues, 0, &in_kernel[436]},
+    {0x80029318u, n_libcd_StSector, 0, &in_kernel[437]},
     {0x80029C34u, 0, 0, &in_kernel[438]},
-    {0x80029C60u, 0, 0, &in_kernel[439]},
-    {0x80029E08u, 0, 0, &in_kernel[440]},
-    {0x80029F0Cu, 0, 0, &in_kernel[441]},
+    {0x80029C60u, n_libcd_DmaStart, 0, &in_kernel[439]},
+    {0x80029E08u, n_libcd_CdIntToPos, 0, &in_kernel[440]},
+    {0x80029F0Cu, n_libcd_CdPosToInt, 0, &in_kernel[441]},
     {0x80029F98u, 0, 0, &in_kernel[442]},
     {0x80029FACu, 0, 0, &in_kernel[443]},
     {0x80029FC0u, 0, 0, &in_kernel[444]},
     {0x80029FD4u, 0, 0, &in_kernel[445]},
-    {0x80029FF8u, 0, 0, &in_kernel[446]},
-    {0x8002A034u, 0, 0, &in_kernel[447]},
-    {0x8002A0C8u, 0, 0, &in_kernel[448]},
+    {0x80029FF8u, n_gte_rsin, 0, &in_kernel[446]},
+    {0x8002A034u, n_gte_sin_1, 0, &in_kernel[447]},
+    {0x8002A0C8u, n_gte_rcos, 0, &in_kernel[448]},
     {0x8002A168u, 0, 0, &in_kernel[449]},
-    {0x8002A278u, 0, 0, &in_kernel[450]},
-    {0x8002A350u, 0, 0, &in_kernel[451]},
-    {0x8002A3D8u, 0, 0, &in_kernel[452]},
-    {0x8002A468u, 0, 0, &in_kernel[453]},
-    {0x8002A50Cu, 0, 0, &in_kernel[454]},
-    {0x8002A5B8u, 0, 0, &in_kernel[455]},
-    {0x8002A608u, 0, 0, &in_kernel[456]},
-    {0x8002A638u, 0, 0, &in_kernel[457]},
-    {0x8002A778u, 0, 0, &in_kernel[458]},
-    {0x8002A7A8u, 0, 0, &in_kernel[459]},
+    {0x8002A278u, n_gte_CordicAngle, 0, &in_kernel[450]},
+    {0x8002A350u, n_gte_InitGeom, 0, &in_kernel[451]},
+    {0x8002A3D8u, n_gte_SquareRoot0, 0, &in_kernel[452]},
+    {0x8002A468u, n_gte_PushMatrix, 0, &in_kernel[453]},
+    {0x8002A50Cu, n_gte_PopMatrix, 0, &in_kernel[454]},
+    {0x8002A5B8u, n_gte_ApplyMatrix, 0, &in_kernel[455]},
+    {0x8002A608u, n_gte_TransMatrix, 0, &in_kernel[456]},
+    {0x8002A638u, n_gte_ScaleMatrix, 0, &in_kernel[457]},
+    {0x8002A778u, n_gte_SetRotMatrix, 0, &in_kernel[458]},
+    {0x8002A7A8u, n_gte_SetTransMatrix, 0, &in_kernel[459]},
     {0x8002A7C8u, 0, 0, &in_kernel[460]},
     {0x8002A7D8u, 0, 0, &in_kernel[461]},
     {0x8002A7E8u, 0, 0, &in_kernel[462]},
@@ -2655,307 +3698,307 @@ static const RtFunc tab_kernel[] = {
     {0x8002A8B4u, 0, 0, &in_kernel[472]},
     {0x8002A8C0u, 0, 0, &in_kernel[473]},
     {0x8002A8CCu, 0, 0, &in_kernel[474]},
-    {0x8002A8D8u, 0, 0, &in_kernel[475]},
-    {0x8002A8F8u, 0, 0, &in_kernel[476]},
-    {0x8002A918u, 0, 0, &in_kernel[477]},
-    {0x8002A928u, 0, 0, &in_kernel[478]},
-    {0x8002A958u, 0, 0, &in_kernel[479]},
-    {0x8002A988u, 0, 0, &in_kernel[480]},
-    {0x8002A9E8u, 0, 0, &in_kernel[481]},
-    {0x8002AA68u, 0, 0, &in_kernel[482]},
-    {0x8002ACF8u, 0, 0, &in_kernel[483]},
-    {0x8002AE98u, 0, 0, &in_kernel[484]},
-    {0x8002B128u, 0, 0, &in_kernel[485]},
+    {0x8002A8D8u, n_gte_SetBackColor2, 0, &in_kernel[475]},
+    {0x8002A8F8u, n_gte_SetGeomOffset, 0, &in_kernel[476]},
+    {0x8002A918u, n_gte_SetGeomScreen, 0, &in_kernel[477]},
+    {0x8002A928u, n_gte_RotTransPers, 0, &in_kernel[478]},
+    {0x8002A958u, n_gte_RotTrans, 0, &in_kernel[479]},
+    {0x8002A988u, n_gte_RotTransPers3, 0, &in_kernel[480]},
+    {0x8002A9E8u, n_gte_RotTransPers4, 0, &in_kernel[481]},
+    {0x8002AA68u, n_gte_RotMatrix, 0, &in_kernel[482]},
+    {0x8002ACF8u, n_gte_RotMatrixY, 0, &in_kernel[483]},
+    {0x8002AE98u, n_gte_RotMatrixYZX, 0, &in_kernel[484]},
+    {0x8002B128u, n_gte_RotMatrixGPF, 0, &in_kernel[485]},
     {0x8002B338u, 0, 0, &in_kernel[486]},
-    {0x8002BB48u, 0, 0, &in_kernel[487]},
-    {0x8002BCC8u, 0, 0, &in_kernel[488]},
+    {0x8002BB48u, n_gte_ratan2, 0, &in_kernel[487]},
+    {0x8002BCC8u, n_gs_PatchBios, 0, &in_kernel[488]},
     {0x8002BD74u, 0, 0, &in_kernel[489]},
-    {0x8002BDA8u, 0, 0, &in_kernel[490]},
-    {0x8002BE88u, 0, 0, &in_kernel[491]},
-    {0x8002BF28u, 0, 0, &in_kernel[492]},
-    {0x8002C428u, 0, 0, &in_kernel[493]},
-    {0x8002C438u, 0, 0, &in_kernel[494]},
-    {0x8002C4B8u, 0, 0, &in_kernel[495]},
-    {0x8002C638u, 0, 0, &in_kernel[496]},
-    {0x8002C6ACu, 0, 0, &in_kernel[497]},
-    {0x8002C7C8u, 0, 0, &in_kernel[498]},
-    {0x8002C830u, 0, 0, &in_kernel[499]},
-    {0x8002CA50u, 0, 0, &in_kernel[500]},
-    {0x8002CB88u, 0, 0, &in_kernel[501]},
-    {0x8002CB98u, 0, 0, &in_kernel[502]},
-    {0x8002CCA8u, 0, 0, &in_kernel[503]},
-    {0x8002CD28u, 0, 0, &in_kernel[504]},
-    {0x8002CDA8u, 0, 0, &in_kernel[505]},
-    {0x8002CE58u, 0, 0, &in_kernel[506]},
+    {0x8002BDA8u, n_gs_SortBoxFill, 0, &in_kernel[490]},
+    {0x8002BE88u, n_gs_SortPacket, 0, &in_kernel[491]},
+    {0x8002BF28u, n_gs_SortSprite, 0, &in_kernel[492]},
+    {0x8002C428u, n_gte_ReadGeomScreen, 0, &in_kernel[493]},
+    {0x8002C438u, n_gs_RotTransPers4Z, 0, &in_kernel[494]},
+    {0x8002C4B8u, n_gs_SortFastSprite, 0, &in_kernel[495]},
+    {0x8002C638u, n_gs_InitGraphAll, 0, &in_kernel[496]},
+    {0x8002C6ACu, n_gs_InitGraph, 0, &in_kernel[497]},
+    {0x8002C7C8u, n_gs_SetScreenSize, 0, &in_kernel[498]},
+    {0x8002C830u, n_gs_Init3D, 0, &in_kernel[499]},
+    {0x8002CA50u, n_gs_SortClear, 0, &in_kernel[500]},
+    {0x8002CB88u, n_gs_GetActiveBuff, 0, &in_kernel[501]},
+    {0x8002CB98u, n_gs_SetDrawOffset, 0, &in_kernel[502]},
+    {0x8002CCA8u, n_gs_ApplyClip, 0, &in_kernel[503]},
+    {0x8002CD28u, n_gs_SetClipRect, 0, &in_kernel[504]},
+    {0x8002CDA8u, n_gs_SwapDispBuff, 0, &in_kernel[505]},
+    {0x8002CE58u, n_gs_SetOffset, 0, &in_kernel[506]},
     {0x8002CE78u, 0, 0, &in_kernel[507]},
     {0x8002CEE8u, 0, 0, &in_kernel[508]},
-    {0x8002CF14u, 0, 0, &in_kernel[509]},
-    {0x8002CF40u, 0, 0, &in_kernel[510]},
+    {0x8002CF14u, n_gte_SetLsMatrix, 0, &in_kernel[509]},
+    {0x8002CF40u, n_gte_SetLocalLight, 0, &in_kernel[510]},
     {0x8002CFD4u, 0, 0, &in_kernel[511]},
     {0x8002D004u, 0, 0, &in_kernel[512]},
-    {0x8002D094u, 0, 0, &in_kernel[513]},
-    {0x8002D114u, 0, 0, &in_kernel[514]},
+    {0x8002D094u, n_gte_CompMatrixLV, 0, &in_kernel[513]},
+    {0x8002D114u, n_gte_CompMatrix, 0, &in_kernel[514]},
     {0x8002D194u, 0, 0, &in_kernel[515]},
     {0x8002D204u, 0, 0, &in_kernel[516]},
     {0x8002D238u, 0, 0, &in_kernel[517]},
-    {0x8002D348u, 0, 0, &in_kernel[518]},
-    {0x8002D4A8u, 0, 0, &in_kernel[519]},
-    {0x8002D5B8u, 0, 0, &in_kernel[520]},
-    {0x8002D6C8u, 0, 0, &in_kernel[521]},
-    {0x8002D6F8u, 0, 0, &in_kernel[522]},
-    {0x8002D798u, 0, 0, &in_kernel[523]},
-    {0x8002D818u, 0, 0, &in_kernel[524]},
-    {0x8002D838u, 0, 0, &in_kernel[525]},
-    {0x8002DCF0u, 0, 0, &in_kernel[526]},
-    {0x8002DD54u, 0, 0, &in_kernel[527]},
-    {0x8002DDA8u, 0, 0, &in_kernel[528]},
-    {0x8002DDD8u, 0, 0, &in_kernel[529]},
-    {0x8002DE58u, 0, 0, &in_kernel[530]},
-    {0x8002DE88u, 0, 0, &in_kernel[531]},
-    {0x8002DEA8u, 0, 0, &in_kernel[532]},
-    {0x8002DED8u, 0, 0, &in_kernel[533]},
-    {0x8002DF38u, 0, 0, &in_kernel[534]},
-    {0x8002DFF8u, 0, 0, &in_kernel[535]},
-    {0x8002E048u, 0, 0, &in_kernel[536]},
-    {0x8002E138u, 0, 0, &in_kernel[537]},
-    {0x8002E208u, 0, 0, &in_kernel[538]},
-    {0x8002E218u, 0, 0, &in_kernel[539]},
+    {0x8002D348u, n_gte_ApplyMatrixLV, 0, &in_kernel[518]},
+    {0x8002D4A8u, n_gte_MulMatrixA, 0, &in_kernel[519]},
+    {0x8002D5B8u, n_gte_MulMatrixB, 0, &in_kernel[520]},
+    {0x8002D6C8u, n_gte_SetLightMatrix, 0, &in_kernel[521]},
+    {0x8002D6F8u, n_gs_DefDispBuff2, 0, &in_kernel[522]},
+    {0x8002D798u, n_gs_CenterOffset, 0, &in_kernel[523]},
+    {0x8002D818u, n_gte_Wrap2D818, 0, &in_kernel[524]},
+    {0x8002D838u, n_gte_SetFlatLight, 0, &in_kernel[525]},
+    {0x8002DCF0u, n_gte_SetColorMatrix, 0, &in_kernel[526]},
+    {0x8002DD54u, n_gte_ReadColorMatrix, 0, &in_kernel[527]},
+    {0x8002DDA8u, n_gte_SetColorMatrixRaw, 0, &in_kernel[528]},
+    {0x8002DDD8u, n_gs_SetProjectionMode, 0, &in_kernel[529]},
+    {0x8002DE58u, n_gs_SetAmbient, 0, &in_kernel[530]},
+    {0x8002DE88u, n_gte_SetBackColor, 0, &in_kernel[531]},
+    {0x8002DEA8u, n_gs_DrawOt, 0, &in_kernel[532]},
+    {0x8002DED8u, n_gs_ClearOt, 0, &in_kernel[533]},
+    {0x8002DF38u, n_gs_SortOt, 0, &in_kernel[534]},
+    {0x8002DFF8u, n_gs_InitGeomAll, 0, &in_kernel[535]},
+    {0x8002E048u, n_gs_GetTimInfo, 0, &in_kernel[536]},
+    {0x8002E138u, n_gte_AxisMatrix, 0, &in_kernel[537]},
+    {0x8002E208u, n_gs_SetWorkBase, 0, &in_kernel[538]},
+    {0x8002E218u, n_gs_DefDispBuff, 0, &in_kernel[539]},
     {0x8002E298u, 0, 0, &in_kernel[540]},
     {0x8002E448u, 0, 0, &in_kernel[541]},
-    {0x8002E648u, 0, 0, &in_kernel[542]},
+    {0x8002E648u, n_gs_DriverF3, 0, &in_kernel[542]},
     {0x8002E7B8u, 0, 0, &in_kernel[543]},
     {0x8002E948u, 0, 0, &in_kernel[544]},
-    {0x8002EB28u, 0, 0, &in_kernel[545]},
+    {0x8002EB28u, n_gs_ProjectVerts, 0, &in_kernel[545]},
     {0x8002EC48u, 0, 0, &in_kernel[546]},
-    {0x8002EC58u, 0, 0, &in_kernel[547]},
-    {0x8002EEC8u, 0, 0, &in_kernel[548]},
+    {0x8002EC58u, n_gs_DriverSharedG3Lit, 0, &in_kernel[547]},
+    {0x8002EEC8u, n_gs_SharedGT3, 0, &in_kernel[548]},
     {0x8002F0F8u, 0, 0, &in_kernel[549]},
-    {0x8002F548u, 0, 0, &in_kernel[550]},
-    {0x8002F938u, 0, 0, &in_kernel[551]},
-    {0x8002F9E0u, 0, 0, &in_kernel[552]},
+    {0x8002F548u, n_gs_SharedGT4, 0, &in_kernel[550]},
+    {0x8002F938u, n_gs_HmdNext, 0, &in_kernel[551]},
+    {0x8002F9E0u, n_gs_HmdBlocks, 0, &in_kernel[552]},
     {0x8002FA28u, 0, 0, &in_kernel[553]},
     {0x8002FB0Cu, 0, 0, &in_kernel[554]},
-    {0x8002FBF8u, 0, 0, &in_kernel[555]},
-    {0x8002FC18u, 0, 0, &in_kernel[556]},
-    {0x8002FCA8u, 0, 0, &in_kernel[557]},
-    {0x8002FD58u, 0, 0, &in_kernel[558]},
+    {0x8002FBF8u, n_gs_NextBlock, 0, &in_kernel[555]},
+    {0x8002FC18u, n_gs_HmdLoadImages, 0, &in_kernel[556]},
+    {0x8002FCA8u, n_gs_HmdLoadImagesClut, 0, &in_kernel[557]},
+    {0x8002FD58u, n_gs_InterpBlock, 0, &in_kernel[558]},
     {0x8002FD9Cu, 0, 0, &in_kernel[559]},
-    {0x8002FDE8u, 0, 0, &in_kernel[560]},
+    {0x8002FDE8u, n_gs_ScreenBlock, 0, &in_kernel[560]},
     {0x8002FE28u, 0, 0, &in_kernel[561]},
     {0x80030110u, 0, 0, &in_kernel[562]},
     {0x800301FCu, 0, 0, &in_kernel[563]},
-    {0x800302C4u, 0, 0, &in_kernel[564]},
-    {0x800302E8u, 0, 0, &in_kernel[565]},
-    {0x800303A8u, 0, 0, &in_kernel[566]},
-    {0x80030778u, 0, 0, &in_kernel[567]},
-    {0x80030864u, 0, 0, &in_kernel[568]},
-    {0x8003092Cu, 0, 0, &in_kernel[569]},
-    {0x80030948u, 0, 0, &in_kernel[570]},
+    {0x800302C4u, n_gs_BitWidth_800302C4, 0, &in_kernel[564]},
+    {0x800302E8u, n_gs_RotateZDeg, 0, &in_kernel[565]},
+    {0x800303A8u, n_gs_SetRefViewL, 0, &in_kernel[566]},
+    {0x80030778u, n_gs_Fit16At8, 0, &in_kernel[567]},
+    {0x80030864u, n_gs_MaxAbs6At8, 0, &in_kernel[568]},
+    {0x8003092Cu, n_gs_BitWidth_8003092C, 0, &in_kernel[569]},
+    {0x80030948u, n_gte_TransposeMatrix, 0, &in_kernel[570]},
     {0x80030988u, 0, 0, &in_kernel[571]},
     {0x80030DF0u, 0, 0, &in_kernel[572]},
     {0x80030EE8u, 0, 0, &in_kernel[573]},
-    {0x80030FB0u, 0, 0, &in_kernel[574]},
+    {0x80030FB0u, n_gs_BitWidth_80030FB0, 0, &in_kernel[574]},
     {0x80030FD8u, 0, 0, &in_kernel[575]},
     {0x80031340u, 0, 0, &in_kernel[576]},
     {0x800316CCu, 0, 0, &in_kernel[577]},
     {0x800317C0u, 0, 0, &in_kernel[578]},
     {0x8003190Cu, 0, 0, &in_kernel[579]},
-    {0x800319C8u, 0, 0, &in_kernel[580]},
-    {0x80031BA0u, 0, 0, &in_kernel[581]},
+    {0x800319C8u, n_gs_MimeBlock, 0, &in_kernel[580]},
+    {0x80031BA0u, n_gs_CallObj28, 0, &in_kernel[581]},
     {0x80031BC4u, 0, 0, &in_kernel[582]},
     {0x80031BE8u, 0, 0, &in_kernel[583]},
     {0x80031C38u, 0, 0, &in_kernel[584]},
     {0x80031EB8u, 0, 0, &in_kernel[585]},
-    {0x80032118u, 0, 0, &in_kernel[586]},
-    {0x80032478u, 0, 0, &in_kernel[587]},
-    {0x80032708u, 0, 0, &in_kernel[588]},
-    {0x80032BF8u, 0, 0, &in_kernel[589]},
-    {0x800330E8u, 0, 0, &in_kernel[590]},
-    {0x80033150u, 0, 0, &in_kernel[591]},
-    {0x80033208u, 0, 0, &in_kernel[592]},
-    {0x800333C0u, 0, 0, &in_kernel[593]},
-    {0x800333D8u, 0, 0, &in_kernel[594]},
-    {0x80033508u, 0, 0, &in_kernel[595]},
-    {0x800336A8u, 0, 0, &in_kernel[596]},
-    {0x80033728u, 0, 0, &in_kernel[597]},
-    {0x800339E8u, 0, 0, &in_kernel[598]},
-    {0x80033CB8u, 0, 0, &in_kernel[599]},
-    {0x80033FD8u, 0, 0, &in_kernel[600]},
-    {0x800343A8u, 0, 0, &in_kernel[601]},
-    {0x80034494u, 0, 0, &in_kernel[602]},
-    {0x8003455Cu, 0, 0, &in_kernel[603]},
+    {0x80032118u, n_gs_LerpCoordRT, 0, &in_kernel[586]},
+    {0x80032478u, n_gte_RotMatrixYXZ, 0, &in_kernel[587]},
+    {0x80032708u, n_gs_LerpCoord, 0, &in_kernel[588]},
+    {0x80032BF8u, n_gs_LerpCoordYXZ, 0, &in_kernel[589]},
+    {0x800330E8u, n_gs_AddScaled, 0, &in_kernel[590]},
+    {0x80033150u, n_gs_CopyRuns, 0, &in_kernel[591]},
+    {0x80033208u, n_gs_ScanUnit, 0, &in_kernel[592]},
+    {0x800333C0u, n_gs_Get60D54, 0, &in_kernel[593]},
+    {0x800333D8u, n_gs_SortUnit, 0, &in_kernel[594]},
+    {0x80033508u, n_gs_HmdMap, 0, &in_kernel[595]},
+    {0x800336A8u, n_gs_PopModelList, 0, &in_kernel[596]},
+    {0x80033728u, n_gs_GetLw, 0, &in_kernel[597]},
+    {0x800339E8u, n_gs_GetLs, 0, &in_kernel[598]},
+    {0x80033CB8u, n_gs_GetLws, 0, &in_kernel[599]},
+    {0x80033FD8u, n_gs_SetRefView2, 0, &in_kernel[600]},
+    {0x800343A8u, n_gs_Fit16, 0, &in_kernel[601]},
+    {0x80034494u, n_gs_MaxAbs6, 0, &in_kernel[602]},
+    {0x8003455Cu, n_gs_BitWidth, 0, &in_kernel[603]},
     {0x80034578u, 0, 0, &in_kernel[604]},
     {0x800345B8u, 0, 0, &in_kernel[605]},
     {0x80034658u, 0, 0, &in_kernel[606]},
     {0x80034910u, 0, 0, &in_kernel[607]},
     {0x80034C2Cu, 0, 0, &in_kernel[608]},
-    {0x80034FF8u, 0, 0, &in_kernel[609]},
+    {0x80034FF8u, n_libgpu_ResetGraph, 0, &in_kernel[609]},
     {0x8003516Cu, 0, 0, &in_kernel[610]},
     {0x800351C8u, 0, 0, &in_kernel[611]},
     {0x8003526Cu, 0, 0, &in_kernel[612]},
     {0x8003527Cu, 0, 0, &in_kernel[613]},
-    {0x800352DCu, 0, 0, &in_kernel[614]},
-    {0x80035374u, 0, 0, &in_kernel[615]},
-    {0x800353DCu, 0, 0, &in_kernel[616]},
-    {0x800354F8u, 0, 0, &in_kernel[617]},
+    {0x800352DCu, n_libgpu_SetDispMask, 0, &in_kernel[614]},
+    {0x80035374u, n_libgpu_DrawSync, 0, &in_kernel[615]},
+    {0x800353DCu, n_libgpu_CheckRect, 0, &in_kernel[616]},
+    {0x800354F8u, n_libgpu_ClearImageQ, 0, &in_kernel[617]},
     {0x80035588u, 0, 0, &in_kernel[618]},
-    {0x80035620u, 0, 0, &in_kernel[619]},
-    {0x80035680u, 0, 0, &in_kernel[620]},
-    {0x800356E0u, 0, 0, &in_kernel[621]},
+    {0x80035620u, n_libgpu_LoadImage, 0, &in_kernel[619]},
+    {0x80035680u, n_libgpu_LoadImage2, 0, &in_kernel[620]},
+    {0x800356E0u, n_libgpu_MoveImage, 0, &in_kernel[621]},
     {0x80035798u, 0, 0, &in_kernel[622]},
-    {0x80035860u, 0, 0, &in_kernel[623]},
-    {0x8003590Cu, 0, 0, &in_kernel[624]},
-    {0x80035968u, 0, 0, &in_kernel[625]},
-    {0x800359D8u, 0, 0, &in_kernel[626]},
+    {0x80035860u, n_libgpu_ClearOTag, 0, &in_kernel[623]},
+    {0x8003590Cu, n_libgpu_DrawPrim, 0, &in_kernel[624]},
+    {0x80035968u, n_libgpu_DrawOTag, 0, &in_kernel[625]},
+    {0x800359D8u, n_libgpu_PutDrawEnv, 0, &in_kernel[626]},
     {0x80035A98u, 0, 0, &in_kernel[627]},
     {0x80035B70u, 0, 0, &in_kernel[628]},
-    {0x80035BA4u, 0, 0, &in_kernel[629]},
+    {0x80035BA4u, n_libgpu_PutDispEnv, 0, &in_kernel[629]},
     {0x8003609Cu, 0, 0, &in_kernel[630]},
     {0x800360D0u, 0, 0, &in_kernel[631]},
     {0x80036100u, 0, 0, &in_kernel[632]},
     {0x80036180u, 0, 0, &in_kernel[633]},
     {0x800361C0u, 0, 0, &in_kernel[634]},
-    {0x800363B8u, 0, 0, &in_kernel[635]},
-    {0x80036628u, 0, 0, &in_kernel[636]},
-    {0x80036648u, 0, 0, &in_kernel[637]},
-    {0x800366E0u, 0, 0, &in_kernel[638]},
-    {0x80036778u, 0, 0, &in_kernel[639]},
-    {0x80036794u, 0, 0, &in_kernel[640]},
+    {0x800363B8u, n_libgpu_SetDrawEnv, 0, &in_kernel[635]},
+    {0x80036628u, n_libgpu_ModeCmd, 0, &in_kernel[636]},
+    {0x80036648u, n_libgpu_ClipStartCmd, 0, &in_kernel[637]},
+    {0x800366E0u, n_libgpu_ClipEndCmd, 0, &in_kernel[638]},
+    {0x80036778u, n_libgpu_OffsetCmd, 0, &in_kernel[639]},
+    {0x80036794u, n_libgpu_TexWindowCmd, 0, &in_kernel[640]},
     {0x80036814u, 0, 0, &in_kernel[641]},
-    {0x8003682Cu, 0, 0, &in_kernel[642]},
-    {0x8003690Cu, 0, 0, &in_kernel[643]},
-    {0x80036B3Cu, 0, 0, &in_kernel[644]},
-    {0x80036D78u, 0, 0, &in_kernel[645]},
-    {0x80036FF8u, 0, 0, &in_kernel[646]},
+    {0x8003682Cu, n_libgpu_DmaClearOT, 0, &in_kernel[642]},
+    {0x8003690Cu, n_libgpu_ClearImage, 0, &in_kernel[643]},
+    {0x80036B3Cu, n_libgpu_DriverLoadImage, 0, &in_kernel[644]},
+    {0x80036D78u, n_libgpu_DriverStoreImage, 0, &in_kernel[645]},
+    {0x80036FF8u, n_libgpu_Ctrl, 0, &in_kernel[646]},
     {0x8003701Cu, 0, 0, &in_kernel[647]},
-    {0x80037030u, 0, 0, &in_kernel[648]},
-    {0x80037070u, 0, 0, &in_kernel[649]},
-    {0x800370B8u, 0, 0, &in_kernel[650]},
+    {0x80037030u, n_libgpu_SendWords, 0, &in_kernel[648]},
+    {0x80037070u, n_libgpu_DmaOt, 0, &in_kernel[649]},
+    {0x800370B8u, n_libgpu_GetInfo, 0, &in_kernel[650]},
     {0x800370E8u, 0, 0, &in_kernel[651]},
-    {0x8003710Cu, 0, 0, &in_kernel[652]},
-    {0x800373BCu, 0, 0, &in_kernel[653]},
-    {0x8003761Cu, 0, 0, &in_kernel[654]},
-    {0x8003776Cu, 0, 0, &in_kernel[655]},
-    {0x800378A8u, 0, 0, &in_kernel[656]},
-    {0x800378DCu, 0, 0, &in_kernel[657]},
-    {0x80037A20u, 0, 0, &in_kernel[658]},
+    {0x8003710Cu, n_libgpu_Enqueue, 0, &in_kernel[652]},
+    {0x800373BCu, n_libgpu_RunQueue, 0, &in_kernel[653]},
+    {0x8003761Cu, n_libgpu_DriverReset, 0, &in_kernel[654]},
+    {0x8003776Cu, n_libgpu_DriverSync, 0, &in_kernel[655]},
+    {0x800378A8u, n_libgpu_SetTimeout, 0, &in_kernel[656]},
+    {0x800378DCu, n_libgpu_TimedOut, 0, &in_kernel[657]},
+    {0x80037A20u, n_libgpu_GpuType, 0, &in_kernel[658]},
     {0x80037AC0u, 0, 0, &in_kernel[659]},
     {0x80037BACu, 0, 0, &in_kernel[660]},
     {0x80037C98u, 0, 0, &in_kernel[661]},
     {0x80037DDCu, 0, 0, &in_kernel[662]},
     {0x80037ED8u, 0, 0, &in_kernel[663]},
-    {0x80037F00u, 0, 0, &in_kernel[664]},
+    {0x80037F00u, n_libgpu_Memset, 0, &in_kernel[664]},
     {0x80037F28u, 0, 0, &in_kernel[665]},
     {0x80038018u, 0, 0, &in_kernel[666]},
-    {0x80038088u, 0, 0, &in_kernel[667]},
-    {0x80038148u, 0, 0, &in_kernel[668]},
-    {0x80038188u, 0, 0, &in_kernel[669]},
-    {0x800381C8u, 0, 0, &in_kernel[670]},
-    {0x800381E8u, 0, 0, &in_kernel[671]},
+    {0x80038088u, n_libgpu_SetDefDrawEnv, 0, &in_kernel[667]},
+    {0x80038148u, n_libgpu_SetDefDispEnv, 0, &in_kernel[668]},
+    {0x80038188u, n_libgpu_GetTPage, 0, &in_kernel[669]},
+    {0x800381C8u, n_libgpu_GetClut, 0, &in_kernel[670]},
+    {0x800381E8u, n_libgpu_AddPrim, 0, &in_kernel[671]},
     {0x80038228u, 0, 0, &in_kernel[672]},
-    {0x80038248u, 0, 0, &in_kernel[673]},
-    {0x80038278u, 0, 0, &in_kernel[674]},
-    {0x800382A8u, 0, 0, &in_kernel[675]},
-    {0x800382C8u, 0, 0, &in_kernel[676]},
-    {0x800382E8u, 0, 0, &in_kernel[677]},
+    {0x80038248u, n_libgpu_SetSemiTrans, 0, &in_kernel[673]},
+    {0x80038278u, n_libgpu_SetShadeTex, 0, &in_kernel[674]},
+    {0x800382A8u, n_libgpu_SetPolyF4, 0, &in_kernel[675]},
+    {0x800382C8u, n_libgpu_SetPolyFT4, 0, &in_kernel[676]},
+    {0x800382E8u, n_libgpu_SetPolyG4, 0, &in_kernel[677]},
     {0x80038308u, 0, 0, &in_kernel[678]},
-    {0x80038328u, 0, 0, &in_kernel[679]},
-    {0x80038348u, 0, 0, &in_kernel[680]},
+    {0x80038328u, n_libgpu_SetSprt, 0, &in_kernel[679]},
+    {0x80038348u, n_libgpu_SetTile, 0, &in_kernel[680]},
     {0x80038368u, 0, 0, &in_kernel[681]},
-    {0x80038388u, 0, 0, &in_kernel[682]},
-    {0x800383B8u, 0, 0, &in_kernel[683]},
-    {0x800383E8u, 0, 0, &in_kernel[684]},
-    {0x80038488u, 0, 0, &in_kernel[685]},
+    {0x80038388u, n_libgpu_SetDrawMode2, 0, &in_kernel[682]},
+    {0x800383B8u, n_libgpu_SetDrawStp, 0, &in_kernel[683]},
+    {0x800383E8u, n_libgpu_SetDrawMode, 0, &in_kernel[684]},
+    {0x80038488u, n_libpress_DecDCTReset, 0, &in_kernel[685]},
     {0x800384BCu, 0, 0, &in_kernel[686]},
     {0x80038548u, 0, 0, &in_kernel[687]},
-    {0x800385E0u, 0, 0, &in_kernel[688]},
-    {0x8003865Cu, 0, 0, &in_kernel[689]},
+    {0x800385E0u, n_libpress_DecDCTin, 0, &in_kernel[688]},
+    {0x8003865Cu, n_libpress_SendIn, 0, &in_kernel[689]},
     {0x8003867Cu, 0, 0, &in_kernel[690]},
     {0x800386B8u, 0, 0, &in_kernel[691]},
     {0x800386F4u, 0, 0, &in_kernel[692]},
-    {0x80038718u, 0, 0, &in_kernel[693]},
-    {0x8003873Cu, 0, 0, &in_kernel[694]},
-    {0x8003882Cu, 0, 0, &in_kernel[695]},
-    {0x800388BCu, 0, 0, &in_kernel[696]},
-    {0x80038948u, 0, 0, &in_kernel[697]},
-    {0x800389DCu, 0, 0, &in_kernel[698]},
+    {0x80038718u, n_libpress_SetOutCallback, 0, &in_kernel[693]},
+    {0x8003873Cu, n_libpress_MdecReset, 0, &in_kernel[694]},
+    {0x8003882Cu, n_libpress_DmaOutCmd, 0, &in_kernel[695]},
+    {0x800388BCu, n_libpress_DmaIn, 0, &in_kernel[696]},
+    {0x80038948u, n_libpress_OutSync, 0, &in_kernel[697]},
+    {0x800389DCu, n_libpress_InSync, 0, &in_kernel[698]},
     {0x80038A70u, 0, 0, &in_kernel[699]},
     {0x80038A88u, 0, 0, &in_kernel[700]},
     {0x80038B08u, 0, 0, &in_kernel[701]},
-    {0x80038B38u, 0, 0, &in_kernel[702]},
-    {0x80038E88u, 0, 0, &in_kernel[703]},
-    {0x80038F78u, 0, 0, &in_kernel[704]},
-    {0x80038F88u, 0, 0, &in_kernel[705]},
-    {0x80038F98u, 0, 0, &in_kernel[706]},
-    {0x80038FA8u, 0, 0, &in_kernel[707]},
-    {0x80038FB8u, 0, 0, &in_kernel[708]},
-    {0x80038FC8u, 0, 0, &in_kernel[709]},
+    {0x80038B38u, n_libpress_DecDCTvlc, 0, &in_kernel[702]},
+    {0x80038E88u, n_libpress_UnpackTable, 0, &in_kernel[703]},
+    {0x80038F78u, n_libpress_BufSize, 0, &in_kernel[704]},
+    {0x80038F88u, n_api_A0_70, 0, &in_kernel[705]},
+    {0x80038F98u, n_api_A0_AB, 0, &in_kernel[706]},
+    {0x80038FA8u, n_api_A0_AC, 0, &in_kernel[707]},
+    {0x80038FB8u, n_api_A0_AD, 0, &in_kernel[708]},
+    {0x80038FC8u, n_api_B0_5D, 0, &in_kernel[709]},
     {0x80038FD8u, 0, 0, &in_kernel[710]},
     {0x80039018u, 0, 0, &in_kernel[711]},
     {0x80039028u, 0, 0, &in_kernel[712]},
-    {0x80039038u, 0, 0, &in_kernel[713]},
-    {0x800390C8u, 0, 0, &in_kernel[714]},
+    {0x80039038u, n_libcard_Init, 0, &in_kernel[713]},
+    {0x800390C8u, n_libcard_Stop, 0, &in_kernel[714]},
     {0x80039110u, 0, 0, &in_kernel[715]},
-    {0x80039138u, 0, 0, &in_kernel[716]},
-    {0x80039148u, 0, 0, &in_kernel[717]},
+    {0x80039138u, n_api_B0_4A, 0, &in_kernel[716]},
+    {0x80039148u, n_api_B0_4B, 0, &in_kernel[717]},
     {0x80039158u, 0, 0, &in_kernel[718]},
-    {0x80039168u, 0, 0, &in_kernel[719]},
+    {0x80039168u, n_libcard_ClearState, 0, &in_kernel[719]},
     {0x800391ACu, 0, 0, &in_kernel[720]},
     {0x800391D8u, 0, 0, &in_kernel[721]},
     {0x8003921Cu, 0, 0, &in_kernel[722]},
-    {0x80039244u, 0, 0, &in_kernel[723]},
-    {0x800392D8u, 0, 0, &in_kernel[724]},
-    {0x80039348u, 0, 0, &in_kernel[725]},
+    {0x80039244u, n_libcard_PatchPad, 0, &in_kernel[723]},
+    {0x800392D8u, n_libcard_Patch, 0, &in_kernel[724]},
+    {0x80039348u, n_libcard_CopyLow, 0, &in_kernel[725]},
     {0x80039388u, 0, 0, &in_kernel[726]},
     {0x80039408u, 0, 0, &in_kernel[727]},
     {0x800397C8u, 0, 0, &in_kernel[728]},
     {0x800397D8u, 0, 0, &in_kernel[729]},
     {0x800397E8u, 0, 0, &in_kernel[730]},
-    {0x80039800u, 0, 0, &in_kernel[731]},
-    {0x80039818u, 0, 0, &in_kernel[732]},
-    {0x80039828u, 0, 0, &in_kernel[733]},
-    {0x80039838u, 0, 0, &in_kernel[734]},
-    {0x80039848u, 0, 0, &in_kernel[735]},
+    {0x80039800u, n_api_B0_3F, 0, &in_kernel[731]},
+    {0x80039818u, n_api_A0_13, 0, &in_kernel[732]},
+    {0x80039828u, n_api_A0_15, 0, &in_kernel[733]},
+    {0x80039838u, n_api_A0_18, 0, &in_kernel[734]},
+    {0x80039848u, n_api_A0_19, 0, &in_kernel[735]},
     {0x80039858u, 0, 0, &in_kernel[736]},
-    {0x80039868u, 0, 0, &in_kernel[737]},
-    {0x80039878u, 0, 0, &in_kernel[738]},
-    {0x80039888u, 0, 0, &in_kernel[739]},
-    {0x80039898u, 0, 0, &in_kernel[740]},
-    {0x800398A8u, 0, 0, &in_kernel[741]},
-    {0x800398B8u, 0, 0, &in_kernel[742]},
-    {0x800398C8u, 0, 0, &in_kernel[743]},
-    {0x800398D8u, 0, 0, &in_kernel[744]},
-    {0x800398E8u, 0, 0, &in_kernel[745]},
-    {0x800398F8u, 0, 0, &in_kernel[746]},
-    {0x80039910u, 0, 0, &in_kernel[747]},
-    {0x80039928u, 0, 0, &in_kernel[748]},
-    {0x80039938u, 0, 0, &in_kernel[749]},
-    {0x80039948u, 0, 0, &in_kernel[750]},
-    {0x80039958u, 0, 0, &in_kernel[751]},
-    {0x80039968u, 0, 0, &in_kernel[752]},
-    {0x80039978u, 0, 0, &in_kernel[753]},
-    {0x80039988u, 0, 0, &in_kernel[754]},
+    {0x80039868u, n_api_A0_27, 0, &in_kernel[737]},
+    {0x80039878u, n_api_A0_28, 0, &in_kernel[738]},
+    {0x80039888u, n_api_A0_2A, 0, &in_kernel[739]},
+    {0x80039898u, n_api_A0_2B, 0, &in_kernel[740]},
+    {0x800398A8u, n_api_A0_2F, 0, &in_kernel[741]},
+    {0x800398B8u, n_api_A0_30, 0, &in_kernel[742]},
+    {0x800398C8u, n_api_A0_3F, 0, &in_kernel[743]},
+    {0x800398D8u, n_api_A0_39, 0, &in_kernel[744]},
+    {0x800398E8u, n_api_A0_44, 0, &in_kernel[745]},
+    {0x800398F8u, n_api_A0_49, 0, &in_kernel[746]},
+    {0x80039910u, n_api_A0_72, 0, &in_kernel[747]},
+    {0x80039928u, n_api_A0_9F, 0, &in_kernel[748]},
+    {0x80039938u, n_api_B0_07, 0, &in_kernel[749]},
+    {0x80039948u, n_api_B0_08, 0, &in_kernel[750]},
+    {0x80039958u, n_api_B0_09, 0, &in_kernel[751]},
+    {0x80039968u, n_api_B0_0A, 0, &in_kernel[752]},
+    {0x80039978u, n_api_B0_0B, 0, &in_kernel[753]},
+    {0x80039988u, n_api_B0_0C, 0, &in_kernel[754]},
     {0x80039998u, 0, 0, &in_kernel[755]},
-    {0x800399A8u, 0, 0, &in_kernel[756]},
-    {0x800399B8u, 0, 0, &in_kernel[757]},
-    {0x800399C8u, 0, 0, &in_kernel[758]},
-    {0x800399D8u, 0, 0, &in_kernel[759]},
+    {0x800399A8u, n_api_B0_0E, 0, &in_kernel[756]},
+    {0x800399B8u, n_api_B0_0F, 0, &in_kernel[757]},
+    {0x800399C8u, n_api_B0_10, 0, &in_kernel[758]},
+    {0x800399D8u, n_api_B0_17, 0, &in_kernel[759]},
     {0x800399E8u, 0, 0, &in_kernel[760]},
-    {0x800399F8u, 0, 0, &in_kernel[761]},
-    {0x80039A08u, 0, 0, &in_kernel[762]},
-    {0x80039A18u, 0, 0, &in_kernel[763]},
-    {0x80039A28u, 0, 0, &in_kernel[764]},
-    {0x80039A38u, 0, 0, &in_kernel[765]},
-    {0x80039A48u, 0, 0, &in_kernel[766]},
+    {0x800399F8u, n_api_B0_19, 0, &in_kernel[761]},
+    {0x80039A08u, n_api_EnterCritical, 0, &in_kernel[762]},
+    {0x80039A18u, n_api_ExitCritical, 0, &in_kernel[763]},
+    {0x80039A28u, n_api_SetSp, 0, &in_kernel[764]},
+    {0x80039A38u, n_api_B0_32, 0, &in_kernel[765]},
+    {0x80039A48u, n_api_B0_33, 0, &in_kernel[766]},
     {0x80039A58u, 0, 0, &in_kernel[767]},
-    {0x80039A68u, 0, 0, &in_kernel[768]},
-    {0x80039A78u, 0, 0, &in_kernel[769]},
-    {0x80039A88u, 0, 0, &in_kernel[770]},
+    {0x80039A68u, n_api_B0_35, 0, &in_kernel[768]},
+    {0x80039A78u, n_api_B0_36, 0, &in_kernel[769]},
+    {0x80039A88u, n_api_B0_43, 0, &in_kernel[770]},
     {0x80039A98u, 0, 0, &in_kernel[771]},
-    {0x80039AA8u, 0, 0, &in_kernel[772]},
-    {0x80039AB8u, 0, 0, &in_kernel[773]},
-    {0x80039AC8u, 0, 0, &in_kernel[774]},
-    {0x80039AD8u, 0, 0, &in_kernel[775]},
+    {0x80039AA8u, n_api_B0_5B, 0, &in_kernel[772]},
+    {0x80039AB8u, n_api_GetGp, 0, &in_kernel[773]},
+    {0x80039AC8u, n_api_GetSp, 0, &in_kernel[774]},
+    {0x80039AD8u, n_api_C0_0A, 0, &in_kernel[775]},
     {0x80039AE8u, 0, 0, &in_kernel[776]},
     {0x80039B84u, 0, 0, &in_kernel[777]},
     {0x80039BBCu, 0, 0, &in_kernel[778]},
@@ -2965,7 +4008,7 @@ static const RtFunc tab_kernel[] = {
     {0x80039DF4u, 0, 0, &in_kernel[782]},
     {0x80039EF8u, 0, 0, &in_kernel[783]},
     {0x80039F08u, 0, 0, &in_kernel[784]},
-    {0x80039F24u, 0, 0, &in_kernel[785]},
+    {0x80039F24u, n_libpad_Get62A5C, 0, &in_kernel[785]},
     {0x80039F34u, 0, 0, &in_kernel[786]},
     {0x80039FC4u, 0, 0, &in_kernel[787]},
     {0x8003A054u, 0, 0, &in_kernel[788]},
@@ -2978,39 +4021,39 @@ static const RtFunc tab_kernel[] = {
     {0x8003A228u, 0, 0, &in_kernel[795]},
     {0x8003A238u, 0, 0, &in_kernel[796]},
     {0x8003A248u, 0, 0, &in_kernel[797]},
-    {0x8003A258u, 0, 0, &in_kernel[798]},
-    {0x8003A268u, 0, 0, &in_kernel[799]},
+    {0x8003A258u, n_api_C0_02, 0, &in_kernel[798]},
+    {0x8003A268u, n_api_C0_03, 0, &in_kernel[799]},
     {0x8003A278u, 0, 0, &in_kernel[800]},
     {0x8003A28Cu, 0, 0, &in_kernel[801]},
     {0x8003A2A0u, 0, 0, &in_kernel[802]},
     {0x8003A318u, 0, 0, &in_kernel[803]},
-    {0x8003A388u, 0, 0, &in_kernel[804]},
-    {0x8003A3A8u, 0, 0, &in_kernel[805]},
+    {0x8003A388u, n_libpad_TakeFlagW, 0, &in_kernel[804]},
+    {0x8003A3A8u, n_libpad_StartCom, 0, &in_kernel[805]},
     {0x8003A3C8u, 0, 0, &in_kernel[806]},
     {0x8003A3E8u, 0, 0, &in_kernel[807]},
-    {0x8003A434u, 0, 0, &in_kernel[808]},
+    {0x8003A434u, n_libpad_GetState, 0, &in_kernel[808]},
     {0x8003A500u, 0, 0, &in_kernel[809]},
     {0x8003A5F8u, 0, 0, &in_kernel[810]},
     {0x8003A6CCu, 0, 0, &in_kernel[811]},
     {0x8003A774u, 0, 0, &in_kernel[812]},
     {0x8003A7ACu, 0, 0, &in_kernel[813]},
-    {0x8003A7F4u, 0, 0, &in_kernel[814]},
+    {0x8003A7F4u, n_libpad_SetPortPending, 0, &in_kernel[814]},
     {0x8003A848u, 0, 0, &in_kernel[815]},
-    {0x8003A960u, 0, 0, &in_kernel[816]},
-    {0x8003A98Cu, 0, 0, &in_kernel[817]},
-    {0x8003A9F4u, 0, 0, &in_kernel[818]},
-    {0x8003AB84u, 0, 0, &in_kernel[819]},
-    {0x8003AB98u, 0, 0, &in_kernel[820]},
+    {0x8003A960u, n_libpad_SetHandlers, 0, &in_kernel[816]},
+    {0x8003A98Cu, n_libpad_IrqCheck, 0, &in_kernel[817]},
+    {0x8003A9F4u, n_libpad_Tick, 0, &in_kernel[818]},
+    {0x8003AB84u, n_libpad_TakeFlag, 0, &in_kernel[819]},
+    {0x8003AB98u, n_libpad_StartExchange, 0, &in_kernel[820]},
     {0x8003AC64u, 0, 0, &in_kernel[821]},
-    {0x8003ACA8u, 0, 0, &in_kernel[822]},
-    {0x8003AFDCu, 0, 0, &in_kernel[823]},
-    {0x8003B0CCu, 0, 0, &in_kernel[824]},
-    {0x8003B2DCu, 0, 0, &in_kernel[825]},
-    {0x8003B554u, 0, 0, &in_kernel[826]},
-    {0x8003B5E4u, 0, 0, &in_kernel[827]},
-    {0x8003B618u, 0, 0, &in_kernel[828]},
+    {0x8003ACA8u, n_libpad_Start, 0, &in_kernel[822]},
+    {0x8003AFDCu, n_libpad_Step, 0, &in_kernel[823]},
+    {0x8003B0CCu, n_libpad_Send, 0, &in_kernel[824]},
+    {0x8003B2DCu, n_libpad_SendReady, 0, &in_kernel[825]},
+    {0x8003B554u, n_libpad_WaitAck, 0, &in_kernel[826]},
+    {0x8003B5E4u, n_libpad_WaitTx, 0, &in_kernel[827]},
+    {0x8003B618u, n_libpad_SetPending, 0, &in_kernel[828]},
     {0x8003B624u, 0, 0, &in_kernel[829]},
-    {0x8003B634u, 0, 0, &in_kernel[830]},
+    {0x8003B634u, n_libpad_StepCommand, 0, &in_kernel[830]},
     {0x8003B6B8u, 0, 0, &in_kernel[831]},
     {0x8003B928u, 0, 0, &in_kernel[832]},
     {0x8003B960u, 0, 0, &in_kernel[833]},
@@ -3022,41 +4065,41 @@ static const RtFunc tab_kernel[] = {
     {0x8003C020u, 0, 0, &in_kernel[839]},
     {0x8003C0B8u, 0, 0, &in_kernel[840]},
     {0x8003C10Cu, 0, 0, &in_kernel[841]},
-    {0x8003C16Cu, 0, 0, &in_kernel[842]},
-    {0x8003C18Cu, 0, 0, &in_kernel[843]},
+    {0x8003C16Cu, n_libpad_SetCommand, 0, &in_kernel[842]},
+    {0x8003C18Cu, n_libpad_EndCommand, 0, &in_kernel[843]},
     {0x8003C1A0u, 0, 0, &in_kernel[844]},
     {0x8003C1C0u, 0, 0, &in_kernel[845]},
     {0x8003C1E0u, 0, 0, &in_kernel[846]},
     {0x8003C200u, 0, 0, &in_kernel[847]},
-    {0x8003C218u, 0, 0, &in_kernel[848]},
-    {0x8003C260u, 0, 0, &in_kernel[849]},
-    {0x8003C338u, 0, 0, &in_kernel[850]},
-    {0x8003C3E4u, 0, 0, &in_kernel[851]},
-    {0x8003C4A8u, 0, 0, &in_kernel[852]},
-    {0x8003C848u, 0, 0, &in_kernel[853]},
-    {0x8003C9A8u, 0, 0, &in_kernel[854]},
-    {0x8003CA10u, 0, 0, &in_kernel[855]},
-    {0x8003CB04u, 0, 0, &in_kernel[856]},
-    {0x8003CB14u, 0, 0, &in_kernel[857]},
-    {0x8003CBD0u, 0, 0, &in_kernel[858]},
+    {0x8003C218u, n_libpad_StepBegin, 0, &in_kernel[848]},
+    {0x8003C260u, n_libpad_StepPoll, 0, &in_kernel[849]},
+    {0x8003C338u, n_libpad_StepExtra, 0, &in_kernel[850]},
+    {0x8003C3E4u, n_libpad_StepIdent, 0, &in_kernel[851]},
+    {0x8003C4A8u, n_libpad_Exchange, 0, &in_kernel[852]},
+    {0x8003C848u, n_libpad_InitDirect, 0, &in_kernel[853]},
+    {0x8003C9A8u, n_libpad_ResetPort, 0, &in_kernel[854]},
+    {0x8003CA10u, n_libpad_NextPort, 0, &in_kernel[855]},
+    {0x8003CB04u, n_libpad_LatchMode, 0, &in_kernel[856]},
+    {0x8003CB14u, n_libpad_ActByte, 0, &in_kernel[857]},
+    {0x8003CBD0u, n_libpad_ActPower, 0, &in_kernel[858]},
     {0x8003CE4Cu, 0, 0, &in_kernel[859]},
-    {0x8003CE84u, 0, 0, &in_kernel[860]},
-    {0x8003CEA8u, 0, 0, &in_kernel[861]},
-    {0x8003CEDCu, 0, 0, &in_kernel[862]},
-    {0x8003CFECu, 0, 0, &in_kernel[863]},
-    {0x8003D250u, 0, 0, &in_kernel[864]},
+    {0x8003CE84u, n_libpad_PortBuf, 0, &in_kernel[860]},
+    {0x8003CEA8u, n_libpad_SetHandlers2, 0, &in_kernel[861]},
+    {0x8003CEDCu, n_libpad_StepAnswer, 0, &in_kernel[862]},
+    {0x8003CFECu, n_libpad_Update, 0, &in_kernel[863]},
+    {0x8003D250u, n_libpad_Close, 0, &in_kernel[864]},
     {0x8003D330u, 0, 0, &in_kernel[865]},
     {0x8003D368u, 0, 0, &in_kernel[866]},
     {0x8003D4C0u, 0, 0, &in_kernel[867]},
-    {0x8003D4CCu, 0, 0, &in_kernel[868]},
+    {0x8003D4CCu, n_libpad_Stop, 0, &in_kernel[868]},
     {0x8003D5DCu, 0, 0, &in_kernel[869]},
     {0x8003D618u, 0, 0, &in_kernel[870]},
     {0x8003D638u, 0, 0, &in_kernel[871]},
     {0x8003D750u, 0, 0, &in_kernel[872]},
-    {0x8003DAF8u, 0, 0, &in_kernel[873]},
-    {0x8003DB18u, 0, 0, &in_kernel[874]},
+    {0x8003DAF8u, n_libpad_TimerStart, 0, &in_kernel[873]},
+    {0x8003DB18u, n_libpad_TimedOut, 0, &in_kernel[874]},
     {0x8003DBB8u, 0, 0, &in_kernel[875]},
-    {0x8003DC2Cu, 0, 0, &in_kernel[876]},
+    {0x8003DC2Cu, n_libpad_PatchBios, 0, &in_kernel[876]},
     {0x8003DC9Cu, 0, 0, &in_kernel[877]},
     {0x8003DCACu, 0, 0, &in_kernel[878]},
     {0x8003DCB8u, 0, 0, &in_kernel[879]},
@@ -3064,15 +4107,15 @@ static const RtFunc tab_kernel[] = {
     {0x8003DCE8u, 0, 0, &in_kernel[881]},
     {0x8003DCF4u, 0, 0, &in_kernel[882]},
     {0x8003DCFCu, 0, 0, &in_kernel[883]},
-    {0x8003DF84u, 0, 0, &in_kernel[884]},
+    {0x8003DF84u, n_libpad_SetGp234, 0, &in_kernel[884]},
     {0x8003DF90u, 0, 0, &in_kernel[885]},
-    {0x8003E14Cu, 0, 0, &in_kernel[886]},
-    {0x8003E334u, 0, 0, &in_kernel[887]},
-    {0x8003E530u, 0, 0, &in_kernel[888]},
-    {0x8003E764u, 0, 0, &in_kernel[889]},
-    {0x8003E950u, 0, 0, &in_kernel[890]},
-    {0x8003EB78u, 0, 0, &in_kernel[891]},
-    {0x8003EDE8u, 0, 0, &in_kernel[892]},
+    {0x8003E14Cu, n_gs_DriverFT3Lit, 0, &in_kernel[886]},
+    {0x8003E334u, n_gs_DriverG3Lit, 0, &in_kernel[887]},
+    {0x8003E530u, n_gs_DriverGT3Lit, 0, &in_kernel[888]},
+    {0x8003E764u, n_gs_DriverF4Lit, 0, &in_kernel[889]},
+    {0x8003E950u, n_gs_DriverFT4Lit, 0, &in_kernel[890]},
+    {0x8003EB78u, n_gs_DriverG4Lit, 0, &in_kernel[891]},
+    {0x8003EDE8u, n_gs_DriverGT4Lit, 0, &in_kernel[892]},
     {0x8003F084u, 0, 0, &in_kernel[893]},
     {0x8003F500u, 0, 0, &in_kernel[894]},
     {0x8003F944u, 0, 0, &in_kernel[895]},
@@ -3083,14 +4126,14 @@ static const RtFunc tab_kernel[] = {
     {0x800403B8u, 0, 0, &in_kernel[900]},
     {0x80040508u, 0, 0, &in_kernel[901]},
     {0x80040604u, 0, 0, &in_kernel[902]},
-    {0x80040668u, 0, 0, &in_kernel[903]},
-    {0x800414B4u, 0, 0, &in_kernel[904]},
-    {0x80041880u, 0, 0, &in_kernel[905]},
-    {0x800419D0u, 0, 0, &in_kernel[906]},
-    {0x80041B04u, 0, 0, &in_kernel[907]},
+    {0x80040668u, n_gs_WaterFT3, 0, &in_kernel[903]},
+    {0x800414B4u, n_gs_DivTriFT3R, 0, &in_kernel[904]},
+    {0x80041880u, n_gs_TriOffscreen8, 0, &in_kernel[905]},
+    {0x800419D0u, n_gs_TriFT3Packet, 0, &in_kernel[906]},
+    {0x80041B04u, n_gs_DivMidpointF2, 0, &in_kernel[907]},
     {0x80041B98u, 0, 0, &in_kernel[908]},
     {0x80041C24u, 0, 0, &in_kernel[909]},
-    {0x80041C38u, 0, 0, &in_kernel[910]},
+    {0x80041C38u, n_gte_VectorNormalD, 0, &in_kernel[910]},
     {0x80041C98u, 0, 0, &in_kernel[911]},
     {0x80041D58u, 0, 0, &in_kernel[912]},
     {0x80041E48u, 0, 0, &in_kernel[913]},
@@ -3102,57 +4145,57 @@ static const RtFunc tab_kernel[] = {
     {0x80041F48u, 0, 0, &in_kernel[919]},
     {0x80041F68u, 0, 0, &in_kernel[920]},
     {0x80041F8Cu, 0, 0, &in_kernel[921]},
-    {0x80041FE4u, 0, 0, &in_kernel[922]},
+    {0x80041FE4u, n_gte_OuterProduct0, 0, &in_kernel[922]},
     {0x8004203Cu, 0, 0, &in_kernel[923]},
-    {0x80042058u, 0, 0, &in_kernel[924]},
-    {0x80042FB0u, 0, 0, &in_kernel[925]},
-    {0x800433D4u, 0, 0, &in_kernel[926]},
-    {0x80043524u, 0, 0, &in_kernel[927]},
-    {0x80043670u, 0, 0, &in_kernel[928]},
-    {0x80043758u, 0, 0, &in_kernel[929]},
+    {0x80042058u, n_gs_WaterGT3, 0, &in_kernel[924]},
+    {0x80042FB0u, n_gs_DivTriGT3R, 0, &in_kernel[925]},
+    {0x800433D4u, n_gs_TriOffscreen, 0, &in_kernel[926]},
+    {0x80043524u, n_gs_TriGT3Packet, 0, &in_kernel[927]},
+    {0x80043670u, n_gs_DivMidpoint2, 0, &in_kernel[928]},
+    {0x80043758u, n_gs_DriverF4Div, 0, &in_kernel[929]},
     {0x80043BCCu, 0, 0, &in_kernel[930]},
-    {0x80044010u, 0, 0, &in_kernel[931]},
+    {0x80044010u, n_gs_DivOffscreenF4, 0, &in_kernel[931]},
     {0x800441D0u, 0, 0, &in_kernel[932]},
     {0x800442CCu, 0, 0, &in_kernel[933]},
-    {0x80044330u, 0, 0, &in_kernel[934]},
-    {0x8004535Cu, 0, 0, &in_kernel[935]},
-    {0x80045810u, 0, 0, &in_kernel[936]},
-    {0x800459D0u, 0, 0, &in_kernel[937]},
-    {0x80045B04u, 0, 0, &in_kernel[938]},
-    {0x80045B98u, 0, 0, &in_kernel[939]},
-    {0x80046048u, 0, 0, &in_kernel[940]},
-    {0x800464FCu, 0, 0, &in_kernel[941]},
-    {0x800466BCu, 0, 0, &in_kernel[942]},
-    {0x800467CCu, 0, 0, &in_kernel[943]},
-    {0x80046880u, 0, 0, &in_kernel[944]},
-    {0x8004792Cu, 0, 0, &in_kernel[945]},
-    {0x80047E4Cu, 0, 0, &in_kernel[946]},
-    {0x8004800Cu, 0, 0, &in_kernel[947]},
-    {0x80048158u, 0, 0, &in_kernel[948]},
-    {0x80048240u, 0, 0, &in_kernel[949]},
-    {0x8004867Cu, 0, 0, &in_kernel[950]},
-    {0x80048A04u, 0, 0, &in_kernel[951]},
-    {0x80048B54u, 0, 0, &in_kernel[952]},
-    {0x80048BE8u, 0, 0, &in_kernel[953]},
-    {0x80049050u, 0, 0, &in_kernel[954]},
-    {0x8004942Cu, 0, 0, &in_kernel[955]},
-    {0x8004957Cu, 0, 0, &in_kernel[956]},
-    {0x80049664u, 0, 0, &in_kernel[957]},
-    {0x80049B20u, 0, 0, &in_kernel[958]},
-    {0x80049F84u, 0, 0, &in_kernel[959]},
-    {0x8004A144u, 0, 0, &in_kernel[960]},
-    {0x8004A1D8u, 0, 0, &in_kernel[961]},
-    {0x8004A6ECu, 0, 0, &in_kernel[962]},
-    {0x8004ABBCu, 0, 0, &in_kernel[963]},
-    {0x8004AD7Cu, 0, 0, &in_kernel[964]},
+    {0x80044330u, n_gs_WaterFT4, 0, &in_kernel[934]},
+    {0x8004535Cu, n_gs_DivQuadFT4, 0, &in_kernel[935]},
+    {0x80045810u, n_gs_DivOffscreenF, 0, &in_kernel[936]},
+    {0x800459D0u, n_gs_DivTriFT3, 0, &in_kernel[937]},
+    {0x80045B04u, n_gs_DivMidpointF, 0, &in_kernel[938]},
+    {0x80045B98u, n_gs_DriverG4Div, 0, &in_kernel[939]},
+    {0x80046048u, n_gs_DivQuadG4, 0, &in_kernel[940]},
+    {0x800464FCu, n_gs_DivOffscreenF_800464FC, 0, &in_kernel[941]},
+    {0x800466BCu, n_gs_TriG3Packet, 0, &in_kernel[942]},
+    {0x800467CCu, n_gs_MidpointG, 0, &in_kernel[943]},
+    {0x80046880u, n_gs_WaterGT4, 0, &in_kernel[944]},
+    {0x8004792Cu, n_gs_DivQuadGT4, 0, &in_kernel[945]},
+    {0x80047E4Cu, n_gs_DivOffscreen, 0, &in_kernel[946]},
+    {0x8004800Cu, n_gs_DivTriGT3, 0, &in_kernel[947]},
+    {0x80048158u, n_gs_DivMidpoint, 0, &in_kernel[948]},
+    {0x80048240u, n_gs_DriverFT3Div, 0, &in_kernel[949]},
+    {0x8004867Cu, n_gs_DivTriF3R, 0, &in_kernel[950]},
+    {0x80048A04u, n_gs_TriOffscreen8_80048A04, 0, &in_kernel[951]},
+    {0x80048B54u, n_gs_DivMidpointF4, 0, &in_kernel[952]},
+    {0x80048BE8u, n_gs_DriverGT3Div, 0, &in_kernel[953]},
+    {0x80049050u, n_gs_DivTriGT3S, 0, &in_kernel[954]},
+    {0x8004942Cu, n_gs_TriOffscreen_8004942C, 0, &in_kernel[955]},
+    {0x8004957Cu, n_gs_DivMidpoint_8004957C, 0, &in_kernel[956]},
+    {0x80049664u, n_gs_DriverFT4Div, 0, &in_kernel[957]},
+    {0x80049B20u, n_gs_DivQuadFT4f, 0, &in_kernel[958]},
+    {0x80049F84u, n_gs_DivOffscreenF_80049F84, 0, &in_kernel[959]},
+    {0x8004A144u, n_gs_DivMidpointF3, 0, &in_kernel[960]},
+    {0x8004A1D8u, n_gs_DriverGT4Div, 0, &in_kernel[961]},
+    {0x8004A6ECu, n_gs_DivQuadGT4f, 0, &in_kernel[962]},
+    {0x8004ABBCu, n_gs_DivOffscreen_8004ABBC, 0, &in_kernel[963]},
+    {0x8004AD7Cu, n_gs_DivMidpoint3, 0, &in_kernel[964]},
     {0x8004AE64u, 0, 0, &in_kernel[965]},
     {0x8004B034u, 0, 0, &in_kernel[966]},
     {0x8004B24Cu, 0, 0, &in_kernel[967]},
-    {0x8004B500u, 0, 0, &in_kernel[968]},
+    {0x8004B500u, n_gs_FogGT3Lit, 0, &in_kernel[968]},
     {0x8004B810u, 0, 0, &in_kernel[969]},
     {0x8004BA2Cu, 0, 0, &in_kernel[970]},
     {0x8004BC78u, 0, 0, &in_kernel[971]},
-    {0x8004BFF0u, 0, 0, &in_kernel[972]},
+    {0x8004BFF0u, n_gs_FogGT4Lit, 0, &in_kernel[972]},
     {0x8004C344u, 0, 0, &in_kernel[973]},
     {0x8004C7B4u, 0, 0, &in_kernel[974]},
     {0x8004CBF8u, 0, 0, &in_kernel[975]},
@@ -3163,52 +4206,52 @@ static const RtFunc tab_kernel[] = {
     {0x8004D640u, 0, 0, &in_kernel[980]},
     {0x8004D790u, 0, 0, &in_kernel[981]},
     {0x8004D88Cu, 0, 0, &in_kernel[982]},
-    {0x8004D8F0u, 0, 0, &in_kernel[983]},
+    {0x8004D8F0u, n_gs_WaterFT3Fog, 0, &in_kernel[983]},
     {0x8004E708u, 0, 0, &in_kernel[984]},
-    {0x8004EAD4u, 0, 0, &in_kernel[985]},
-    {0x8004EC24u, 0, 0, &in_kernel[986]},
-    {0x8004ED58u, 0, 0, &in_kernel[987]},
-    {0x8004EDECu, 0, 0, &in_kernel[988]},
+    {0x8004EAD4u, n_gs_TriOffscreen8_8004EAD4, 0, &in_kernel[985]},
+    {0x8004EC24u, n_gs_TriFT3Packet_8004EC24, 0, &in_kernel[986]},
+    {0x8004ED58u, n_gs_DivMidpointF_8004ED58, 0, &in_kernel[987]},
+    {0x8004EDECu, n_gs_WaterGT3Fog, 0, &in_kernel[988]},
     {0x8004FF50u, 0, 0, &in_kernel[989]},
-    {0x80050374u, 0, 0, &in_kernel[990]},
-    {0x800504C4u, 0, 0, &in_kernel[991]},
-    {0x80050610u, 0, 0, &in_kernel[992]},
+    {0x80050374u, n_gs_TriOffscreen_80050374, 0, &in_kernel[990]},
+    {0x800504C4u, n_gs_TriGT3Packet_800504C4, 0, &in_kernel[991]},
+    {0x80050610u, n_gs_DivMidpoint_80050610, 0, &in_kernel[992]},
     {0x800506F8u, 0, 0, &in_kernel[993]},
     {0x80050B28u, 0, 0, &in_kernel[994]},
     {0x80050F6Cu, 0, 0, &in_kernel[995]},
     {0x8005112Cu, 0, 0, &in_kernel[996]},
     {0x80051228u, 0, 0, &in_kernel[997]},
-    {0x8005128Cu, 0, 0, &in_kernel[998]},
-    {0x8005224Cu, 0, 0, &in_kernel[999]},
-    {0x80052700u, 0, 0, &in_kernel[1000]},
-    {0x800528C0u, 0, 0, &in_kernel[1001]},
-    {0x800529F4u, 0, 0, &in_kernel[1002]},
+    {0x8005128Cu, n_gs_WaterFT4Fog, 0, &in_kernel[998]},
+    {0x8005224Cu, n_gs_DivQuadFT4b, 0, &in_kernel[999]},
+    {0x80052700u, n_gs_DivOffscreenF_80052700, 0, &in_kernel[1000]},
+    {0x800528C0u, n_gs_DivTriFT3b, 0, &in_kernel[1001]},
+    {0x800529F4u, n_gs_DivMidpointF5, 0, &in_kernel[1002]},
     {0x80052A88u, 0, 0, &in_kernel[1003]},
     {0x80053140u, 0, 0, &in_kernel[1004]},
-    {0x800535F4u, 0, 0, &in_kernel[1005]},
+    {0x800535F4u, n_gs_DivOffscreenF_800535F4, 0, &in_kernel[1005]},
     {0x800537B4u, 0, 0, &in_kernel[1006]},
     {0x800538C4u, 0, 0, &in_kernel[1007]},
-    {0x80053978u, 0, 0, &in_kernel[1008]},
-    {0x80054C48u, 0, 0, &in_kernel[1009]},
-    {0x80055168u, 0, 0, &in_kernel[1010]},
-    {0x80055328u, 0, 0, &in_kernel[1011]},
-    {0x80055474u, 0, 0, &in_kernel[1012]},
+    {0x80053978u, n_gs_WaterGT4Fog, 0, &in_kernel[1008]},
+    {0x80054C48u, n_gs_DivQuadGT4c, 0, &in_kernel[1009]},
+    {0x80055168u, n_gs_DivOffscreen_80055168, 0, &in_kernel[1010]},
+    {0x80055328u, n_gs_DivTriGT3b, 0, &in_kernel[1011]},
+    {0x80055474u, n_gs_DivMidpoint4, 0, &in_kernel[1012]},
     {0x8005555Cu, 0, 0, &in_kernel[1013]},
     {0x8005595Cu, 0, 0, &in_kernel[1014]},
-    {0x80055CE4u, 0, 0, &in_kernel[1015]},
-    {0x80055E34u, 0, 0, &in_kernel[1016]},
+    {0x80055CE4u, n_gs_TriOffscreen8_80055CE4, 0, &in_kernel[1015]},
+    {0x80055E34u, n_gs_DivMidpointF_80055E34, 0, &in_kernel[1016]},
     {0x80055EC8u, 0, 0, &in_kernel[1017]},
     {0x800564FCu, 0, 0, &in_kernel[1018]},
-    {0x800568D8u, 0, 0, &in_kernel[1019]},
-    {0x80056A28u, 0, 0, &in_kernel[1020]},
+    {0x800568D8u, n_gs_TriOffscreen_800568D8, 0, &in_kernel[1019]},
+    {0x80056A28u, n_gs_DivMidpoint_80056A28, 0, &in_kernel[1020]},
     {0x80056B10u, 0, 0, &in_kernel[1021]},
     {0x80056FB8u, 0, 0, &in_kernel[1022]},
-    {0x8005741Cu, 0, 0, &in_kernel[1023]},
-    {0x800575DCu, 0, 0, &in_kernel[1024]},
+    {0x8005741Cu, n_gs_DivOffscreenF_8005741C, 0, &in_kernel[1023]},
+    {0x800575DCu, n_gs_DivMidpointF_800575DC, 0, &in_kernel[1024]},
     {0x80057670u, 0, 0, &in_kernel[1025]},
     {0x80057D8Cu, 0, 0, &in_kernel[1026]},
-    {0x8005825Cu, 0, 0, &in_kernel[1027]},
-    {0x8005841Cu, 0, 0, &in_kernel[1028]},
+    {0x8005825Cu, n_gs_DivOffscreen_8005825C, 0, &in_kernel[1027]},
+    {0x8005841Cu, n_gs_DivMidpoint_8005841C, 0, &in_kernel[1028]},
 };
 static const uint32_t patch_kernel[] = {0x800110D8, 0x0000006B, 0x03E00008, 0x00000000, 0x27BDFFC0, 0xAFBF003C, 0xAFB10038, 0xAFB00034, 0x0C01DFDA, 0x00808025, 0x3C11800B, 0x8E263D48, 0x27A50024, 0x0C01BDEA, 0x02002025, 0x3401FFFF, 0x3C03800B, 0x3C04800B, 0x3C02800B, 0x8C454DE8, 0x00000000, 0x24A60001, 0xAC464DE8, 0x8C844DE4, 0x00052840, 0x00852821, 0x84A50000, 0x00000000, 0x24A5F9C0, 0xAC658634, 0x00061840, 0x00831821, 0x94630000, 0x00000000, 0x14610010, 0x00000000, 0x8E213D48, 0x00000000, 0x0421000A, 0xAC404DE8, 0x3C02800B, 0x84414DF8, 0x00000000, 0x24230001, 0x28210003, 0x14200002, 0x00000000, 0x24030064, 0xA4434DF8, 0x0C0212C1, 0x00000000, 0x27A40014, 0x27B00024, 0x0C020720, 0x02002825, 0x8FA10014, 0x8FA20024, 0x00000000, 0x00410821, 0xAFA10024, 0x8FA10018, 0x8FA20028, 0x00000000, 0x00410821, 0xAFA10028, 0x8FA1001C, 0x8FA2002C, 0x00000000, 0x00410821, 0xAFA1002C, 0x3C01800B, 0x243185C0, 0x26240018, 0x02002825, 0x0C01F2E7, 0x24060000, 0x10400004, 0x8FA30024, 0x8FA2002C, 0x0800448C, 0x00000000, 0x8E210020, 0x8FA2002C, 0x00000000, 0x00221021, 0x8E210018, 0x00000000, 0x00231821, 0x3C01800B, 0x242185C0, 0xAC220020, 0x0C01E039, 0xAC230018, 0x0C01E082, 0x00000000, 0x3C01800B, 0x9421865C, 0x00000000, 0x10200003, 0x00000000, 0x0C01E27E, 0x00000000, 0x8FB00034, 0x8FB10038, 0x8FBF003C, 0x00000000, 0x03E00008, 0x27BD0040, 0x00000000, 0x80011288, 0x00000001, 0x00000000, 0x80011290, 0x00000002, 0x00000000, 0x00000000};
 
@@ -3867,7 +4910,7 @@ static const InFunc in_test[] = {
 };
 static const RtFunc tab_test[] = {
     {0x8006C9FCu, 0, 0, &in_test[0]},
-    {0x8006CAA0u, 0, 0, &in_test[1]},
+    {0x8006CAA0u, n_test_Main, 0, &in_test[1]},
     {0x8006D068u, n_render_ClearOts, 0, &in_test[2]},
     {0x8006D158u, n_render_AddObject, 0, &in_test[3]},
     {0x8006D180u, n_render_ClearObjects, 0, &in_test[4]},
@@ -3915,14 +4958,14 @@ static const RtFunc tab_test[] = {
     {0x800710FCu, n_enemy_AddHit, 0, &in_test[46]},
     {0x800711A8u, n_object_InView, 0, &in_test[47]},
     {0x800713F4u, n_demo_Start, 0, &in_test[48]},
-    {0x80071514u, 0, 0, &in_test[49]},
+    {0x80071514u, n_item_InitListC, 0, &in_test[49]},
     {0x80071584u, n_input_SampleFrame, 0, &in_test[50]},
     {0x80071738u, n_checkpoint_NewGameItems, 0, &in_test[51]},
     {0x800717E8u, n_checkpoint_Make, 0, &in_test[52]},
     {0x80071C0Cu, 0, 0, &in_test[53]},
     {0x80071CF4u, n_checkpoint_Restore, 0, &in_test[54]},
     {0x80072DC8u, n_display_Init, 0, &in_test[55]},
-    {0x80072F74u, 0, 0, &in_test[56]},
+    {0x80072F74u, n_test_DisplayReset, 0, &in_test[56]},
     {0x800731BCu, n_pad_Rumble, 0, &in_test[57]},
     {0x80073228u, 0, 0, &in_test[58]},
     {0x80073274u, 0, 0, &in_test[59]},
@@ -4048,7 +5091,7 @@ static const RtFunc tab_test[] = {
     {0x8007EBDCu, 0, 0, &in_test[179]},
     {0x8007EF44u, 0, 0, &in_test[180]},
     {0x8007EF50u, n_pad_CheckRemoved, 0, &in_test[181]},
-    {0x8007F028u, 0, 0, &in_test[182]},
+    {0x8007F028u, n_hint_Setup, 0, &in_test[182]},
     {0x8007F16Cu, n_hint_DrawIcon, 0, &in_test[183]},
     {0x8007F210u, n_enemy_SteerToPlayer, 0, &in_test[184]},
     {0x8007F404u, n_enemy_MoveStep, 0, &in_test[185]},
@@ -4182,7 +5225,7 @@ static const RtFunc tab_test[] = {
     {0x800885FCu, 0, 0, &in_test[313]},
     {0x80088604u, 0, 0, &in_test[314]},
     {0x8008860Cu, 0, 0, &in_test[315]},
-    {0x80088614u, 0, 0, &in_test[316]},
+    {0x80088614u, n_script_StageOp, 0, &in_test[316]},
     {0x80088678u, n_op_WhiteOut, 0, &in_test[317]},
     {0x8008870Cu, 0, 0, &in_test[318]},
     {0x80088828u, n_op_Music, 0, &in_test[319]},
@@ -4302,7 +5345,7 @@ static const RtFunc tab_test[] = {
     {0x8008F014u, n_enemy_ResetMarkers, 0, &in_test[433]},
     {0x8008F044u, 0, 0, &in_test[434]},
     {0x8008F0E0u, n_reticle_LoadImage, 0, &in_test[435]},
-    {0x8008F1A0u, 0, 0, &in_test[436]},
+    {0x8008F1A0u, n_hint_LoadImage, 0, &in_test[436]},
     {0x8008F1F0u, n_opening_SetupText, 0, &in_test[437]},
     {0x8008F3BCu, n_sg_Monologue, 0, &in_test[438]},
     {0x8008F5F8u, n_flag_Set, 0, &in_test[439]},
@@ -4437,7 +5480,7 @@ static const RtFunc tab_test[] = {
     {0x8009798Cu, n_action_LauncherDone, 0, &in_test[568]},
     {0x800979F4u, n_action_Rocket, 0, &in_test[569]},
     {0x80097B48u, n_hud_NewBullet, 0, &in_test[570]},
-    {0x80097C14u, 0, 0, &in_test[571]},
+    {0x80097C14u, n_fx_LoadBuiltin, 0, &in_test[571]},
     {0x8009806Cu, n_fx_LoadSet, 0, &in_test[572]},
     {0x80098100u, n_fx_LoadStageSet, 0, &in_test[573]},
     {0x8009815Cu, n_fx_StreamStageSet, 0, &in_test[574]},
@@ -4679,26 +5722,26 @@ static const InFunc in_title[] = {
     {0x8007EE20u, 155, 1, 459, 0, 0, 0},
 };
 static const RtFunc tab_title[] = {
-    {0x8006C244u, 0, 0, &in_title[0]},
+    {0x8006C244u, n_title_Main, 0, &in_title[0]},
     {0x8006C55Cu, n_title_Init, 0, &in_title[1]},
     {0x8006C6E4u, n_title_FrameEnd, 0, &in_title[2]},
-    {0x8006C88Cu, 0, 0, &in_title[3]},
+    {0x8006C88Cu, n_title_Setup, 0, &in_title[3]},
     {0x8006C9D8u, n_title_Draw, 0, &in_title[4]},
-    {0x8006CBF8u, 0, 0, &in_title[5]},
+    {0x8006CBF8u, n_title_Entry0, 0, &in_title[5]},
     {0x8006CC18u, 0, 0, &in_title[6]},
-    {0x8006CC38u, 0, 0, &in_title[7]},
-    {0x8006CC58u, 0, 0, &in_title[8]},
+    {0x8006CC38u, n_title_Entry2, 0, &in_title[7]},
+    {0x8006CC58u, n_title_Entry3, 0, &in_title[8]},
     {0x8006CC78u, n_title_Sound, 0, &in_title[9]},
     {0x8006CD74u, 0, 0, &in_title[10]},
     {0x8006CE20u, n_title_LoadPics, 0, &in_title[11]},
     {0x8006CEB0u, 0, 0, &in_title[12]},
     {0x8006CF00u, 0, 0, &in_title[13]},
-    {0x8006CF24u, 0, 0, &in_title[14]},
+    {0x8006CF24u, n_title_Frame, 0, &in_title[14]},
     {0x8006D094u, n_title_RunSprites, 0, &in_title[15]},
-    {0x8006D11Cu, 0, 0, &in_title[16]},
+    {0x8006D11Cu, n_title_Picture, 0, &in_title[16]},
     {0x8006D3DCu, n_title_ItemUpdate, 0, &in_title[17]},
-    {0x8006D628u, 0, 0, &in_title[18]},
-    {0x8006D820u, 0, 0, &in_title[19]},
+    {0x8006D628u, n_title_Movie, 0, &in_title[18]},
+    {0x8006D820u, n_title_Logos, 0, &in_title[19]},
     {0x8006DA00u, n_title_MenuBuild, 0, &in_title[20]},
     {0x8006E120u, n_title_WheelItemUpdate, 0, &in_title[21]},
     {0x8006E2B8u, n_title_PointerUpdate, 0, &in_title[22]},
@@ -4719,7 +5762,7 @@ static const RtFunc tab_title[] = {
     {0x8006F4F0u, n_title_LoadFadeIn, 0, &in_title[37]},
     {0x8006F528u, 0, 0, &in_title[38]},
     {0x8006F56Cu, n_title_UploadTim, 0, &in_title[39]},
-    {0x8006F620u, 0, 0, &in_title[40]},
+    {0x8006F620u, n_title_ToDemo, 0, &in_title[40]},
     {0x8006F65Cu, 0, 0, &in_title[41]},
     {0x8006F6D0u, n_sprite_AddShadow, 0, &in_title[42]},
     {0x8006F7D0u, n_title_ArrowUpdate, 0, &in_title[43]},
@@ -4874,11 +5917,11 @@ static const InFunc in_typew[] = {
     {0x8006EEDCu, 32, 1, 82, 2, 0, 0},
 };
 static const RtFunc tab_typew[] = {
-    {0x8006C22Cu, 0, 0, &in_typew[0]},
-    {0x8006C284u, 0, 0, &in_typew[1]},
-    {0x8006C314u, 0, 0, &in_typew[2]},
+    {0x8006C22Cu, n_story_Main, 0, &in_typew[0]},
+    {0x8006C284u, n_story_End, 0, &in_typew[1]},
+    {0x8006C314u, n_story_Reset, 0, &in_typew[2]},
     {0x8006C420u, n_story_TextCode, 0, &in_typew[3]},
-    {0x8006C480u, 0, 0, &in_typew[4]},
+    {0x8006C480u, n_story_MainLoop, 0, &in_typew[4]},
     {0x8006C6D0u, n_story_FadeInStart, 0, &in_typew[5]},
     {0x8006C71Cu, n_story_Typing, 0, &in_typew[6]},
     {0x8006C934u, n_story_EndWait, 0, &in_typew[7]},
@@ -4899,7 +5942,7 @@ static const RtFunc tab_typew[] = {
     {0x8006DC20u, n_story_FadeToBlack, 0, &in_typew[22]},
     {0x8006DC68u, n_story_FadeDraw, 0, &in_typew[23]},
     {0x8006DE7Cu, n_story_FadeMode, 0, &in_typew[24]},
-    {0x8006DEB4u, 0, 0, &in_typew[25]},
+    {0x8006DEB4u, n_story_Movie, 0, &in_typew[25]},
     {0x8006E15Cu, n_story_CheckSkip, 0, &in_typew[26]},
     {0x8006E3C0u, n_story_DrawPrompt, 0, &in_typew[27]},
     {0x8006EC18u, n_story_SkipFade, 0, &in_typew[28]},
@@ -4940,33 +5983,33 @@ static const InFunc in_score[] = {
     {0x8006D8DCu, 26, 1, 13, 0, 0, 0},
 };
 static const RtFunc tab_score[] = {
-    {0x8006C154u, 0, 0, &in_score[0]},
-    {0x8006C290u, 0, 0, &in_score[1]},
-    {0x8006C3E4u, 0, 0, &in_score[2]},
-    {0x8006C650u, 0, 0, &in_score[3]},
-    {0x8006C7E0u, 0, 0, &in_score[4]},
-    {0x8006CA28u, 0, 0, &in_score[5]},
-    {0x8006CCE4u, 0, 0, &in_score[6]},
-    {0x8006CE14u, 0, 0, &in_score[7]},
-    {0x8006D01Cu, 0, 0, &in_score[8]},
-    {0x8006D150u, 0, 0, &in_score[9]},
-    {0x8006D198u, 0, 0, &in_score[10]},
-    {0x8006D1E0u, 0, 0, &in_score[11]},
-    {0x8006D278u, 0, 0, &in_score[12]},
-    {0x8006D2B0u, 0, 0, &in_score[13]},
-    {0x8006D320u, 0, 0, &in_score[14]},
-    {0x8006D3B0u, 0, 0, &in_score[15]},
-    {0x8006D44Cu, 0, 0, &in_score[16]},
-    {0x8006D50Cu, 0, 0, &in_score[17]},
-    {0x8006D62Cu, 0, 0, &in_score[18]},
-    {0x8006D74Cu, 0, 0, &in_score[19]},
-    {0x8006D778u, 0, 0, &in_score[20]},
-    {0x8006D828u, 0, 0, &in_score[21]},
-    {0x8006D854u, 0, 0, &in_score[22]},
-    {0x8006D890u, 0, 0, &in_score[23]},
-    {0x8006D8B0u, 0, 0, &in_score[24]},
-    {0x8006D8CCu, 0, 0, &in_score[25]},
-    {0x8006D8DCu, 0, 0, &in_score[26]},
+    {0x8006C154u, n_results_Init, 0, &in_score[0]},
+    {0x8006C290u, n_results_Flip, 0, &in_score[1]},
+    {0x8006C3E4u, n_results_DrawText, 0, &in_score[2]},
+    {0x8006C650u, n_results_DrawTexts, 0, &in_score[3]},
+    {0x8006C7E0u, n_results_DrawBackground, 0, &in_score[4]},
+    {0x8006CA28u, n_results_Compute, 0, &in_score[5]},
+    {0x8006CCE4u, n_results_TimeDigits, 0, &in_score[6]},
+    {0x8006CE14u, n_results_Rank, 0, &in_score[7]},
+    {0x8006D01Cu, n_results_Fade, 0, &in_score[8]},
+    {0x8006D150u, n_results_Main, 0, &in_score[9]},
+    {0x8006D198u, n_results_Begin, 0, &in_score[10]},
+    {0x8006D1E0u, n_results_Loop, 0, &in_score[11]},
+    {0x8006D278u, n_results_Exit, 0, &in_score[12]},
+    {0x8006D2B0u, n_results_Frame, 0, &in_score[13]},
+    {0x8006D320u, n_results_Load, 0, &in_score[14]},
+    {0x8006D3B0u, n_results_UploadTim, 0, &in_score[15]},
+    {0x8006D44Cu, n_results_InitFade, 0, &in_score[16]},
+    {0x8006D50Cu, n_results_Digits6, 0, &in_score[17]},
+    {0x8006D62Cu, n_results_Digits4, 0, &in_score[18]},
+    {0x8006D74Cu, n_results_StateFadeIn, 0, &in_score[19]},
+    {0x8006D778u, n_results_StatePad, 0, &in_score[20]},
+    {0x8006D828u, n_results_StateFadeOut, 0, &in_score[21]},
+    {0x8006D854u, n_results_StateWaitFade, 0, &in_score[22]},
+    {0x8006D890u, n_results_FadeInStart, 0, &in_score[23]},
+    {0x8006D8B0u, n_results_FadeOutStart, 0, &in_score[24]},
+    {0x8006D8CCu, n_results_FadeFlags, 0, &in_score[25]},
+    {0x8006D8DCu, n_results_Pow, 0, &in_score[26]},
 };
 static const uint32_t patch_score[] = {0};
 
@@ -4995,23 +6038,23 @@ static const InFunc in_staff[] = {
     {0x8006CFACu, 18, 1, 21, 0, 0, 0},
 };
 static const RtFunc tab_staff[] = {
-    {0x8006C11Cu, 0, 0, &in_staff[0]},
+    {0x8006C11Cu, n_credits_Main, 0, &in_staff[0]},
     {0x8006C30Cu, n_credits_Init, 0, &in_staff[1]},
     {0x8006C448u, n_credits_Flip, 0, &in_staff[2]},
     {0x8006C5ACu, n_credits_Scroll, 0, &in_staff[3]},
-    {0x8006C770u, 0, 0, &in_staff[4]},
+    {0x8006C770u, n_credits_FadeOutWait, 0, &in_staff[4]},
     {0x8006C838u, n_credits_DrawText, 0, &in_staff[5]},
     {0x8006C9F8u, n_credits_DrawLines, 0, &in_staff[6]},
     {0x8006CB7Cu, n_credits_Fade, 0, &in_staff[7]},
-    {0x8006CCB0u, 0, 0, &in_staff[8]},
-    {0x8006CCF8u, 0, 0, &in_staff[9]},
-    {0x8006CD4Cu, 0, 0, &in_staff[10]},
+    {0x8006CCB0u, n_credits_Entry, 0, &in_staff[8]},
+    {0x8006CCF8u, n_credits_Reset, 0, &in_staff[9]},
+    {0x8006CD4Cu, n_credits_End, 0, &in_staff[10]},
     {0x8006CD90u, n_credits_FrameBegin, 0, &in_staff[11]},
     {0x8006CDF8u, n_credits_LoadImage, 0, &in_staff[12]},
     {0x8006CE1Cu, n_credits_UploadTim, 0, &in_staff[13]},
     {0x8006CEB8u, n_credits_InitFade, 0, &in_staff[14]},
-    {0x8006CF78u, 0, 0, &in_staff[15]},
-    {0x8006CF94u, 0, 0, &in_staff[16]},
+    {0x8006CF78u, n_credits_FadeStart, 0, &in_staff[15]},
+    {0x8006CF94u, n_credits_FadeFlags, 0, &in_staff[16]},
     {0x8006CFA4u, 0, 0, &in_staff[17]},
     {0x8006CFACu, 0, 0, &in_staff[18]},
 };
@@ -5075,55 +6118,55 @@ static const InFunc in_option[] = {
     {0x800CC264u, 51, 1, 188, 0, 0, 0},
 };
 static const RtFunc tab_option[] = {
-    {0x800C3E80u, 0, 0, &in_option[0]},
-    {0x800C3F9Cu, 0, 0, &in_option[1]},
-    {0x800C40D4u, 0, 0, &in_option[2]},
-    {0x800C41E8u, 0, 0, &in_option[3]},
-    {0x800C43B4u, 0, 0, &in_option[4]},
-    {0x800C4E1Cu, 0, 0, &in_option[5]},
-    {0x800C4F84u, 0, 0, &in_option[6]},
-    {0x800C5054u, 0, 0, &in_option[7]},
-    {0x800C53D4u, 0, 0, &in_option[8]},
-    {0x800C5FC8u, 0, 0, &in_option[9]},
+    {0x800C3E80u, n_option_Open, 0, &in_option[0]},
+    {0x800C3F9Cu, n_option_Frame, 0, &in_option[1]},
+    {0x800C40D4u, n_option_InitCursors, 0, &in_option[2]},
+    {0x800C41E8u, n_option_EdgeSprite, 0, &in_option[3]},
+    {0x800C43B4u, n_option_Carousel, 0, &in_option[4]},
+    {0x800C4E1Cu, n_option_Wheel, 0, &in_option[5]},
+    {0x800C4F84u, n_option_AttachedText, 0, &in_option[6]},
+    {0x800C5054u, n_option_ResetScreen, 0, &in_option[7]},
+    {0x800C53D4u, n_option_AdjustScreen, 0, &in_option[8]},
+    {0x800C5FC8u, n_option_ItemLabel, 0, &in_option[9]},
     {0x800C6060u, 0, 0, &in_option[10]},
-    {0x800C61C8u, 0, 0, &in_option[11]},
-    {0x800C7160u, 0, 0, &in_option[12]},
-    {0x800C72B8u, 0, 0, &in_option[13]},
-    {0x800C7448u, 0, 0, &in_option[14]},
+    {0x800C61C8u, n_option_KeyConfig, 0, &in_option[11]},
+    {0x800C7160u, n_option_ScrollArrow, 0, &in_option[12]},
+    {0x800C72B8u, n_option_ListEntry, 0, &in_option[13]},
+    {0x800C7448u, n_option_KeyGlyph, 0, &in_option[14]},
     {0x800C75F8u, 0, 0, &in_option[15]},
     {0x800C7CB4u, 0, 0, &in_option[16]},
-    {0x800C7D80u, 0, 0, &in_option[17]},
-    {0x800C8FC4u, 0, 0, &in_option[18]},
-    {0x800C919Cu, 0, 0, &in_option[19]},
-    {0x800C9250u, 0, 0, &in_option[20]},
-    {0x800C9364u, 0, 0, &in_option[21]},
-    {0x800C9420u, 0, 0, &in_option[22]},
-    {0x800C95FCu, 0, 0, &in_option[23]},
+    {0x800C7D80u, n_option_SoundScreen, 0, &in_option[17]},
+    {0x800C8FC4u, n_option_ValueText, 0, &in_option[18]},
+    {0x800C919Cu, n_option_ValueBox, 0, &in_option[19]},
+    {0x800C9250u, n_option_ValueSlider, 0, &in_option[20]},
+    {0x800C9364u, n_option_RowMarker, 0, &in_option[21]},
+    {0x800C9420u, n_option_RowNumber, 0, &in_option[22]},
+    {0x800C95FCu, n_option_ValueButton, 0, &in_option[23]},
     {0x800C976Cu, 0, 0, &in_option[24]},
     {0x800CA240u, 0, 0, &in_option[25]},
     {0x800CA358u, 0, 0, &in_option[26]},
-    {0x800CA41Cu, 0, 0, &in_option[27]},
-    {0x800CA860u, 0, 0, &in_option[28]},
-    {0x800CAAD8u, 0, 0, &in_option[29]},
+    {0x800CA41Cu, n_option_DrawBigText, 0, &in_option[27]},
+    {0x800CA860u, n_option_DrawText, 0, &in_option[28]},
+    {0x800CAAD8u, n_option_DrawTextEx, 0, &in_option[29]},
     {0x800CAF9Cu, 0, 0, &in_option[30]},
-    {0x800CB248u, 0, 0, &in_option[31]},
-    {0x800CB2ACu, 0, 0, &in_option[32]},
+    {0x800CB248u, n_option_AllocSprite, 0, &in_option[31]},
+    {0x800CB2ACu, n_option_DrawSprites, 0, &in_option[32]},
     {0x800CB7A4u, 0, 0, &in_option[33]},
-    {0x800CB924u, 0, 0, &in_option[34]},
-    {0x800CBA8Cu, 0, 0, &in_option[35]},
-    {0x800CBC28u, 0, 0, &in_option[36]},
-    {0x800CBCB0u, 0, 0, &in_option[37]},
-    {0x800CBD48u, 0, 0, &in_option[38]},
+    {0x800CB924u, n_option_Pressed, 0, &in_option[34]},
+    {0x800CBA8Cu, n_option_Draw, 0, &in_option[35]},
+    {0x800CBC28u, n_option_RunSprites, 0, &in_option[36]},
+    {0x800CBCB0u, n_option_InitSprite, 0, &in_option[37]},
+    {0x800CBD48u, n_option_ClearMarks, 0, &in_option[38]},
     {0x800CBD60u, 0, 0, &in_option[39]},
-    {0x800CBDE4u, 0, 0, &in_option[40]},
-    {0x800CBE40u, 0, 0, &in_option[41]},
-    {0x800CBEA8u, 0, 0, &in_option[42]},
-    {0x800CBED0u, 0, 0, &in_option[43]},
-    {0x800CBF40u, 0, 0, &in_option[44]},
-    {0x800CBFA8u, 0, 0, &in_option[45]},
-    {0x800CC03Cu, 0, 0, &in_option[46]},
-    {0x800CC090u, 0, 0, &in_option[47]},
-    {0x800CC0DCu, 0, 0, &in_option[48]},
+    {0x800CBDE4u, n_option_EndMouseDrag, 0, &in_option[40]},
+    {0x800CBE40u, n_option_LoadText, 0, &in_option[41]},
+    {0x800CBEA8u, n_option_HideOnClose, 0, &in_option[42]},
+    {0x800CBED0u, n_option_MouseShown, 0, &in_option[43]},
+    {0x800CBF40u, n_option_ArrowPair, 0, &in_option[44]},
+    {0x800CBFA8u, n_option_SlideOnEdit, 0, &in_option[45]},
+    {0x800CC03Cu, n_option_DimUnlessCurrent, 0, &in_option[46]},
+    {0x800CC090u, n_option_NumberText, 0, &in_option[47]},
+    {0x800CC0DCu, n_option_DimUnlessCurrentB, 0, &in_option[48]},
     {0x800CC130u, 0, 0, &in_option[49]},
     {0x800CC1D8u, 0, 0, &in_option[50]},
     {0x800CC264u, 0, 0, &in_option[51]},
@@ -5252,25 +6295,25 @@ static const InFunc in_ovl34[] = {
 static const RtFunc tab_ovl34[] = {
     {0x800F80D0u, 0, 0, &in_ovl34[0]},
     {0x800F80D4u, 0, 0, &in_ovl34[1]},
-    {0x800F8560u, 0, 0, &in_ovl34[2]},
-    {0x800F8598u, 0, 0, &in_ovl34[3]},
-    {0x800F85BCu, 0, 0, &in_ovl34[4]},
-    {0x800F85FCu, 0, 0, &in_ovl34[5]},
-    {0x800F8628u, 0, 0, &in_ovl34[6]},
-    {0x800F86E4u, 0, 0, &in_ovl34[7]},
-    {0x800F8728u, 0, 0, &in_ovl34[8]},
-    {0x800F878Cu, 0, 0, &in_ovl34[9]},
-    {0x800F8924u, 0, 0, &in_ovl34[10]},
-    {0x800F8944u, 0, 0, &in_ovl34[11]},
-    {0x800F8AE8u, 0, 0, &in_ovl34[12]},
-    {0x800F8C90u, 0, 0, &in_ovl34[13]},
-    {0x800F8D40u, 0, 0, &in_ovl34[14]},
-    {0x800F8DC8u, 0, 0, &in_ovl34[15]},
-    {0x800F8E24u, 0, 0, &in_ovl34[16]},
-    {0x800F90DCu, 0, 0, &in_ovl34[17]},
-    {0x800F90ECu, 0, 0, &in_ovl34[18]},
-    {0x800F9130u, 0, 0, &in_ovl34[19]},
-    {0x800F922Cu, 0, 0, &in_ovl34[20]},
+    {0x800F8560u, n_zombie_Voice_A, 0, &in_ovl34[2]},
+    {0x800F8598u, n_zombie_Sound_A, 0, &in_ovl34[3]},
+    {0x800F85BCu, n_zombie_VoiceAt_A, 0, &in_ovl34[4]},
+    {0x800F85FCu, n_zombie_SoundAt_A, 0, &in_ovl34[5]},
+    {0x800F8628u, n_zombie_CanGrab_A, 0, &in_ovl34[6]},
+    {0x800F86E4u, n_zombie_SetPartsDir_A, 0, &in_ovl34[7]},
+    {0x800F8728u, n_zombie_AnimEvent_A, 0, &in_ovl34[8]},
+    {0x800F878Cu, n_zombie_PlayerInCone_A, 0, &in_ovl34[9]},
+    {0x800F8924u, n_zombie_PlayerInConeCached_A, 0, &in_ovl34[10]},
+    {0x800F8944u, n_zombie_CrossedEdge_A, 0, &in_ovl34[11]},
+    {0x800F8AE8u, n_zombie_CrossedWall_A, 0, &in_ovl34[12]},
+    {0x800F8C90u, n_zombie_WallAhead_A, 0, &in_ovl34[13]},
+    {0x800F8D40u, n_zombie_PlayerSide_A, 0, &in_ovl34[14]},
+    {0x800F8DC8u, n_zombie_WallDistance_A, 0, &in_ovl34[15]},
+    {0x800F8E24u, n_zombie_AvoidWalls_A, 0, &in_ovl34[16]},
+    {0x800F90DCu, n_zombie_NoDeathEvent_A, 0, &in_ovl34[17]},
+    {0x800F90ECu, n_zombie_EaseSway_A, 0, &in_ovl34[18]},
+    {0x800F9130u, n_zombie_SwayToPlayer_A, 0, &in_ovl34[19]},
+    {0x800F922Cu, n_zombie_WalkAnimFor_A, 0, &in_ovl34[20]},
     {0x800F9268u, 0, 0, &in_ovl34[21]},
     {0x800F9274u, 0, 0, &in_ovl34[22]},
     {0x800F927Cu, 0, 0, &in_ovl34[23]},
@@ -5280,67 +6323,67 @@ static const RtFunc tab_ovl34[] = {
     {0x800F92B0u, 0, 0, &in_ovl34[27]},
     {0x800F92B8u, 0, 0, &in_ovl34[28]},
     {0x800F92C0u, 0, 0, &in_ovl34[29]},
-    {0x800F92CCu, 0, 0, &in_ovl34[30]},
+    {0x800F92CCu, n_zombie_OnHit_A, 0, &in_ovl34[30]},
     {0x800F9428u, 0, 0, &in_ovl34[31]},
     {0x800F9438u, 0, 0, &in_ovl34[32]},
     {0x800F9448u, 0, 0, &in_ovl34[33]},
     {0x800F945Cu, 0, 0, &in_ovl34[34]},
-    {0x800F9474u, 0, 0, &in_ovl34[35]},
-    {0x800F9700u, 0, 0, &in_ovl34[36]},
-    {0x800F9948u, 0, 0, &in_ovl34[37]},
-    {0x800F99F0u, 0, 0, &in_ovl34[38]},
-    {0x800F9CE4u, 0, 0, &in_ovl34[39]},
+    {0x800F9474u, n_zombie_PickHitReaction_A, 0, &in_ovl34[35]},
+    {0x800F9700u, n_zombie_PickFatalReaction_A, 0, &in_ovl34[36]},
+    {0x800F9948u, n_zombie_TryGrab_A, 0, &in_ovl34[37]},
+    {0x800F99F0u, n_zombie_IdleThink_A, 0, &in_ovl34[38]},
+    {0x800F9CE4u, n_zombie_WalkAnim_A, 0, &in_ovl34[39]},
     {0x800F9D3Cu, 0, 0, &in_ovl34[40]},
-    {0x800F9D44u, 0, 0, &in_ovl34[41]},
-    {0x800F9F88u, 0, 0, &in_ovl34[42]},
-    {0x800FA054u, 0, 0, &in_ovl34[43]},
-    {0x800FA224u, 0, 0, &in_ovl34[44]},
-    {0x800FA3C8u, 0, 0, &in_ovl34[45]},
-    {0x800FA468u, 0, 0, &in_ovl34[46]},
-    {0x800FA488u, 0, 0, &in_ovl34[47]},
+    {0x800F9D44u, n_zombie_WalkThink_A, 0, &in_ovl34[41]},
+    {0x800F9F88u, n_zombie_DropLimb_A, 0, &in_ovl34[42]},
+    {0x800FA054u, n_zombie_LoseLimbs_A, 0, &in_ovl34[43]},
+    {0x800FA224u, n_zombie_ApplyDamage_A, 0, &in_ovl34[44]},
+    {0x800FA3C8u, n_zombie_ArmourBonus_A, 0, &in_ovl34[45]},
+    {0x800FA468u, n_zombie_IdlePre_A, 0, &in_ovl34[46]},
+    {0x800FA488u, n_zombie_IdleStep_A, 0, &in_ovl34[47]},
     {0x800FA490u, 0, 0, &in_ovl34[48]},
     {0x800FA4BCu, 0, 0, &in_ovl34[49]},
     {0x800FA648u, 0, 0, &in_ovl34[50]},
     {0x800FA770u, 0, 0, &in_ovl34[51]},
-    {0x800FA7C0u, 0, 0, &in_ovl34[52]},
-    {0x800FA828u, 0, 0, &in_ovl34[53]},
-    {0x800FAC30u, 0, 0, &in_ovl34[54]},
-    {0x800FAC38u, 0, 0, &in_ovl34[55]},
-    {0x800FAD54u, 0, 0, &in_ovl34[56]},
-    {0x800FAD74u, 0, 0, &in_ovl34[57]},
-    {0x800FB2ACu, 0, 0, &in_ovl34[58]},
-    {0x800FB2CCu, 0, 0, &in_ovl34[59]},
+    {0x800FA7C0u, n_zombie_WalkPre_A, 0, &in_ovl34[52]},
+    {0x800FA828u, n_zombie_WalkStep_A, 0, &in_ovl34[53]},
+    {0x800FAC30u, n_zombie_GrabPre_A, 0, &in_ovl34[54]},
+    {0x800FAC38u, n_zombie_GrabStep_A, 0, &in_ovl34[55]},
+    {0x800FAD54u, n_zombie_KnockPre_A, 0, &in_ovl34[56]},
+    {0x800FAD74u, n_zombie_KnockStep_A, 0, &in_ovl34[57]},
+    {0x800FB2ACu, n_zombie_DiePre_A, 0, &in_ovl34[58]},
+    {0x800FB2CCu, n_zombie_DieStep_A, 0, &in_ovl34[59]},
     {0x800FB498u, 0, 0, &in_ovl34[60]},
     {0x800FB4A0u, 0, 0, &in_ovl34[61]},
-    {0x800FB510u, 0, 0, &in_ovl34[62]},
-    {0x800FB518u, 0, 0, &in_ovl34[63]},
-    {0x800FB5F4u, 0, 0, &in_ovl34[64]},
-    {0x800FB614u, 0, 0, &in_ovl34[65]},
+    {0x800FB510u, n_zombie_CollapsePre_A, 0, &in_ovl34[62]},
+    {0x800FB518u, n_zombie_CollapseStep_A, 0, &in_ovl34[63]},
+    {0x800FB5F4u, n_zombie_LurkPre_A, 0, &in_ovl34[64]},
+    {0x800FB614u, n_zombie_LurkStep_A, 0, &in_ovl34[65]},
     {0x800FB860u, 0, 0, &in_ovl34[66]},
     {0x800FB868u, 0, 0, &in_ovl34[67]},
     {0x800FBC64u, 0, 0, &in_ovl34[68]},
     {0x800FBC6Cu, 0, 0, &in_ovl34[69]},
     {0x800FBF6Cu, 0, 0, &in_ovl34[70]},
     {0x800FBF74u, 0, 0, &in_ovl34[71]},
-    {0x800FBF9Cu, 0, 0, &in_ovl34[72]},
-    {0x800FBFA4u, 0, 0, &in_ovl34[73]},
+    {0x800FBF9Cu, n_zombie_BitePre_A, 0, &in_ovl34[72]},
+    {0x800FBFA4u, n_zombie_BiteStep_A, 0, &in_ovl34[73]},
     {0x800FC0FCu, 0, 0, &in_ovl34[74]},
-    {0x800FC108u, 0, 0, &in_ovl34[75]},
-    {0x800FC2E0u, 0, 0, &in_ovl34[76]},
-    {0x800FC398u, 0, 0, &in_ovl34[77]},
-    {0x800FC534u, 0, 0, &in_ovl34[78]},
-    {0x800FC660u, 0, 0, &in_ovl34[79]},
-    {0x800FC6F4u, 0, 0, &in_ovl34[80]},
-    {0x800FC7B4u, 0, 0, &in_ovl34[81]},
+    {0x800FC108u, n_zombie_StateActive_A, 0, &in_ovl34[75]},
+    {0x800FC2E0u, n_zombie_StateHit_A, 0, &in_ovl34[76]},
+    {0x800FC398u, n_zombie_StateDying_A, 0, &in_ovl34[77]},
+    {0x800FC534u, n_zombie_StatePad_A, 0, &in_ovl34[78]},
+    {0x800FC660u, n_zombie_StepSound_A, 0, &in_ovl34[79]},
+    {0x800FC6F4u, n_zombie_JointHook_A, 0, &in_ovl34[80]},
+    {0x800FC7B4u, n_zombie_Setup_A, 0, &in_ovl34[81]},
     {0x800FCADCu, 0, 0, &in_ovl34[82]},
-    {0x800FCBE8u, 0, 0, &in_ovl34[83]},
-    {0x800FCC50u, 0, 0, &in_ovl34[84]},
-    {0x800FCCECu, 0, 0, &in_ovl34[85]},
-    {0x800FCD5Cu, 0, 0, &in_ovl34[86]},
-    {0x800FCE78u, 0, 0, &in_ovl34[87]},
+    {0x800FCBE8u, n_zombie_ZoneCheck_A, 0, &in_ovl34[83]},
+    {0x800FCC50u, n_zombie_ZoneTrack_A, 0, &in_ovl34[84]},
+    {0x800FCCECu, n_zombie_UpdateLostHead_A, 0, &in_ovl34[85]},
+    {0x800FCD5Cu, n_zombie_SpeedByDistance_A, 0, &in_ovl34[86]},
+    {0x800FCE78u, n_zombie_SyncWalkAnim_A, 0, &in_ovl34[87]},
     {0x800FD030u, 0, 0, &in_ovl34[88]},
-    {0x800FD160u, 0, 0, &in_ovl34[89]},
-    {0x800FD180u, 0, 0, &in_ovl34[90]},
+    {0x800FD160u, n_zombie_GrabCooldown_A, 0, &in_ovl34[89]},
+    {0x800FD180u, n_zombie_Update_A, 0, &in_ovl34[90]},
 };
 static const uint32_t patch_ovl34[] = {0};
 
@@ -5396,33 +6439,33 @@ static const InFunc in_ovl35[] = {
     {0x800FBC80u, 46, 1, 98, 0, 0, 0},
 };
 static const RtFunc tab_ovl35[] = {
-    {0x800F801Cu, 0, 0, &in_ovl35[0]},
-    {0x800F812Cu, 0, 0, &in_ovl35[1]},
-    {0x800F8454u, 0, 0, &in_ovl35[2]},
-    {0x800F8870u, 0, 0, &in_ovl35[3]},
-    {0x800F8C7Cu, 0, 0, &in_ovl35[4]},
+    {0x800F801Cu, n_cerberus_TargetInCone_A, 0, &in_ovl35[0]},
+    {0x800F812Cu, n_cerberus_CrossedWall_A, 0, &in_ovl35[1]},
+    {0x800F8454u, n_cerberus_AvoidWalls_A, 0, &in_ovl35[2]},
+    {0x800F8870u, n_cerberus_Steer_A, 0, &in_ovl35[3]},
+    {0x800F8C7Cu, n_cerberus_SteerTo_A, 0, &in_ovl35[4]},
     {0x800F8EA4u, 0, 0, &in_ovl35[5]},
-    {0x800F8FD4u, 0, 0, &in_ovl35[6]},
-    {0x800F9248u, 0, 0, &in_ovl35[7]},
-    {0x800F941Cu, 0, 0, &in_ovl35[8]},
-    {0x800F9568u, 0, 0, &in_ovl35[9]},
-    {0x800F976Cu, 0, 0, &in_ovl35[10]},
-    {0x800F9ABCu, 0, 0, &in_ovl35[11]},
+    {0x800F8FD4u, n_cerberus_Circle_A, 0, &in_ovl35[6]},
+    {0x800F9248u, n_cerberus_BlockedSides_A, 0, &in_ovl35[7]},
+    {0x800F941Cu, n_cerberus_CanLeap_A, 0, &in_ovl35[8]},
+    {0x800F9568u, n_cerberus_Wander_A, 0, &in_ovl35[9]},
+    {0x800F976Cu, n_cerberus_RoamStep_A, 0, &in_ovl35[10]},
+    {0x800F9ABCu, n_cerberus_ChaseStep_A, 0, &in_ovl35[11]},
     {0x800F9F58u, 0, 0, &in_ovl35[12]},
     {0x800FA070u, 0, 0, &in_ovl35[13]},
-    {0x800FA1BCu, 0, 0, &in_ovl35[14]},
-    {0x800FA2D4u, 0, 0, &in_ovl35[15]},
-    {0x800FA65Cu, 0, 0, &in_ovl35[16]},
+    {0x800FA1BCu, n_cerberus_KnockStep_A, 0, &in_ovl35[14]},
+    {0x800FA2D4u, n_cerberus_LeapStep_A, 0, &in_ovl35[15]},
+    {0x800FA65Cu, n_cerberus_BiteStep_A, 0, &in_ovl35[16]},
     {0x800FA88Cu, 0, 0, &in_ovl35[17]},
     {0x800FA99Cu, 0, 0, &in_ovl35[18]},
-    {0x800FAAE8u, 0, 0, &in_ovl35[19]},
+    {0x800FAAE8u, n_cerberus_OnHit_A, 0, &in_ovl35[19]},
     {0x800FAD58u, 0, 0, &in_ovl35[20]},
     {0x800FADA0u, 0, 0, &in_ovl35[21]},
     {0x800FAE9Cu, 0, 0, &in_ovl35[22]},
-    {0x800FAEBCu, 0, 0, &in_ovl35[23]},
-    {0x800FAFF0u, 0, 0, &in_ovl35[24]},
-    {0x800FB0F0u, 0, 0, &in_ovl35[25]},
-    {0x800FB1FCu, 0, 0, &in_ovl35[26]},
+    {0x800FAEBCu, n_cerberus_PlaceInRoom_A, 0, &in_ovl35[23]},
+    {0x800FAFF0u, n_cerberus_TrackPos_A, 0, &in_ovl35[24]},
+    {0x800FB0F0u, n_cerberus_Setup_A, 0, &in_ovl35[25]},
+    {0x800FB1FCu, n_cerberus_Update_A, 0, &in_ovl35[26]},
     {0x800FB618u, 0, 0, &in_ovl35[27]},
     {0x800FB6FCu, 0, 0, &in_ovl35[28]},
     {0x800FB800u, 0, 0, &in_ovl35[29]},
@@ -5436,9 +6479,9 @@ static const RtFunc tab_ovl35[] = {
     {0x800FBB68u, 0, 0, &in_ovl35[37]},
     {0x800FBB70u, 0, 0, &in_ovl35[38]},
     {0x800FBB78u, 0, 0, &in_ovl35[39]},
-    {0x800FBB80u, 0, 0, &in_ovl35[40]},
+    {0x800FBB80u, n_cerberus_JointHook_A, 0, &in_ovl35[40]},
     {0x800FBBC4u, 0, 0, &in_ovl35[41]},
-    {0x800FBBCCu, 0, 0, &in_ovl35[42]},
+    {0x800FBBCCu, n_cerberus_StateActive_A, 0, &in_ovl35[42]},
     {0x800FBC08u, 0, 0, &in_ovl35[43]},
     {0x800FBC44u, 0, 0, &in_ovl35[44]},
     {0x800FBC80u, 0, 0, &in_ovl35[45]},
@@ -5498,11 +6541,11 @@ static const InFunc in_ovl36[] = {
 static const RtFunc tab_ovl36[] = {
     {0x800F8040u, 0, 0, &in_ovl36[0]},
     {0x800F8044u, 0, 0, &in_ovl36[1]},
-    {0x800F809Cu, 0, 0, &in_ovl36[2]},
-    {0x800F81D0u, 0, 0, &in_ovl36[3]},
-    {0x800F8380u, 0, 0, &in_ovl36[4]},
-    {0x800F8594u, 0, 0, &in_ovl36[5]},
-    {0x800F87FCu, 0, 0, &in_ovl36[6]},
+    {0x800F809Cu, n_crow_TakeHits_A, 0, &in_ovl36[2]},
+    {0x800F81D0u, n_crow_WallBetween_A, 0, &in_ovl36[3]},
+    {0x800F8380u, n_crow_WallAhead_A, 0, &in_ovl36[4]},
+    {0x800F8594u, n_crow_Steer_A, 0, &in_ovl36[5]},
+    {0x800F87FCu, n_crow_TurnTo_A, 0, &in_ovl36[6]},
     {0x800F89DCu, 0, 0, &in_ovl36[7]},
     {0x800F8B04u, 0, 0, &in_ovl36[8]},
     {0x800F8B28u, 0, 0, &in_ovl36[9]},
@@ -5513,31 +6556,31 @@ static const RtFunc tab_ovl36[] = {
     {0x800F9024u, 0, 0, &in_ovl36[14]},
     {0x800F9228u, 0, 0, &in_ovl36[15]},
     {0x800F9358u, 0, 0, &in_ovl36[16]},
-    {0x800F9488u, 0, 0, &in_ovl36[17]},
-    {0x800F9650u, 0, 0, &in_ovl36[18]},
-    {0x800F97BCu, 0, 0, &in_ovl36[19]},
-    {0x800F9AD0u, 0, 0, &in_ovl36[20]},
-    {0x800F9C58u, 0, 0, &in_ovl36[21]},
-    {0x800FA028u, 0, 0, &in_ovl36[22]},
+    {0x800F9488u, n_crow_FallStep_A, 0, &in_ovl36[17]},
+    {0x800F9650u, n_crow_PickFlight_A, 0, &in_ovl36[18]},
+    {0x800F97BCu, n_crow_Approach_A, 0, &in_ovl36[19]},
+    {0x800F9AD0u, n_crow_Circle_A, 0, &in_ovl36[20]},
+    {0x800F9C58u, n_crow_FlyStep_A, 0, &in_ovl36[21]},
+    {0x800FA028u, n_crow_PeckStep_A, 0, &in_ovl36[22]},
     {0x800FA104u, 0, 0, &in_ovl36[23]},
     {0x800FA184u, 0, 0, &in_ovl36[24]},
     {0x800FA1BCu, 0, 0, &in_ovl36[25]},
     {0x800FA1F4u, 0, 0, &in_ovl36[26]},
     {0x800FA264u, 0, 0, &in_ovl36[27]},
-    {0x800FA3E4u, 0, 0, &in_ovl36[28]},
-    {0x800FAAFCu, 0, 0, &in_ovl36[29]},
-    {0x800FAE04u, 0, 0, &in_ovl36[30]},
-    {0x800FAF50u, 0, 0, &in_ovl36[31]},
-    {0x800FB08Cu, 0, 0, &in_ovl36[32]},
-    {0x800FB218u, 0, 0, &in_ovl36[33]},
-    {0x800FB458u, 0, 0, &in_ovl36[34]},
+    {0x800FA3E4u, n_crow_SwoopStep_A, 0, &in_ovl36[28]},
+    {0x800FAAFCu, n_crow_TakeoffStep_A, 0, &in_ovl36[29]},
+    {0x800FAE04u, n_crow_Hop_A, 0, &in_ovl36[30]},
+    {0x800FAF50u, n_crow_PerchStep_A, 0, &in_ovl36[31]},
+    {0x800FB08Cu, n_crow_LandStep_A, 0, &in_ovl36[32]},
+    {0x800FB218u, n_crow_WatchStep_A, 0, &in_ovl36[33]},
+    {0x800FB458u, n_crow_DieStep_A, 0, &in_ovl36[34]},
     {0x800FB794u, 0, 0, &in_ovl36[35]},
-    {0x800FB898u, 0, 0, &in_ovl36[36]},
-    {0x800FBA9Cu, 0, 0, &in_ovl36[37]},
-    {0x800FBC38u, 0, 0, &in_ovl36[38]},
+    {0x800FB898u, n_crow_DeadFallStep_A, 0, &in_ovl36[36]},
+    {0x800FBA9Cu, n_crow_RoomEvent_A, 0, &in_ovl36[37]},
+    {0x800FBC38u, n_crow_Update_A, 0, &in_ovl36[38]},
     {0x800FBD68u, 0, 0, &in_ovl36[39]},
     {0x800FBE24u, 0, 0, &in_ovl36[40]},
-    {0x800FBE30u, 0, 0, &in_ovl36[41]},
+    {0x800FBE30u, n_crow_StateActive_A, 0, &in_ovl36[41]},
     {0x800FBE6Cu, 0, 0, &in_ovl36[42]},
     {0x800FBEA8u, 0, 0, &in_ovl36[43]},
     {0x800FBEE4u, 0, 0, &in_ovl36[44]},
@@ -5684,25 +6727,25 @@ static const InFunc in_ovl37[] = {
 static const RtFunc tab_ovl37[] = {
     {0x800F80B8u, 0, 0, &in_ovl37[0]},
     {0x800F80BCu, 0, 0, &in_ovl37[1]},
-    {0x800F81CCu, 0, 0, &in_ovl37[2]},
-    {0x800F8294u, 0, 0, &in_ovl37[3]},
-    {0x800F83CCu, 0, 0, &in_ovl37[4]},
-    {0x800F844Cu, 0, 0, &in_ovl37[5]},
-    {0x800F84B4u, 0, 0, &in_ovl37[6]},
-    {0x800F84E8u, 0, 0, &in_ovl37[7]},
+    {0x800F81CCu, n_licker_TryDrop_A, 0, &in_ovl37[2]},
+    {0x800F8294u, n_licker_TryLeap_A, 0, &in_ovl37[3]},
+    {0x800F83CCu, n_licker_StepSound_A, 0, &in_ovl37[4]},
+    {0x800F844Cu, n_licker_WakeHit_A, 0, &in_ovl37[5]},
+    {0x800F84B4u, n_licker_ShowParts_A, 0, &in_ovl37[6]},
+    {0x800F84E8u, n_licker_AnimEvent_A, 0, &in_ovl37[7]},
     {0x800F854Cu, 0, 0, &in_ovl37[8]},
     {0x800F8590u, 0, 0, &in_ovl37[9]},
     {0x800F86FCu, 0, 0, &in_ovl37[10]},
     {0x800F874Cu, 0, 0, &in_ovl37[11]},
     {0x800F87A8u, 0, 0, &in_ovl37[12]},
-    {0x800F8830u, 0, 0, &in_ovl37[13]},
-    {0x800F89B8u, 0, 0, &in_ovl37[14]},
+    {0x800F8830u, n_licker_PlayerInCone_A, 0, &in_ovl37[13]},
+    {0x800F89B8u, n_licker_CrossedWall_A, 0, &in_ovl37[14]},
     {0x800F8B60u, 0, 0, &in_ovl37[15]},
-    {0x800F8C34u, 0, 0, &in_ovl37[16]},
-    {0x800F8CE4u, 0, 0, &in_ovl37[17]},
+    {0x800F8C34u, n_licker_WallAhead_A, 0, &in_ovl37[16]},
+    {0x800F8CE4u, n_licker_CrossedEdge_A, 0, &in_ovl37[17]},
     {0x800F8E88u, 0, 0, &in_ovl37[18]},
     {0x800F8EECu, 0, 0, &in_ovl37[19]},
-    {0x800F8F10u, 0, 0, &in_ovl37[20]},
+    {0x800F8F10u, n_licker_EdgeAhead_A, 0, &in_ovl37[20]},
     {0x800F9004u, 0, 0, &in_ovl37[21]},
     {0x800F9100u, 0, 0, &in_ovl37[22]},
     {0x800F91E0u, 0, 0, &in_ovl37[23]},
@@ -5719,12 +6762,12 @@ static const RtFunc tab_ovl37[] = {
     {0x800F93C8u, 0, 0, &in_ovl37[34]},
     {0x800F95D0u, 0, 0, &in_ovl37[35]},
     {0x800F9680u, 0, 0, &in_ovl37[36]},
-    {0x800F96C8u, 0, 0, &in_ovl37[37]},
+    {0x800F96C8u, n_licker_IdleThink_A, 0, &in_ovl37[37]},
     {0x800F98C0u, 0, 0, &in_ovl37[38]},
     {0x800F9940u, 0, 0, &in_ovl37[39]},
-    {0x800F9B18u, 0, 0, &in_ovl37[40]},
-    {0x800F9C68u, 0, 0, &in_ovl37[41]},
-    {0x800F9E18u, 0, 0, &in_ovl37[42]},
+    {0x800F9B18u, n_licker_CalmDown_A, 0, &in_ovl37[40]},
+    {0x800F9C68u, n_licker_Spot_A, 0, &in_ovl37[41]},
+    {0x800F9E18u, n_licker_AvoidWalls_A, 0, &in_ovl37[42]},
     {0x800FA14Cu, 0, 0, &in_ovl37[43]},
     {0x800FA174u, 0, 0, &in_ovl37[44]},
     {0x800FA2E4u, 0, 0, &in_ovl37[45]},
@@ -5745,10 +6788,10 @@ static const RtFunc tab_ovl37[] = {
     {0x800FA96Cu, 0, 0, &in_ovl37[60]},
     {0x800FA9A8u, 0, 0, &in_ovl37[61]},
     {0x800FA9C0u, 0, 0, &in_ovl37[62]},
-    {0x800FAA40u, 0, 0, &in_ovl37[63]},
-    {0x800FAA74u, 0, 0, &in_ovl37[64]},
-    {0x800FAD04u, 0, 0, &in_ovl37[65]},
-    {0x800FAD48u, 0, 0, &in_ovl37[66]},
+    {0x800FAA40u, n_licker_IdlePre_A, 0, &in_ovl37[63]},
+    {0x800FAA74u, n_licker_TurnStep_A, 0, &in_ovl37[64]},
+    {0x800FAD04u, n_licker_HuntPre_A, 0, &in_ovl37[65]},
+    {0x800FAD48u, n_licker_HuntStep_A, 0, &in_ovl37[66]},
     {0x800FAFF4u, 0, 0, &in_ovl37[67]},
     {0x800FB038u, 0, 0, &in_ovl37[68]},
     {0x800FB0FCu, 0, 0, &in_ovl37[69]},
@@ -5771,8 +6814,8 @@ static const RtFunc tab_ovl37[] = {
     {0x800FBE04u, 0, 0, &in_ovl37[86]},
     {0x800FC0ACu, 0, 0, &in_ovl37[87]},
     {0x800FC0B4u, 0, 0, &in_ovl37[88]},
-    {0x800FC138u, 0, 0, &in_ovl37[89]},
-    {0x800FC140u, 0, 0, &in_ovl37[90]},
+    {0x800FC138u, n_licker_LeapPre_A, 0, &in_ovl37[89]},
+    {0x800FC140u, n_licker_LeapStep_A, 0, &in_ovl37[90]},
     {0x800FC4A0u, 0, 0, &in_ovl37[91]},
     {0x800FC4A8u, 0, 0, &in_ovl37[92]},
     {0x800FC894u, 0, 0, &in_ovl37[93]},
@@ -5785,12 +6828,12 @@ static const RtFunc tab_ovl37[] = {
     {0x800FCB58u, 0, 0, &in_ovl37[100]},
     {0x800FCDE0u, 0, 0, &in_ovl37[101]},
     {0x800FCDE8u, 0, 0, &in_ovl37[102]},
-    {0x800FCEF8u, 0, 0, &in_ovl37[103]},
-    {0x800FCF00u, 0, 0, &in_ovl37[104]},
+    {0x800FCEF8u, n_licker_IntroPre_A, 0, &in_ovl37[103]},
+    {0x800FCF00u, n_licker_IntroStep_A, 0, &in_ovl37[104]},
     {0x800FD330u, 0, 0, &in_ovl37[105]},
     {0x800FD338u, 0, 0, &in_ovl37[106]},
-    {0x800FD508u, 0, 0, &in_ovl37[107]},
-    {0x800FD510u, 0, 0, &in_ovl37[108]},
+    {0x800FD508u, n_licker_RoomPre_A, 0, &in_ovl37[107]},
+    {0x800FD510u, n_licker_RoomSetup_A, 0, &in_ovl37[108]},
     {0x800FD720u, 0, 0, &in_ovl37[109]},
     {0x800FD728u, 0, 0, &in_ovl37[110]},
     {0x800FDBB4u, 0, 0, &in_ovl37[111]},
@@ -5804,16 +6847,16 @@ static const RtFunc tab_ovl37[] = {
     {0x800FE704u, 0, 0, &in_ovl37[119]},
     {0x800FE70Cu, 0, 0, &in_ovl37[120]},
     {0x800FE7E0u, 0, 0, &in_ovl37[121]},
-    {0x800FE7ECu, 0, 0, &in_ovl37[122]},
+    {0x800FE7ECu, n_licker_StateActive_A, 0, &in_ovl37[122]},
     {0x800FE888u, 0, 0, &in_ovl37[123]},
     {0x800FE938u, 0, 0, &in_ovl37[124]},
     {0x800FE9D0u, 0, 0, &in_ovl37[125]},
-    {0x800FE9D8u, 0, 0, &in_ovl37[126]},
+    {0x800FE9D8u, n_licker_Tongue_A, 0, &in_ovl37[126]},
     {0x800FEC84u, 0, 0, &in_ovl37[127]},
-    {0x800FECCCu, 0, 0, &in_ovl37[128]},
-    {0x800FEDE8u, 0, 0, &in_ovl37[129]},
-    {0x800FEE94u, 0, 0, &in_ovl37[130]},
-    {0x800FF094u, 0, 0, &in_ovl37[131]},
+    {0x800FECCCu, n_licker_SpeedByDistance_A, 0, &in_ovl37[128]},
+    {0x800FEDE8u, n_licker_Marker_A, 0, &in_ovl37[129]},
+    {0x800FEE94u, n_licker_Setup_A, 0, &in_ovl37[130]},
+    {0x800FF094u, n_licker_Update_A, 0, &in_ovl37[131]},
 };
 static const uint32_t patch_ovl37[] = {0};
 
@@ -5856,32 +6899,32 @@ static const InFunc in_ovl38[] = {
 static const RtFunc tab_ovl38[] = {
     {0x800F8018u, 0, 0, &in_ovl38[0]},
     {0x800F801Cu, 0, 0, &in_ovl38[1]},
-    {0x800F80ACu, 0, 0, &in_ovl38[2]},
-    {0x800F8254u, 0, 0, &in_ovl38[3]},
-    {0x800F83FCu, 0, 0, &in_ovl38[4]},
-    {0x800F860Cu, 0, 0, &in_ovl38[5]},
-    {0x800F88B8u, 0, 0, &in_ovl38[6]},
-    {0x800F8C24u, 0, 0, &in_ovl38[7]},
-    {0x800F8DE4u, 0, 0, &in_ovl38[8]},
-    {0x800F8FBCu, 0, 0, &in_ovl38[9]},
+    {0x800F80ACu, n_cockroach_CrossedEdge_A, 0, &in_ovl38[2]},
+    {0x800F8254u, n_cockroach_OntoWall_A, 0, &in_ovl38[3]},
+    {0x800F83FCu, n_cockroach_Steer_A, 0, &in_ovl38[4]},
+    {0x800F860Cu, n_cockroach_CeilingStep_A, 0, &in_ovl38[5]},
+    {0x800F88B8u, n_cockroach_FloorStep_A, 0, &in_ovl38[6]},
+    {0x800F8C24u, n_cockroach_ClimbStep_A, 0, &in_ovl38[7]},
+    {0x800F8DE4u, n_cockroach_DescendStep_A, 0, &in_ovl38[8]},
+    {0x800F8FBCu, n_cockroach_LeapFloor_A, 0, &in_ovl38[9]},
     {0x800F900Cu, 0, 0, &in_ovl38[10]},
     {0x800F90C0u, 0, 0, &in_ovl38[11]},
     {0x800F9170u, 0, 0, &in_ovl38[12]},
     {0x800F9238u, 0, 0, &in_ovl38[13]},
     {0x800F9284u, 0, 0, &in_ovl38[14]},
-    {0x800F9330u, 0, 0, &in_ovl38[15]},
+    {0x800F9330u, n_cockroach_LeapCeiling_A, 0, &in_ovl38[15]},
     {0x800F9744u, 0, 0, &in_ovl38[16]},
-    {0x800F9B88u, 0, 0, &in_ovl38[17]},
-    {0x800F9F84u, 0, 0, &in_ovl38[18]},
-    {0x800FA0A8u, 0, 0, &in_ovl38[19]},
-    {0x800FA1FCu, 0, 0, &in_ovl38[20]},
-    {0x800FA384u, 0, 0, &in_ovl38[21]},
-    {0x800FA4BCu, 0, 0, &in_ovl38[22]},
+    {0x800F9B88u, n_cockroach_ClingStep_A, 0, &in_ovl38[17]},
+    {0x800F9F84u, n_cockroach_FallDead_A, 0, &in_ovl38[18]},
+    {0x800FA0A8u, n_cockroach_IdleStep_A, 0, &in_ovl38[19]},
+    {0x800FA1FCu, n_cockroach_CrawlStep_A, 0, &in_ovl38[20]},
+    {0x800FA384u, n_cockroach_CrouchStep_A, 0, &in_ovl38[21]},
+    {0x800FA4BCu, n_cockroach_DieStep_A, 0, &in_ovl38[22]},
     {0x800FA58Cu, 0, 0, &in_ovl38[23]},
-    {0x800FA6A8u, 0, 0, &in_ovl38[24]},
-    {0x800FA93Cu, 0, 0, &in_ovl38[25]},
+    {0x800FA6A8u, n_cockroach_Update_A, 0, &in_ovl38[24]},
+    {0x800FA93Cu, n_cockroach_LeapStep_A, 0, &in_ovl38[25]},
     {0x800FAA18u, 0, 0, &in_ovl38[26]},
-    {0x800FAA24u, 0, 0, &in_ovl38[27]},
+    {0x800FAA24u, n_cockroach_StateActive_A, 0, &in_ovl38[27]},
     {0x800FAA60u, 0, 0, &in_ovl38[28]},
     {0x800FAA9Cu, 0, 0, &in_ovl38[29]},
     {0x800FAAD8u, 0, 0, &in_ovl38[30]},
@@ -5995,19 +7038,19 @@ static const RtFunc tab_ovl39[] = {
     {0x800F801Cu, 0, 0, &in_ovl39[1]},
     {0x800F8030u, 0, 0, &in_ovl39[2]},
     {0x800F8078u, 0, 0, &in_ovl39[3]},
-    {0x800F820Cu, 0, 0, &in_ovl39[4]},
-    {0x800F841Cu, 0, 0, &in_ovl39[5]},
-    {0x800F84ACu, 0, 0, &in_ovl39[6]},
+    {0x800F820Cu, n_spider_EdgeCheck_A, 0, &in_ovl39[4]},
+    {0x800F841Cu, n_spider_MoveCheck_A, 0, &in_ovl39[5]},
+    {0x800F84ACu, n_spider_MoveStep_A, 0, &in_ovl39[6]},
     {0x800F8510u, 0, 0, &in_ovl39[7]},
     {0x800F853Cu, 0, 0, &in_ovl39[8]},
-    {0x800F8684u, 0, 0, &in_ovl39[9]},
-    {0x800F8798u, 0, 0, &in_ovl39[10]},
+    {0x800F8684u, n_spider_Attack_A, 0, &in_ovl39[9]},
+    {0x800F8798u, n_spider_Sway_A, 0, &in_ovl39[10]},
     {0x800F8AE0u, 0, 0, &in_ovl39[11]},
-    {0x800F8C80u, 0, 0, &in_ovl39[12]},
+    {0x800F8C80u, n_spider_Wake_A, 0, &in_ovl39[12]},
     {0x800F8D08u, 0, 0, &in_ovl39[13]},
     {0x800F8E20u, 0, 0, &in_ovl39[14]},
     {0x800F8F38u, 0, 0, &in_ovl39[15]},
-    {0x800F8FFCu, 0, 0, &in_ovl39[16]},
+    {0x800F8FFCu, n_spider_CrossedWall_A, 0, &in_ovl39[16]},
     {0x800F91A4u, 0, 0, &in_ovl39[17]},
     {0x800F9310u, 0, 0, &in_ovl39[18]},
     {0x800F9334u, 0, 0, &in_ovl39[19]},
@@ -6018,11 +7061,11 @@ static const RtFunc tab_ovl39[] = {
     {0x800F963Cu, 0, 0, &in_ovl39[24]},
     {0x800F9658u, 0, 0, &in_ovl39[25]},
     {0x800F9718u, 0, 0, &in_ovl39[26]},
-    {0x800F9918u, 0, 0, &in_ovl39[27]},
-    {0x800F9B48u, 0, 0, &in_ovl39[28]},
+    {0x800F9918u, n_spider_TakeHits_A, 0, &in_ovl39[27]},
+    {0x800F9B48u, n_spider_OnHit_A, 0, &in_ovl39[28]},
     {0x800F9C58u, 0, 0, &in_ovl39[29]},
     {0x800F9CB4u, 0, 0, &in_ovl39[30]},
-    {0x800F9D3Cu, 0, 0, &in_ovl39[31]},
+    {0x800F9D3Cu, n_spider_PlayerInCone_A, 0, &in_ovl39[31]},
     {0x800F9EC4u, 0, 0, &in_ovl39[32]},
     {0x800F9F74u, 0, 0, &in_ovl39[33]},
     {0x800FA230u, 0, 0, &in_ovl39[34]},
@@ -6060,12 +7103,12 @@ static const RtFunc tab_ovl39[] = {
     {0x800FBF8Cu, 0, 0, &in_ovl39[66]},
     {0x800FC0F4u, 0, 0, &in_ovl39[67]},
     {0x800FC0FCu, 0, 0, &in_ovl39[68]},
-    {0x800FC328u, 0, 0, &in_ovl39[69]},
-    {0x800FC3B4u, 0, 0, &in_ovl39[70]},
+    {0x800FC328u, n_spider_CrawlPre_A, 0, &in_ovl39[69]},
+    {0x800FC3B4u, n_spider_CrawlStep_A, 0, &in_ovl39[70]},
     {0x800FC5DCu, 0, 0, &in_ovl39[71]},
     {0x800FC5E4u, 0, 0, &in_ovl39[72]},
-    {0x800FC63Cu, 0, 0, &in_ovl39[73]},
-    {0x800FC65Cu, 0, 0, &in_ovl39[74]},
+    {0x800FC63Cu, n_spider_LandPre_A, 0, &in_ovl39[73]},
+    {0x800FC65Cu, n_spider_LandStep_A, 0, &in_ovl39[74]},
     {0x800FC828u, 0, 0, &in_ovl39[75]},
     {0x800FC848u, 0, 0, &in_ovl39[76]},
     {0x800FC9F0u, 0, 0, &in_ovl39[77]},
@@ -6074,20 +7117,20 @@ static const RtFunc tab_ovl39[] = {
     {0x800FCB3Cu, 0, 0, &in_ovl39[80]},
     {0x800FCCC4u, 0, 0, &in_ovl39[81]},
     {0x800FCCCCu, 0, 0, &in_ovl39[82]},
-    {0x800FCCD4u, 0, 0, &in_ovl39[83]},
-    {0x800FCCDCu, 0, 0, &in_ovl39[84]},
+    {0x800FCCD4u, n_spider_DiePre_A, 0, &in_ovl39[83]},
+    {0x800FCCDCu, n_spider_DieStep_A, 0, &in_ovl39[84]},
     {0x800FCE58u, 0, 0, &in_ovl39[85]},
     {0x800FCE60u, 0, 0, &in_ovl39[86]},
     {0x800FD114u, 0, 0, &in_ovl39[87]},
     {0x800FD11Cu, 0, 0, &in_ovl39[88]},
     {0x800FD2F8u, 0, 0, &in_ovl39[89]},
-    {0x800FD300u, 0, 0, &in_ovl39[90]},
+    {0x800FD300u, n_spider_StateActive_A, 0, &in_ovl39[90]},
     {0x800FD424u, 0, 0, &in_ovl39[91]},
-    {0x800FD4B0u, 0, 0, &in_ovl39[92]},
+    {0x800FD4B0u, n_spider_StateBoth_A, 0, &in_ovl39[92]},
     {0x800FD518u, 0, 0, &in_ovl39[93]},
-    {0x800FD520u, 0, 0, &in_ovl39[94]},
+    {0x800FD520u, n_spider_ShadowHeight_A, 0, &in_ovl39[94]},
     {0x800FD530u, 0, 0, &in_ovl39[95]},
-    {0x800FD69Cu, 0, 0, &in_ovl39[96]},
+    {0x800FD69Cu, n_spider_Update_A, 0, &in_ovl39[96]},
 };
 static const uint32_t patch_ovl39[] = {0};
 
@@ -6148,17 +7191,17 @@ static const InFunc in_ovl40[] = {
 static const RtFunc tab_ovl40[] = {
     {0x800F8030u, 0, 0, &in_ovl40[0]},
     {0x800F8034u, 0, 0, &in_ovl40[1]},
-    {0x800F8078u, 0, 0, &in_ovl40[2]},
+    {0x800F8078u, n_alligator_AnimEvent_A, 0, &in_ovl40[2]},
     {0x800F80DCu, 0, 0, &in_ovl40[3]},
-    {0x800F8104u, 0, 0, &in_ovl40[4]},
-    {0x800F828Cu, 0, 0, &in_ovl40[5]},
-    {0x800F8338u, 0, 0, &in_ovl40[6]},
+    {0x800F8104u, n_alligator_PlayerInCone_A, 0, &in_ovl40[4]},
+    {0x800F828Cu, n_alligator_TryLunge_A, 0, &in_ovl40[5]},
+    {0x800F8338u, n_alligator_Tire_A, 0, &in_ovl40[6]},
     {0x800F8440u, 0, 0, &in_ovl40[7]},
     {0x800F85B4u, 0, 0, &in_ovl40[8]},
     {0x800F8664u, 0, 0, &in_ovl40[9]},
     {0x800F866Cu, 0, 0, &in_ovl40[10]},
-    {0x800F8674u, 0, 0, &in_ovl40[11]},
-    {0x800F8690u, 0, 0, &in_ovl40[12]},
+    {0x800F8674u, n_alligator_EntranceAPre_A, 0, &in_ovl40[11]},
+    {0x800F8690u, n_alligator_EntranceA_A, 0, &in_ovl40[12]},
     {0x800F86D0u, 0, 0, &in_ovl40[13]},
     {0x800F86E0u, 0, 0, &in_ovl40[14]},
     {0x800F874Cu, 0, 0, &in_ovl40[15]},
@@ -6169,32 +7212,32 @@ static const RtFunc tab_ovl40[] = {
     {0x800F8964u, 0, 0, &in_ovl40[20]},
     {0x800F89D4u, 0, 0, &in_ovl40[21]},
     {0x800F8A74u, 0, 0, &in_ovl40[22]},
-    {0x800F8AB8u, 0, 0, &in_ovl40[23]},
-    {0x800F8AD4u, 0, 0, &in_ovl40[24]},
-    {0x800F8FD0u, 0, 0, &in_ovl40[25]},
-    {0x800F8FFCu, 0, 0, &in_ovl40[26]},
+    {0x800F8AB8u, n_alligator_EntranceBPre_A, 0, &in_ovl40[23]},
+    {0x800F8AD4u, n_alligator_EntranceB_A, 0, &in_ovl40[24]},
+    {0x800F8FD0u, n_alligator_SwimPre_A, 0, &in_ovl40[25]},
+    {0x800F8FFCu, n_alligator_Swim_A, 0, &in_ovl40[26]},
     {0x800F90E4u, 0, 0, &in_ovl40[27]},
     {0x800F90F0u, 0, 0, &in_ovl40[28]},
-    {0x800F91E4u, 0, 0, &in_ovl40[29]},
-    {0x800F91F0u, 0, 0, &in_ovl40[30]},
+    {0x800F91E4u, n_alligator_LungePre_A, 0, &in_ovl40[29]},
+    {0x800F91F0u, n_alligator_Lunge_A, 0, &in_ovl40[30]},
     {0x800F92E4u, 0, 0, &in_ovl40[31]},
     {0x800F92ECu, 0, 0, &in_ovl40[32]},
-    {0x800F935Cu, 0, 0, &in_ovl40[33]},
-    {0x800F9364u, 0, 0, &in_ovl40[34]},
+    {0x800F935Cu, n_alligator_DivePre_A, 0, &in_ovl40[33]},
+    {0x800F9364u, n_alligator_Dive_A, 0, &in_ovl40[34]},
     {0x800F94C0u, 0, 0, &in_ovl40[35]},
     {0x800F94C8u, 0, 0, &in_ovl40[36]},
     {0x800F94D0u, 0, 0, &in_ovl40[37]},
     {0x800F94D8u, 0, 0, &in_ovl40[38]},
-    {0x800F9638u, 0, 0, &in_ovl40[39]},
-    {0x800F97C0u, 0, 0, &in_ovl40[40]},
+    {0x800F9638u, n_alligator_Damage_A, 0, &in_ovl40[39]},
+    {0x800F97C0u, n_alligator_OnHit_A, 0, &in_ovl40[40]},
     {0x800F98ACu, 0, 0, &in_ovl40[41]},
-    {0x800F98B8u, 0, 0, &in_ovl40[42]},
+    {0x800F98B8u, n_alligator_StateActive_A, 0, &in_ovl40[42]},
     {0x800F9984u, 0, 0, &in_ovl40[43]},
-    {0x800F9A04u, 0, 0, &in_ovl40[44]},
-    {0x800F9A84u, 0, 0, &in_ovl40[45]},
+    {0x800F9A04u, n_alligator_StateDying_A, 0, &in_ovl40[44]},
+    {0x800F9A84u, n_alligator_StateNone_A, 0, &in_ovl40[45]},
     {0x800F9A8Cu, 0, 0, &in_ovl40[46]},
     {0x800F9AE8u, 0, 0, &in_ovl40[47]},
-    {0x800F9B84u, 0, 0, &in_ovl40[48]},
+    {0x800F9B84u, n_alligator_Update_A, 0, &in_ovl40[48]},
 };
 static const uint32_t patch_ovl40[] = {0};
 
@@ -6410,32 +7453,32 @@ static const InFunc in_ovl42[] = {
 static const RtFunc tab_ovl42[] = {
     {0x800F8030u, 0, 0, &in_ovl42[0]},
     {0x800F8034u, 0, 0, &in_ovl42[1]},
-    {0x800F8160u, 0, 0, &in_ovl42[2]},
-    {0x800F82F0u, 0, 0, &in_ovl42[3]},
-    {0x800F839Cu, 0, 0, &in_ovl42[4]},
-    {0x800F849Cu, 0, 0, &in_ovl42[5]},
-    {0x800F857Cu, 0, 0, &in_ovl42[6]},
-    {0x800F8604u, 0, 0, &in_ovl42[7]},
-    {0x800F8718u, 0, 0, &in_ovl42[8]},
-    {0x800F8774u, 0, 0, &in_ovl42[9]},
-    {0x800F891Cu, 0, 0, &in_ovl42[10]},
-    {0x800F89F8u, 0, 0, &in_ovl42[11]},
-    {0x800F8C1Cu, 0, 0, &in_ovl42[12]},
-    {0x800F8D68u, 0, 0, &in_ovl42[13]},
-    {0x800F8D9Cu, 0, 0, &in_ovl42[14]},
-    {0x800F8DC8u, 0, 0, &in_ovl42[15]},
-    {0x800F8E0Cu, 0, 0, &in_ovl42[16]},
+    {0x800F8160u, n_tyrant_MorphFilter_A, 0, &in_ovl42[2]},
+    {0x800F82F0u, n_tyrant_MorphPush_A, 0, &in_ovl42[3]},
+    {0x800F839Cu, n_tyrant_MorphPick_A, 0, &in_ovl42[4]},
+    {0x800F849Cu, n_tyrant_PlayerFiring_A, 0, &in_ovl42[5]},
+    {0x800F857Cu, n_tyrant_Grab_A, 0, &in_ovl42[6]},
+    {0x800F8604u, n_tyrant_PlayerInCone_A, 0, &in_ovl42[7]},
+    {0x800F8718u, n_tyrant_WallDist_A, 0, &in_ovl42[8]},
+    {0x800F8774u, n_tyrant_CrossedWall_A, 0, &in_ovl42[9]},
+    {0x800F891Cu, n_tyrant_WallAhead_A, 0, &in_ovl42[10]},
+    {0x800F89F8u, n_tyrant_Wander_A, 0, &in_ovl42[11]},
+    {0x800F8C1Cu, n_tyrant_TurnTo_A, 0, &in_ovl42[12]},
+    {0x800F8D68u, n_tyrant_NotFacing_A, 0, &in_ovl42[13]},
+    {0x800F8D9Cu, n_tyrant_WallToPlayer_A, 0, &in_ovl42[14]},
+    {0x800F8DC8u, n_tyrant_SetPartsDir_A, 0, &in_ovl42[15]},
+    {0x800F8E0Cu, n_tyrant_AnimEvent_A, 0, &in_ovl42[16]},
     {0x800F8E70u, 0, 0, &in_ovl42[17]},
     {0x800F8E9Cu, 0, 0, &in_ovl42[18]},
-    {0x800F8ED0u, 0, 0, &in_ovl42[19]},
-    {0x800F8F10u, 0, 0, &in_ovl42[20]},
-    {0x800F8FE8u, 0, 0, &in_ovl42[21]},
-    {0x800F9088u, 0, 0, &in_ovl42[22]},
+    {0x800F8ED0u, n_tyrant_Anim_A, 0, &in_ovl42[19]},
+    {0x800F8F10u, n_tyrant_CanCharge_A, 0, &in_ovl42[20]},
+    {0x800F8FE8u, n_tyrant_PlayerSide_A, 0, &in_ovl42[21]},
+    {0x800F9088u, n_tyrant_Steer_A, 0, &in_ovl42[22]},
     {0x800F918Cu, 0, 0, &in_ovl42[23]},
-    {0x800F9228u, 0, 0, &in_ovl42[24]},
-    {0x800F9368u, 0, 0, &in_ovl42[25]},
-    {0x800F9404u, 0, 0, &in_ovl42[26]},
-    {0x800F9708u, 0, 0, &in_ovl42[27]},
+    {0x800F9228u, n_tyrant_ScriptCheck_A, 0, &in_ovl42[24]},
+    {0x800F9368u, n_tyrant_PickAttack_A, 0, &in_ovl42[25]},
+    {0x800F9404u, n_tyrant_WalkStep_A, 0, &in_ovl42[26]},
+    {0x800F9708u, n_tyrant_Standoff_A, 0, &in_ovl42[27]},
     {0x800F9810u, 0, 0, &in_ovl42[28]},
     {0x800F985Cu, 0, 0, &in_ovl42[29]},
     {0x800F9884u, 0, 0, &in_ovl42[30]},
@@ -6455,54 +7498,54 @@ static const RtFunc tab_ovl42[] = {
     {0x800F9BE8u, 0, 0, &in_ovl42[44]},
     {0x800F9C0Cu, 0, 0, &in_ovl42[45]},
     {0x800F9D34u, 0, 0, &in_ovl42[46]},
-    {0x800F9E24u, 0, 0, &in_ovl42[47]},
-    {0x800F9FB0u, 0, 0, &in_ovl42[48]},
-    {0x800FA128u, 0, 0, &in_ovl42[49]},
-    {0x800FA2A4u, 0, 0, &in_ovl42[50]},
-    {0x800FA3ACu, 0, 0, &in_ovl42[51]},
-    {0x800FA4B4u, 0, 0, &in_ovl42[52]},
+    {0x800F9E24u, n_tyrant_IdleAct_A, 0, &in_ovl42[47]},
+    {0x800F9FB0u, n_tyrant_WalkAct_A, 0, &in_ovl42[48]},
+    {0x800FA128u, n_tyrant_PunchAct_A, 0, &in_ovl42[49]},
+    {0x800FA2A4u, n_tyrant_Flinch1Act_A, 0, &in_ovl42[50]},
+    {0x800FA3ACu, n_tyrant_Flinch2Act_A, 0, &in_ovl42[51]},
+    {0x800FA4B4u, n_tyrant_SwingAct_A, 0, &in_ovl42[52]},
     {0x800FA680u, 0, 0, &in_ovl42[53]},
     {0x800FA688u, 0, 0, &in_ovl42[54]},
     {0x800FA790u, 0, 0, &in_ovl42[55]},
     {0x800FA830u, 0, 0, &in_ovl42[56]},
     {0x800FAA38u, 0, 0, &in_ovl42[57]},
-    {0x800FAA40u, 0, 0, &in_ovl42[58]},
+    {0x800FAA40u, n_tyrant_SlamAct_A, 0, &in_ovl42[58]},
     {0x800FABD0u, 0, 0, &in_ovl42[59]},
     {0x800FABD8u, 0, 0, &in_ovl42[60]},
     {0x800FABE0u, 0, 0, &in_ovl42[61]},
     {0x800FABE8u, 0, 0, &in_ovl42[62]},
-    {0x800FABF0u, 0, 0, &in_ovl42[63]},
+    {0x800FABF0u, n_tyrant_LungeAct_A, 0, &in_ovl42[63]},
     {0x800FAD74u, 0, 0, &in_ovl42[64]},
     {0x800FAE88u, 0, 0, &in_ovl42[65]},
-    {0x800FAFC8u, 0, 0, &in_ovl42[66]},
+    {0x800FAFC8u, n_tyrant_ReelAct_A, 0, &in_ovl42[66]},
     {0x800FB104u, 0, 0, &in_ovl42[67]},
-    {0x800FB10Cu, 0, 0, &in_ovl42[68]},
+    {0x800FB10Cu, n_tyrant_DodgeAct_A, 0, &in_ovl42[68]},
     {0x800FB280u, 0, 0, &in_ovl42[69]},
     {0x800FB53Cu, 0, 0, &in_ovl42[70]},
     {0x800FB750u, 0, 0, &in_ovl42[71]},
-    {0x800FB85Cu, 0, 0, &in_ovl42[72]},
-    {0x800FBB08u, 0, 0, &in_ovl42[73]},
+    {0x800FB85Cu, n_tyrant_OnHit_A, 0, &in_ovl42[72]},
+    {0x800FBB08u, n_tyrant_JointHook_A, 0, &in_ovl42[73]},
     {0x800FBC40u, 0, 0, &in_ovl42[74]},
     {0x800FBECCu, 0, 0, &in_ovl42[75]},
     {0x800FC034u, 0, 0, &in_ovl42[76]},
-    {0x800FC1F8u, 0, 0, &in_ovl42[77]},
+    {0x800FC1F8u, n_tyrant_Stage2Check_A, 0, &in_ovl42[77]},
     {0x800FC280u, 0, 0, &in_ovl42[78]},
     {0x800FC510u, 0, 0, &in_ovl42[79]},
     {0x800FC604u, 0, 0, &in_ovl42[80]},
     {0x800FC778u, 0, 0, &in_ovl42[81]},
     {0x800FC7A8u, 0, 0, &in_ovl42[82]},
     {0x800FC910u, 0, 0, &in_ovl42[83]},
-    {0x800FC940u, 0, 0, &in_ovl42[84]},
+    {0x800FC940u, n_tyrant_StageCheck_A, 0, &in_ovl42[84]},
     {0x800FC9F0u, 0, 0, &in_ovl42[85]},
-    {0x800FC9FCu, 0, 0, &in_ovl42[86]},
+    {0x800FC9FCu, n_tyrant_StateActive_A, 0, &in_ovl42[86]},
     {0x800FCA38u, 0, 0, &in_ovl42[87]},
     {0x800FCA74u, 0, 0, &in_ovl42[88]},
-    {0x800FCAB0u, 0, 0, &in_ovl42[89]},
+    {0x800FCAB0u, n_tyrant_StateNone_A, 0, &in_ovl42[89]},
     {0x800FCAB8u, 0, 0, &in_ovl42[90]},
     {0x800FCB34u, 0, 0, &in_ovl42[91]},
     {0x800FCDB0u, 0, 0, &in_ovl42[92]},
-    {0x800FD080u, 0, 0, &in_ovl42[93]},
-    {0x800FD270u, 0, 0, &in_ovl42[94]},
+    {0x800FD080u, n_tyrant_Setup_A, 0, &in_ovl42[93]},
+    {0x800FD270u, n_tyrant_Update_A, 0, &in_ovl42[94]},
 };
 static const uint32_t patch_ovl42[] = {0};
 
@@ -6548,8 +7591,8 @@ static const InFunc in_ovl43[] = {
 static const RtFunc tab_ovl43[] = {
     {0x800F8018u, 0, 0, &in_ovl43[0]},
     {0x800F801Cu, 0, 0, &in_ovl43[1]},
-    {0x800F803Cu, 0, 0, &in_ovl43[2]},
-    {0x800F81E4u, 0, 0, &in_ovl43[3]},
+    {0x800F803Cu, n_moth_CrossedWall_A, 0, &in_ovl43[2]},
+    {0x800F81E4u, n_moth_TurnTo_A, 0, &in_ovl43[3]},
     {0x800F83E4u, 0, 0, &in_ovl43[4]},
     {0x800F8510u, 0, 0, &in_ovl43[5]},
     {0x800F8550u, 0, 0, &in_ovl43[6]},
@@ -6557,26 +7600,26 @@ static const RtFunc tab_ovl43[] = {
     {0x800F85BCu, 0, 0, &in_ovl43[8]},
     {0x800F8618u, 0, 0, &in_ovl43[9]},
     {0x800F8658u, 0, 0, &in_ovl43[10]},
-    {0x800F86B0u, 0, 0, &in_ovl43[11]},
-    {0x800F8AACu, 0, 0, &in_ovl43[12]},
-    {0x800F8CA0u, 0, 0, &in_ovl43[13]},
-    {0x800F8FD0u, 0, 0, &in_ovl43[14]},
+    {0x800F86B0u, n_moth_Swoop_A, 0, &in_ovl43[11]},
+    {0x800F8AACu, n_moth_Grab_A, 0, &in_ovl43[12]},
+    {0x800F8CA0u, n_moth_Glide_A, 0, &in_ovl43[13]},
+    {0x800F8FD0u, n_moth_Drop_A, 0, &in_ovl43[14]},
     {0x800F9150u, 0, 0, &in_ovl43[15]},
     {0x800F9278u, 0, 0, &in_ovl43[16]},
     {0x800F94A8u, 0, 0, &in_ovl43[17]},
-    {0x800F9670u, 0, 0, &in_ovl43[18]},
-    {0x800F9828u, 0, 0, &in_ovl43[19]},
-    {0x800F9A78u, 0, 0, &in_ovl43[20]},
-    {0x800F9BB0u, 0, 0, &in_ovl43[21]},
-    {0x800F9D64u, 0, 0, &in_ovl43[22]},
+    {0x800F9670u, n_moth_FlyStep_A, 0, &in_ovl43[18]},
+    {0x800F9828u, n_moth_FloorStep_A, 0, &in_ovl43[19]},
+    {0x800F9A78u, n_moth_DieStep_A, 0, &in_ovl43[20]},
+    {0x800F9BB0u, n_moth_OnHit_A, 0, &in_ovl43[21]},
+    {0x800F9D64u, n_moth_Update_A, 0, &in_ovl43[22]},
     {0x800F9F48u, 0, 0, &in_ovl43[23]},
-    {0x800F9FF4u, 0, 0, &in_ovl43[24]},
+    {0x800F9FF4u, n_moth_SwoopStep_A, 0, &in_ovl43[24]},
     {0x800FA098u, 0, 0, &in_ovl43[25]},
     {0x800FA0ECu, 0, 0, &in_ovl43[26]},
-    {0x800FA0F4u, 0, 0, &in_ovl43[27]},
+    {0x800FA0F4u, n_moth_GrabStep_A, 0, &in_ovl43[27]},
     {0x800FA130u, 0, 0, &in_ovl43[28]},
     {0x800FA138u, 0, 0, &in_ovl43[29]},
-    {0x800FA144u, 0, 0, &in_ovl43[30]},
+    {0x800FA144u, n_moth_StateActive_A, 0, &in_ovl43[30]},
     {0x800FA180u, 0, 0, &in_ovl43[31]},
     {0x800FA1BCu, 0, 0, &in_ovl43[32]},
     {0x800FA1F8u, 0, 0, &in_ovl43[33]},
@@ -6695,47 +7738,47 @@ static const InFunc in_ovl44[] = {
 static const RtFunc tab_ovl44[] = {
     {0x800F8048u, 0, 0, &in_ovl44[0]},
     {0x800F804Cu, 0, 0, &in_ovl44[1]},
-    {0x800F8128u, 0, 0, &in_ovl44[2]},
+    {0x800F8128u, n_hunter_Near_A, 0, &in_ovl44[2]},
     {0x800F81A4u, 0, 0, &in_ovl44[3]},
-    {0x800F8240u, 0, 0, &in_ovl44[4]},
-    {0x800F83ACu, 0, 0, &in_ovl44[5]},
+    {0x800F8240u, n_hunter_Advance_A, 0, &in_ovl44[4]},
+    {0x800F83ACu, n_hunter_GrabStep_A, 0, &in_ovl44[5]},
     {0x800F8440u, 0, 0, &in_ovl44[6]},
-    {0x800F84E4u, 0, 0, &in_ovl44[7]},
+    {0x800F84E4u, n_hunter_NotFacing_A, 0, &in_ovl44[7]},
     {0x800F8518u, 0, 0, &in_ovl44[8]},
-    {0x800F8574u, 0, 0, &in_ovl44[9]},
+    {0x800F8574u, n_hunter_CrossedWall_A, 0, &in_ovl44[9]},
     {0x800F871Cu, 0, 0, &in_ovl44[10]},
-    {0x800F88C0u, 0, 0, &in_ovl44[11]},
-    {0x800F899Cu, 0, 0, &in_ovl44[12]},
-    {0x800F8B70u, 0, 0, &in_ovl44[13]},
-    {0x800F8D90u, 0, 0, &in_ovl44[14]},
-    {0x800F8EACu, 0, 0, &in_ovl44[15]},
-    {0x800F8FC0u, 0, 0, &in_ovl44[16]},
-    {0x800F9118u, 0, 0, &in_ovl44[17]},
-    {0x800F9180u, 0, 0, &in_ovl44[18]},
-    {0x800F9310u, 0, 0, &in_ovl44[19]},
-    {0x800F93A8u, 0, 0, &in_ovl44[20]},
+    {0x800F88C0u, n_hunter_WallAhead_A, 0, &in_ovl44[11]},
+    {0x800F899Cu, n_hunter_PlayerWalls_A, 0, &in_ovl44[12]},
+    {0x800F8B70u, n_hunter_Wander_A, 0, &in_ovl44[13]},
+    {0x800F8D90u, n_hunter_InPlayerCone_A, 0, &in_ovl44[14]},
+    {0x800F8EACu, n_hunter_PlayerInCone_A, 0, &in_ovl44[15]},
+    {0x800F8FC0u, n_hunter_TurnTo_A, 0, &in_ovl44[16]},
+    {0x800F9118u, n_hunter_WallToPlayer_A, 0, &in_ovl44[17]},
+    {0x800F9180u, n_hunter_PlayerHasRoom_A, 0, &in_ovl44[18]},
+    {0x800F9310u, n_hunter_Status_A, 0, &in_ovl44[19]},
+    {0x800F93A8u, n_hunter_Lunge_A, 0, &in_ovl44[20]},
     {0x800F9420u, 0, 0, &in_ovl44[21]},
-    {0x800F9464u, 0, 0, &in_ovl44[22]},
-    {0x800F94C8u, 0, 0, &in_ovl44[23]},
-    {0x800F95A0u, 0, 0, &in_ovl44[24]},
-    {0x800F95D4u, 0, 0, &in_ovl44[25]},
-    {0x800F9620u, 0, 0, &in_ovl44[26]},
+    {0x800F9464u, n_hunter_AnimEvent_A, 0, &in_ovl44[22]},
+    {0x800F94C8u, n_hunter_StepSound_A, 0, &in_ovl44[23]},
+    {0x800F95A0u, n_hunter_Anim_A, 0, &in_ovl44[24]},
+    {0x800F95D4u, n_hunter_Cooldown_A, 0, &in_ovl44[25]},
+    {0x800F9620u, n_hunter_TryPounce_A, 0, &in_ovl44[26]},
     {0x800F97D0u, 0, 0, &in_ovl44[27]},
-    {0x800F97E0u, 0, 0, &in_ovl44[28]},
-    {0x800F9940u, 0, 0, &in_ovl44[29]},
-    {0x800F996Cu, 0, 0, &in_ovl44[30]},
+    {0x800F97E0u, n_hunter_PickSide_A, 0, &in_ovl44[28]},
+    {0x800F9940u, n_hunter_Lift_A, 0, &in_ovl44[29]},
+    {0x800F996Cu, n_hunter_Land_A, 0, &in_ovl44[30]},
     {0x800F99FCu, 0, 0, &in_ovl44[31]},
     {0x800F9A88u, 0, 0, &in_ovl44[32]},
     {0x800F9A94u, 0, 0, &in_ovl44[33]},
     {0x800F9B08u, 0, 0, &in_ovl44[34]},
     {0x800F9C14u, 0, 0, &in_ovl44[35]},
-    {0x800F9C94u, 0, 0, &in_ovl44[36]},
-    {0x800F9DA0u, 0, 0, &in_ovl44[37]},
-    {0x800F9FCCu, 0, 0, &in_ovl44[38]},
-    {0x800FA17Cu, 0, 0, &in_ovl44[39]},
-    {0x800FA404u, 0, 0, &in_ovl44[40]},
-    {0x800FA528u, 0, 0, &in_ovl44[41]},
-    {0x800FA634u, 0, 0, &in_ovl44[42]},
+    {0x800F9C94u, n_hunter_ProwlStep_A, 0, &in_ovl44[36]},
+    {0x800F9DA0u, n_hunter_RushStep_A, 0, &in_ovl44[37]},
+    {0x800F9FCCu, n_hunter_LeapStep_A, 0, &in_ovl44[38]},
+    {0x800FA17Cu, n_hunter_LeapFarStep_A, 0, &in_ovl44[39]},
+    {0x800FA404u, n_hunter_WaitStep_A, 0, &in_ovl44[40]},
+    {0x800FA528u, n_hunter_SidestepStep_A, 0, &in_ovl44[41]},
+    {0x800FA634u, n_hunter_LeapStart_A, 0, &in_ovl44[42]},
     {0x800FA6F4u, 0, 0, &in_ovl44[43]},
     {0x800FA7ECu, 0, 0, &in_ovl44[44]},
     {0x800FA8E8u, 0, 0, &in_ovl44[45]},
@@ -6749,7 +7792,7 @@ static const RtFunc tab_ovl44[] = {
     {0x800FB0D8u, 0, 0, &in_ovl44[53]},
     {0x800FB148u, 0, 0, &in_ovl44[54]},
     {0x800FB228u, 0, 0, &in_ovl44[55]},
-    {0x800FB3E0u, 0, 0, &in_ovl44[56]},
+    {0x800FB3E0u, n_hunter_IdleAct_A, 0, &in_ovl44[56]},
     {0x800FB440u, 0, 0, &in_ovl44[57]},
     {0x800FB450u, 0, 0, &in_ovl44[58]},
     {0x800FB460u, 0, 0, &in_ovl44[59]},
@@ -6759,15 +7802,15 @@ static const RtFunc tab_ovl44[] = {
     {0x800FB4A0u, 0, 0, &in_ovl44[63]},
     {0x800FB4B0u, 0, 0, &in_ovl44[64]},
     {0x800FB4B8u, 0, 0, &in_ovl44[65]},
-    {0x800FB4C8u, 0, 0, &in_ovl44[66]},
-    {0x800FB5A8u, 0, 0, &in_ovl44[67]},
+    {0x800FB4C8u, n_hunter_WalkAct_A, 0, &in_ovl44[66]},
+    {0x800FB5A8u, n_hunter_RunAct_A, 0, &in_ovl44[67]},
     {0x800FB668u, 0, 0, &in_ovl44[68]},
     {0x800FB704u, 0, 0, &in_ovl44[69]},
-    {0x800FB81Cu, 0, 0, &in_ovl44[70]},
-    {0x800FB954u, 0, 0, &in_ovl44[71]},
+    {0x800FB81Cu, n_hunter_SlashAct_A, 0, &in_ovl44[70]},
+    {0x800FB954u, n_hunter_LeapAct_A, 0, &in_ovl44[71]},
     {0x800FBA30u, 0, 0, &in_ovl44[72]},
     {0x800FBA38u, 0, 0, &in_ovl44[73]},
-    {0x800FBB24u, 0, 0, &in_ovl44[74]},
+    {0x800FBB24u, n_hunter_RiseAct_A, 0, &in_ovl44[74]},
     {0x800FBC04u, 0, 0, &in_ovl44[75]},
     {0x800FBCE8u, 0, 0, &in_ovl44[76]},
     {0x800FBD70u, 0, 0, &in_ovl44[77]},
@@ -6777,26 +7820,26 @@ static const RtFunc tab_ovl44[] = {
     {0x800FC3C0u, 0, 0, &in_ovl44[81]},
     {0x800FC4B8u, 0, 0, &in_ovl44[82]},
     {0x800FC4C0u, 0, 0, &in_ovl44[83]},
-    {0x800FC4C8u, 0, 0, &in_ovl44[84]},
+    {0x800FC4C8u, n_hunter_OnHit_A, 0, &in_ovl44[84]},
     {0x800FCAB4u, 0, 0, &in_ovl44[85]},
     {0x800FCC44u, 0, 0, &in_ovl44[86]},
-    {0x800FCCB8u, 0, 0, &in_ovl44[87]},
+    {0x800FCCB8u, n_hunter_Room1Retreat_A, 0, &in_ovl44[87]},
     {0x800FCD18u, 0, 0, &in_ovl44[88]},
     {0x800FCD48u, 0, 0, &in_ovl44[89]},
     {0x800FCDE0u, 0, 0, &in_ovl44[90]},
     {0x800FCF64u, 0, 0, &in_ovl44[91]},
-    {0x800FCF94u, 0, 0, &in_ovl44[92]},
+    {0x800FCF94u, n_hunter_Stage4Check_A, 0, &in_ovl44[92]},
     {0x800FCFC4u, 0, 0, &in_ovl44[93]},
-    {0x800FD044u, 0, 0, &in_ovl44[94]},
+    {0x800FD044u, n_hunter_StageCheck_A, 0, &in_ovl44[94]},
     {0x800FD0D8u, 0, 0, &in_ovl44[95]},
-    {0x800FD0E4u, 0, 0, &in_ovl44[96]},
+    {0x800FD0E4u, n_hunter_StateActive_A, 0, &in_ovl44[96]},
     {0x800FD120u, 0, 0, &in_ovl44[97]},
     {0x800FD15Cu, 0, 0, &in_ovl44[98]},
     {0x800FD198u, 0, 0, &in_ovl44[99]},
     {0x800FD1A0u, 0, 0, &in_ovl44[100]},
     {0x800FD244u, 0, 0, &in_ovl44[101]},
     {0x800FD2C8u, 0, 0, &in_ovl44[102]},
-    {0x800FD37Cu, 0, 0, &in_ovl44[103]},
+    {0x800FD37Cu, n_hunter_Update_A, 0, &in_ovl44[103]},
 };
 static const uint32_t patch_ovl44[] = {0};
 
@@ -6930,54 +7973,54 @@ static const InFunc in_ovl45[] = {
 };
 static const RtFunc tab_ovl45[] = {
     {0x800F8004u, 0, 0, &in_ovl45[0]},
-    {0x800F8074u, 0, 0, &in_ovl45[1]},
-    {0x800F8224u, 0, 0, &in_ovl45[2]},
-    {0x800F8298u, 0, 0, &in_ovl45[3]},
-    {0x800F8460u, 0, 0, &in_ovl45[4]},
-    {0x800F862Cu, 0, 0, &in_ovl45[5]},
-    {0x800F8688u, 0, 0, &in_ovl45[6]},
-    {0x800F86D0u, 0, 0, &in_ovl45[7]},
-    {0x800F8700u, 0, 0, &in_ovl45[8]},
+    {0x800F8074u, n_children_SpawnMark_A, 0, &in_ovl45[1]},
+    {0x800F8224u, n_children_PuffAnim_A, 0, &in_ovl45[2]},
+    {0x800F8298u, n_children_SpawnPuff_A, 0, &in_ovl45[3]},
+    {0x800F8460u, n_children_PlayVoice_A, 0, &in_ovl45[4]},
+    {0x800F862Cu, n_children_VoiceTimer_A, 0, &in_ovl45[5]},
+    {0x800F8688u, n_children_VoiceStop_A, 0, &in_ovl45[6]},
+    {0x800F86D0u, n_children_StartAnim_A, 0, &in_ovl45[7]},
+    {0x800F8700u, n_children_AnimEvent_A, 0, &in_ovl45[8]},
     {0x800F8764u, 0, 0, &in_ovl45[9]},
     {0x800F87FCu, 0, 0, &in_ovl45[10]},
     {0x800F88B8u, 0, 0, &in_ovl45[11]},
     {0x800F893Cu, 0, 0, &in_ovl45[12]},
     {0x800F896Cu, 0, 0, &in_ovl45[13]},
     {0x800F89F4u, 0, 0, &in_ovl45[14]},
-    {0x800F8A84u, 0, 0, &in_ovl45[15]},
-    {0x800F8C54u, 0, 0, &in_ovl45[16]},
-    {0x800F8D30u, 0, 0, &in_ovl45[17]},
-    {0x800F8E78u, 0, 0, &in_ovl45[18]},
+    {0x800F8A84u, n_children_CrossedWall_A, 0, &in_ovl45[15]},
+    {0x800F8C54u, n_children_WallAhead_A, 0, &in_ovl45[16]},
+    {0x800F8D30u, n_children_Offset_A, 0, &in_ovl45[17]},
+    {0x800F8E78u, n_children_KeepOffWalls_A, 0, &in_ovl45[18]},
     {0x800F8F6Cu, 0, 0, &in_ovl45[19]},
-    {0x800F8FF4u, 0, 0, &in_ovl45[20]},
+    {0x800F8FF4u, n_children_PlayerInCone_A, 0, &in_ovl45[20]},
     {0x800F9168u, 0, 0, &in_ovl45[21]},
-    {0x800F9294u, 0, 0, &in_ovl45[22]},
-    {0x800F92C8u, 0, 0, &in_ovl45[23]},
-    {0x800F95A0u, 0, 0, &in_ovl45[24]},
-    {0x800F95FCu, 0, 0, &in_ovl45[25]},
-    {0x800F9650u, 0, 0, &in_ovl45[26]},
-    {0x800F969Cu, 0, 0, &in_ovl45[27]},
-    {0x800F97E0u, 0, 0, &in_ovl45[28]},
-    {0x800F980Cu, 0, 0, &in_ovl45[29]},
+    {0x800F9294u, n_children_NotFacing_A, 0, &in_ovl45[22]},
+    {0x800F92C8u, n_children_TurnTo_A, 0, &in_ovl45[23]},
+    {0x800F95A0u, n_children_WallDistance_A, 0, &in_ovl45[24]},
+    {0x800F95FCu, n_children_SideOfPlayer_A, 0, &in_ovl45[25]},
+    {0x800F9650u, n_children_PlayerSide_A, 0, &in_ovl45[26]},
+    {0x800F969Cu, n_children_SteerAroundWall_A, 0, &in_ovl45[27]},
+    {0x800F97E0u, n_children_WallToPlayer_A, 0, &in_ovl45[28]},
+    {0x800F980Cu, n_children_SetAnimDir_A, 0, &in_ovl45[29]},
     {0x800F9850u, 0, 0, &in_ovl45[30]},
-    {0x800F9980u, 0, 0, &in_ovl45[31]},
-    {0x800F9A2Cu, 0, 0, &in_ovl45[32]},
-    {0x800F9A6Cu, 0, 0, &in_ovl45[33]},
+    {0x800F9980u, n_children_ZoneCheck_A, 0, &in_ovl45[31]},
+    {0x800F9A2Cu, n_children_JointHook_A, 0, &in_ovl45[32]},
+    {0x800F9A6Cu, n_children_HoldPlayer_A, 0, &in_ovl45[33]},
     {0x800F9AC0u, 0, 0, &in_ovl45[34]},
     {0x800F9AE0u, 0, 0, &in_ovl45[35]},
-    {0x800F9B0Cu, 0, 0, &in_ovl45[36]},
-    {0x800F9BB0u, 0, 0, &in_ovl45[37]},
+    {0x800F9B0Cu, n_children_StartWalk_A, 0, &in_ovl45[36]},
+    {0x800F9BB0u, n_children_StartSidestep_A, 0, &in_ovl45[37]},
     {0x800F9C10u, 0, 0, &in_ovl45[38]},
     {0x800F9C44u, 0, 0, &in_ovl45[39]},
     {0x800F9CF0u, 0, 0, &in_ovl45[40]},
     {0x800F9D30u, 0, 0, &in_ovl45[41]},
     {0x800F9DDCu, 0, 0, &in_ovl45[42]},
-    {0x800F9E58u, 0, 0, &in_ovl45[43]},
+    {0x800F9E58u, n_children_StartCall_A, 0, &in_ovl45[43]},
     {0x800F9EBCu, 0, 0, &in_ovl45[44]},
     {0x800F9EFCu, 0, 0, &in_ovl45[45]},
     {0x800F9F38u, 0, 0, &in_ovl45[46]},
-    {0x800F9FECu, 0, 0, &in_ovl45[47]},
-    {0x800FA060u, 0, 0, &in_ovl45[48]},
+    {0x800F9FECu, n_children_StartVanish_A, 0, &in_ovl45[47]},
+    {0x800FA060u, n_children_LeftBehind_A, 0, &in_ovl45[48]},
     {0x800FA0F4u, 0, 0, &in_ovl45[49]},
     {0x800FA19Cu, 0, 0, &in_ovl45[50]},
     {0x800FA2A4u, 0, 0, &in_ovl45[51]},
@@ -6989,46 +8032,46 @@ static const RtFunc tab_ovl45[] = {
     {0x800FA648u, 0, 0, &in_ovl45[57]},
     {0x800FA67Cu, 0, 0, &in_ovl45[58]},
     {0x800FA904u, 0, 0, &in_ovl45[59]},
-    {0x800FAB78u, 0, 0, &in_ovl45[60]},
+    {0x800FAB78u, n_children_WantsGo_A, 0, &in_ovl45[60]},
     {0x800FAC1Cu, 0, 0, &in_ovl45[61]},
-    {0x800FAC40u, 0, 0, &in_ovl45[62]},
-    {0x800FAD90u, 0, 0, &in_ovl45[63]},
-    {0x800FB268u, 0, 0, &in_ovl45[64]},
-    {0x800FB620u, 0, 0, &in_ovl45[65]},
+    {0x800FAC40u, n_children_PickMove_A, 0, &in_ovl45[62]},
+    {0x800FAD90u, n_children_OnHit_A, 0, &in_ovl45[63]},
+    {0x800FB268u, n_children_IdlePre_A, 0, &in_ovl45[64]},
+    {0x800FB620u, n_children_IdleStep_A, 0, &in_ovl45[65]},
     {0x800FB628u, 0, 0, &in_ovl45[66]},
     {0x800FB7F8u, 0, 0, &in_ovl45[67]},
-    {0x800FB800u, 0, 0, &in_ovl45[68]},
-    {0x800FBC0Cu, 0, 0, &in_ovl45[69]},
-    {0x800FBC14u, 0, 0, &in_ovl45[70]},
-    {0x800FBD60u, 0, 0, &in_ovl45[71]},
-    {0x800FBD68u, 0, 0, &in_ovl45[72]},
-    {0x800FBF44u, 0, 0, &in_ovl45[73]},
+    {0x800FB800u, n_children_WalkPre_A, 0, &in_ovl45[68]},
+    {0x800FBC0Cu, n_children_WalkStep_A, 0, &in_ovl45[69]},
+    {0x800FBC14u, n_children_Act3Pre_A, 0, &in_ovl45[70]},
+    {0x800FBD60u, n_children_Act3Step_A, 0, &in_ovl45[71]},
+    {0x800FBD68u, n_children_SidestepPre_A, 0, &in_ovl45[72]},
+    {0x800FBF44u, n_children_SidestepStep_A, 0, &in_ovl45[73]},
     {0x800FBF4Cu, 0, 0, &in_ovl45[74]},
-    {0x800FC00Cu, 0, 0, &in_ovl45[75]},
-    {0x800FC014u, 0, 0, &in_ovl45[76]},
+    {0x800FC00Cu, n_children_Act5Step_A, 0, &in_ovl45[75]},
+    {0x800FC014u, n_children_Act5Pre_A, 0, &in_ovl45[76]},
     {0x800FC0D4u, 0, 0, &in_ovl45[77]},
-    {0x800FC0DCu, 0, 0, &in_ovl45[78]},
-    {0x800FC41Cu, 0, 0, &in_ovl45[79]},
-    {0x800FC424u, 0, 0, &in_ovl45[80]},
-    {0x800FC528u, 0, 0, &in_ovl45[81]},
+    {0x800FC0DCu, n_children_CallPre_A, 0, &in_ovl45[78]},
+    {0x800FC41Cu, n_children_CallStep_A, 0, &in_ovl45[79]},
+    {0x800FC424u, n_children_Act8Pre_A, 0, &in_ovl45[80]},
+    {0x800FC528u, n_children_Act8Step_A, 0, &in_ovl45[81]},
     {0x800FC530u, 0, 0, &in_ovl45[82]},
     {0x800FC610u, 0, 0, &in_ovl45[83]},
     {0x800FC618u, 0, 0, &in_ovl45[84]},
     {0x800FC684u, 0, 0, &in_ovl45[85]},
-    {0x800FC68Cu, 0, 0, &in_ovl45[86]},
-    {0x800FC6C8u, 0, 0, &in_ovl45[87]},
-    {0x800FC6D0u, 0, 0, &in_ovl45[88]},
-    {0x800FC770u, 0, 0, &in_ovl45[89]},
+    {0x800FC68Cu, n_children_Act11Pre_A, 0, &in_ovl45[86]},
+    {0x800FC6C8u, n_children_Act11Step_A, 0, &in_ovl45[87]},
+    {0x800FC6D0u, n_children_Act12Pre_A, 0, &in_ovl45[88]},
+    {0x800FC770u, n_children_Act12Step_A, 0, &in_ovl45[89]},
     {0x800FC778u, 0, 0, &in_ovl45[90]},
     {0x800FC7F4u, 0, 0, &in_ovl45[91]},
     {0x800FC7FCu, 0, 0, &in_ovl45[92]},
     {0x800FC838u, 0, 0, &in_ovl45[93]},
-    {0x800FC840u, 0, 0, &in_ovl45[94]},
-    {0x800FC98Cu, 0, 0, &in_ovl45[95]},
+    {0x800FC840u, n_children_VanishPre_A, 0, &in_ovl45[94]},
+    {0x800FC98Cu, n_children_VanishStep_A, 0, &in_ovl45[95]},
     {0x800FC994u, 0, 0, &in_ovl45[96]},
     {0x800FCA74u, 0, 0, &in_ovl45[97]},
-    {0x800FCA7Cu, 0, 0, &in_ovl45[98]},
-    {0x800FCE64u, 0, 0, &in_ovl45[99]},
+    {0x800FCA7Cu, n_children_ReturnPre_A, 0, &in_ovl45[98]},
+    {0x800FCE64u, n_children_ReturnStep_A, 0, &in_ovl45[99]},
     {0x800FCE6Cu, 0, 0, &in_ovl45[100]},
     {0x800FCF5Cu, 0, 0, &in_ovl45[101]},
     {0x800FCF64u, 0, 0, &in_ovl45[102]},
@@ -7046,12 +8089,12 @@ static const RtFunc tab_ovl45[] = {
     {0x800FD8BCu, 0, 0, &in_ovl45[114]},
     {0x800FD8F4u, 0, 0, &in_ovl45[115]},
     {0x800FD914u, 0, 0, &in_ovl45[116]},
-    {0x800FD920u, 0, 0, &in_ovl45[117]},
-    {0x800FD99Cu, 0, 0, &in_ovl45[118]},
-    {0x800FDA04u, 0, 0, &in_ovl45[119]},
-    {0x800FDA6Cu, 0, 0, &in_ovl45[120]},
+    {0x800FD920u, n_children_StateActive_A, 0, &in_ovl45[117]},
+    {0x800FD99Cu, n_children_StateHit_A, 0, &in_ovl45[118]},
+    {0x800FDA04u, n_children_StateDying_A, 0, &in_ovl45[119]},
+    {0x800FDA6Cu, n_children_State4_A, 0, &in_ovl45[120]},
     {0x800FDA74u, 0, 0, &in_ovl45[121]},
-    {0x800FDCB8u, 0, 0, &in_ovl45[122]},
+    {0x800FDCB8u, n_children_Update_A, 0, &in_ovl45[122]},
 };
 static const uint32_t patch_ovl45[] = {0};
 
@@ -7239,37 +8282,37 @@ static const InFunc in_ovl47[] = {
     {0x800FAE98u, 70, 1, 88, 1, 0, 0},
 };
 static const RtFunc tab_ovl47[] = {
-    {0x800F8004u, 0, 0, &in_ovl47[0]},
+    {0x800F8004u, n_finalboss_CrossedWall_A, 0, &in_ovl47[0]},
     {0x800F81F8u, 0, 0, &in_ovl47[1]},
-    {0x800F82D4u, 0, 0, &in_ovl47[2]},
-    {0x800F84A8u, 0, 0, &in_ovl47[3]},
-    {0x800F85BCu, 0, 0, &in_ovl47[4]},
-    {0x800F8714u, 0, 0, &in_ovl47[5]},
-    {0x800F8840u, 0, 0, &in_ovl47[6]},
-    {0x800F88E4u, 0, 0, &in_ovl47[7]},
-    {0x800F8A08u, 0, 0, &in_ovl47[8]},
-    {0x800F8A3Cu, 0, 0, &in_ovl47[9]},
+    {0x800F82D4u, n_finalboss_PlayerWalls_A, 0, &in_ovl47[2]},
+    {0x800F84A8u, n_finalboss_PlayerInCone_A, 0, &in_ovl47[3]},
+    {0x800F85BCu, n_finalboss_TurnTo_A, 0, &in_ovl47[4]},
+    {0x800F8714u, n_finalboss_InPlayerCone_A, 0, &in_ovl47[5]},
+    {0x800F8840u, n_finalboss_PlayerSide_A, 0, &in_ovl47[6]},
+    {0x800F88E4u, n_finalboss_TurnBeside_A, 0, &in_ovl47[7]},
+    {0x800F8A08u, n_finalboss_NotFacing_A, 0, &in_ovl47[8]},
+    {0x800F8A3Cu, n_finalboss_Grab_A, 0, &in_ovl47[9]},
     {0x800F8AA8u, 0, 0, &in_ovl47[10]},
-    {0x800F8AECu, 0, 0, &in_ovl47[11]},
-    {0x800F8B50u, 0, 0, &in_ovl47[12]},
-    {0x800F8B7Cu, 0, 0, &in_ovl47[13]},
-    {0x800F8BD0u, 0, 0, &in_ovl47[14]},
-    {0x800F8C48u, 0, 0, &in_ovl47[15]},
-    {0x800F8C88u, 0, 0, &in_ovl47[16]},
-    {0x800F8D0Cu, 0, 0, &in_ovl47[17]},
-    {0x800F8D80u, 0, 0, &in_ovl47[18]},
-    {0x800F8E84u, 0, 0, &in_ovl47[19]},
-    {0x800F8F5Cu, 0, 0, &in_ovl47[20]},
+    {0x800F8AECu, n_finalboss_AnimEvent_A, 0, &in_ovl47[11]},
+    {0x800F8B50u, n_finalboss_Lift_A, 0, &in_ovl47[12]},
+    {0x800F8B7Cu, n_finalboss_Land_A, 0, &in_ovl47[13]},
+    {0x800F8BD0u, n_finalboss_StepSound_A, 0, &in_ovl47[14]},
+    {0x800F8C48u, n_finalboss_Anim_A, 0, &in_ovl47[15]},
+    {0x800F8C88u, n_finalboss_PickSwipe_A, 0, &in_ovl47[16]},
+    {0x800F8D0Cu, n_finalboss_CheckClose_A, 0, &in_ovl47[17]},
+    {0x800F8D80u, n_finalboss_CheckRange_A, 0, &in_ovl47[18]},
+    {0x800F8E84u, n_finalboss_CheckMid_A, 0, &in_ovl47[19]},
+    {0x800F8F5Cu, n_finalboss_TryGrab_A, 0, &in_ovl47[20]},
     {0x800F9000u, 0, 0, &in_ovl47[21]},
     {0x800F915Cu, 0, 0, &in_ovl47[22]},
-    {0x800F9214u, 0, 0, &in_ovl47[23]},
-    {0x800F9260u, 0, 0, &in_ovl47[24]},
-    {0x800F9294u, 0, 0, &in_ovl47[25]},
-    {0x800F92E4u, 0, 0, &in_ovl47[26]},
-    {0x800F93ECu, 0, 0, &in_ovl47[27]},
-    {0x800F948Cu, 0, 0, &in_ovl47[28]},
-    {0x800F9518u, 0, 0, &in_ovl47[29]},
-    {0x800F962Cu, 0, 0, &in_ovl47[30]},
+    {0x800F9214u, n_finalboss_StartMoving_A, 0, &in_ovl47[23]},
+    {0x800F9260u, n_finalboss_StartGloat_A, 0, &in_ovl47[24]},
+    {0x800F9294u, n_finalboss_IdleWake_A, 0, &in_ovl47[25]},
+    {0x800F92E4u, n_finalboss_IdleWait_A, 0, &in_ovl47[26]},
+    {0x800F93ECu, n_finalboss_StalkStep_A, 0, &in_ovl47[27]},
+    {0x800F948Cu, n_finalboss_RushStep_A, 0, &in_ovl47[28]},
+    {0x800F9518u, n_finalboss_LeapUp_A, 0, &in_ovl47[29]},
+    {0x800F962Cu, n_finalboss_LeapIn_A, 0, &in_ovl47[30]},
     {0x800F97D8u, 0, 0, &in_ovl47[31]},
     {0x800F97E0u, 0, 0, &in_ovl47[32]},
     {0x800F9944u, 0, 0, &in_ovl47[33]},
@@ -7278,38 +8321,38 @@ static const RtFunc tab_ovl47[] = {
     {0x800F9C6Cu, 0, 0, &in_ovl47[36]},
     {0x800F9D98u, 0, 0, &in_ovl47[37]},
     {0x800F9DF8u, 0, 0, &in_ovl47[38]},
-    {0x800F9E7Cu, 0, 0, &in_ovl47[39]},
-    {0x800F9F14u, 0, 0, &in_ovl47[40]},
-    {0x800F9FA4u, 0, 0, &in_ovl47[41]},
-    {0x800FA058u, 0, 0, &in_ovl47[42]},
-    {0x800FA190u, 0, 0, &in_ovl47[43]},
-    {0x800FA300u, 0, 0, &in_ovl47[44]},
+    {0x800F9E7Cu, n_finalboss_IdleAct_A, 0, &in_ovl47[39]},
+    {0x800F9F14u, n_finalboss_WalkAct_A, 0, &in_ovl47[40]},
+    {0x800F9FA4u, n_finalboss_RunAct_A, 0, &in_ovl47[41]},
+    {0x800FA058u, n_finalboss_SwipeAct_A, 0, &in_ovl47[42]},
+    {0x800FA190u, n_finalboss_Swipe2Act_A, 0, &in_ovl47[43]},
+    {0x800FA300u, n_finalboss_LeapAct_A, 0, &in_ovl47[44]},
     {0x800FA3CCu, 0, 0, &in_ovl47[45]},
     {0x800FA428u, 0, 0, &in_ovl47[46]},
     {0x800FA4D0u, 0, 0, &in_ovl47[47]},
-    {0x800FA578u, 0, 0, &in_ovl47[48]},
-    {0x800FA654u, 0, 0, &in_ovl47[49]},
+    {0x800FA578u, n_finalboss_GloatAct_A, 0, &in_ovl47[48]},
+    {0x800FA654u, n_finalboss_AirAct_A, 0, &in_ovl47[49]},
     {0x800FA6ACu, 0, 0, &in_ovl47[50]},
-    {0x800FA704u, 0, 0, &in_ovl47[51]},
+    {0x800FA704u, n_finalboss_LandAct_A, 0, &in_ovl47[51]},
     {0x800FA73Cu, 0, 0, &in_ovl47[52]},
     {0x800FA774u, 0, 0, &in_ovl47[53]},
     {0x800FA7D0u, 0, 0, &in_ovl47[54]},
     {0x800FA808u, 0, 0, &in_ovl47[55]},
     {0x800FA840u, 0, 0, &in_ovl47[56]},
-    {0x800FA848u, 0, 0, &in_ovl47[57]},
-    {0x800FA908u, 0, 0, &in_ovl47[58]},
-    {0x800FAA24u, 0, 0, &in_ovl47[59]},
-    {0x800FAC38u, 0, 0, &in_ovl47[60]},
+    {0x800FA848u, n_finalboss_CloseAct_A, 0, &in_ovl47[57]},
+    {0x800FA908u, n_finalboss_Close2Act_A, 0, &in_ovl47[58]},
+    {0x800FAA24u, n_finalboss_OnHit_A, 0, &in_ovl47[59]},
+    {0x800FAC38u, n_finalboss_TakeHits_A, 0, &in_ovl47[60]},
     {0x800FAC7Cu, 0, 0, &in_ovl47[61]},
-    {0x800FACC0u, 0, 0, &in_ovl47[62]},
+    {0x800FACC0u, n_finalboss_Nothing_A, 0, &in_ovl47[62]},
     {0x800FACC8u, 0, 0, &in_ovl47[63]},
-    {0x800FACD4u, 0, 0, &in_ovl47[64]},
+    {0x800FACD4u, n_finalboss_StateActive_A, 0, &in_ovl47[64]},
     {0x800FAD10u, 0, 0, &in_ovl47[65]},
     {0x800FAD4Cu, 0, 0, &in_ovl47[66]},
-    {0x800FAD88u, 0, 0, &in_ovl47[67]},
-    {0x800FAD90u, 0, 0, &in_ovl47[68]},
+    {0x800FAD88u, n_finalboss_StateNone_A, 0, &in_ovl47[67]},
+    {0x800FAD90u, n_finalboss_ModelHook_A, 0, &in_ovl47[68]},
     {0x800FADD4u, 0, 0, &in_ovl47[69]},
-    {0x800FAE98u, 0, 0, &in_ovl47[70]},
+    {0x800FAE98u, n_finalboss_Update_A, 0, &in_ovl47[70]},
 };
 static const uint32_t patch_ovl47[] = {0};
 
@@ -9846,7 +10889,7 @@ static const RtFunc tab_ovl64[] = {
     {0x801040E0u, 0, 0, &in_ovl64[85]},
     {0x8010411Cu, 0, 0, &in_ovl64[86]},
     {0x80104158u, 0, 0, &in_ovl64[87]},
-    {0x80104160u, 0, 0, &in_ovl64[88]},
+    {0x80104160u, n_hypnos_Setup_B, 0, &in_ovl64[88]},
     {0x80104220u, 0, 0, &in_ovl64[89]},
 };
 static const uint32_t patch_ovl64[] = {0};
@@ -9881,9 +10924,9 @@ static const InFunc in_ovl15[] = {
     {0x800F4C4Cu, 34, 1, 65, 1, 0, 0},
 };
 static const RtFunc tab_ovl15[] = {
-    {0x800F2C70u, 0, 0, &in_ovl15[0]},
-    {0x800F2C94u, 0, 0, &in_ovl15[1]},
-    {0x800F2CE8u, 0, 0, &in_ovl15[2]},
+    {0x800F2C70u, n_stage15_InitHooks, 0, &in_ovl15[0]},
+    {0x800F2C94u, n_stage15_RoomTable, 0, &in_ovl15[1]},
+    {0x800F2CE8u, n_stage15_RoomEnter, 0, &in_ovl15[2]},
     {0x800F34E4u, 0, 0, &in_ovl15[3]},
     {0x800F3548u, 0, 0, &in_ovl15[4]},
     {0x800F3740u, 0, 0, &in_ovl15[5]},
@@ -10258,10 +11301,10 @@ static const InFunc in_ovl24[] = {
     {0x800F3E14u, 11, 1, 27, 0, 0, 0},
 };
 static const RtFunc tab_ovl24[] = {
-    {0x800F2C54u, 0, 0, &in_ovl24[0]},
-    {0x800F2C78u, 0, 0, &in_ovl24[1]},
-    {0x800F2D2Cu, 0, 0, &in_ovl24[2]},
-    {0x800F31B8u, 0, 0, &in_ovl24[3]},
+    {0x800F2C54u, n_stage24_InitHooks, 0, &in_ovl24[0]},
+    {0x800F2C78u, n_stage24_RoomTable, 0, &in_ovl24[1]},
+    {0x800F2D2Cu, n_stage24_RoomEnter, 0, &in_ovl24[2]},
+    {0x800F31B8u, n_stage24_MusicCheck, 0, &in_ovl24[3]},
     {0x800F321Cu, 0, 0, &in_ovl24[4]},
     {0x800F3414u, 0, 0, &in_ovl24[5]},
     {0x800F361Cu, 0, 0, &in_ovl24[6]},
@@ -10560,7 +11603,7 @@ static const RtFunc tab_ovl32[] = {
     {0x800F324Cu, 0, 0, &in_ovl32[5]},
     {0x800F3358u, 0, 0, &in_ovl32[6]},
     {0x800F3404u, n_stage32_OpBlank, 0, &in_ovl32[7]},
-    {0x800F3464u, 0, 0, &in_ovl32[8]},
+    {0x800F3464u, n_stage32_OpModel, 0, &in_ovl32[8]},
     {0x800F34ACu, 0, 0, &in_ovl32[9]},
     {0x800F34D0u, 0, 0, &in_ovl32[10]},
     {0x800F34F8u, 0, 0, &in_ovl32[11]},
@@ -10698,7 +11741,7 @@ static const InFunc in_conpau_e[] = {
     {0x800CEC08u, 127, 1, 207, 5, 0, 0},
 };
 static const RtFunc tab_conpau_e[] = {
-    {0x800C3F58u, 0, 0, &in_conpau_e[0]},
+    {0x800C3F58u, n_status_Main, 0, &in_conpau_e[0]},
     {0x800C3FB0u, n_status_SetView, 0, &in_conpau_e[1]},
     {0x800C4020u, n_status_Init, 0, &in_conpau_e[2]},
     {0x800C4120u, n_status_Frame, 0, &in_conpau_e[3]},
@@ -10883,5 +11926,3 @@ const int rt_module_count = 57;
 
 /* Translations the decompiled wrappers ("~name" in native.txt) call. */
 void f_test_8008F3BC(void) { interp_resume(&rt_modules[1], &tab_test[438]); }
-
-void f_test_8007428C(void) { interp_resume(&rt_modules[1], &tab_test[69]); }

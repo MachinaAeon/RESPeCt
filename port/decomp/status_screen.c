@@ -2,8 +2,9 @@
  * when the game pauses; TYPEW and the other slot-4 overlays share these
  * addresses, so these natives only run while CONPAU_E is loaded).
  *
- * The screen runs on its own game thread (main loop 800C3F58, kept
- * translated): every frame it clears the ordering tables, runs the state
+ * The screen runs on its own game thread (main loop 800C3F58; it never
+ * returns, and waits by mode switches, so save states are made in the
+ * main thread meanwhile): every frame it clears the ordering tables, runs the state
  * handler from the table at 0x800CF594 (state 0x800CF668: 1 load the
  * screen's files, 2 wait for input, 3 closing, 4 ...), updates the HUD
  * panels (8009358C) and sorts the 3D objects of the screen (800C4218).
@@ -37,6 +38,7 @@
 
 void n_status_SetView(void);
 void n_status_Init(void);
+void n_status_Main(void);
 void n_status_Frame(void);
 void n_status_SortObjects(void);
 void n_status_CountSlot(void);
@@ -1498,5 +1500,29 @@ void n_status_Button(void) {
     case 0x7FF: V0 = b & 0x40; break;
     case 0x800: V0 = (u32)(s32)(s16)(b & 0x8000); break;
     default:    V0 = 0; break;
+    }
+}
+
+/* 800C3F58: the screen's thread: hold the game's thread, set up, then
+ * every frame: the frame, the 3D objects, the sorting (8007D7FC,
+ * 8007DD24), "paused" (0x80062DF0) and a vertical blank (mode switch).
+ * Never returns. */
+void n_status_Main(void) {
+    FRAME(0x20);
+    MEM_W32(sp + 0x18, R[31]);
+    MEM_W32(sp + 0x14, R[17]);
+    MEM_W32(sp + 0x10, R[16]);
+    gcall_ra(0x800C3F70u, 0x800131A4u, 0, A1, A2, A3);
+    R[17] = 0x80060000u;
+    gcall_ra(0x800C3F78u, 0x800C4020u, A0, A1, A2, A3);
+    R[16] = 1;
+    for (;;) {
+        gcall_ra(0x800C3F84u, 0x800C4120u, A0, A1, A2, A3);
+        gcall_ra(0x800C3F8Cu, 0x800C4218u, A0, A1, A2, A3);
+        gcall_ra(0x800C3F94u, 0x8007D7FCu, A0, A1, A2, A3);
+        gcall_ra(0x800C3F9Cu, 0x8007DD24u, A0, A1, A2, A3);
+        GV(u32, 0x80062DF0u) = 1;
+        gcall_ra(0x800C3FA8u, 0x8001306Cu, 1, A1, A2, A3);
+        LOOP_POLL(0x800C3FA8u);
     }
 }

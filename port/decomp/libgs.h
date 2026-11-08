@@ -34,6 +34,22 @@ static inline u32 gcall_ra(u32 ra, u32 addr, u32 a0, u32 a1, u32 a2, u32 a3) {
     return v;
 }
 
+/* A call a save state can be made under: like gcall_ra, but the callee
+ * isn't counted as running below a native (g_native_depth), so its waits
+ * (a movie, the frame wait) can make save states. Those continue in the
+ * calling function's translation at ra, so use it only where the native
+ * has the original's frame (FRAME, the registers saved at the original's
+ * offsets) and, at the call, the registers the translation goes on to
+ * read after ra (the s registers, $fp) as the original has them. */
+static inline u32 gcall_ss(u32 ra, u32 addr, u32 a0, u32 a1, u32 a2, u32 a3) {
+    u32 old = R[31];
+    R[31] = ra;
+    R[4] = a0; R[5] = a1; R[6] = a2; R[7] = a3;
+    rt_call(addr);
+    R[31] = old;
+    return R[2];
+}
+
 /* ---- kernel ---- */
 #define F_GET_SP            0x80039AC8u   /* returns sp */
 #define F_SET_SP            0x80039A28u   /* (sp): switch stacks */

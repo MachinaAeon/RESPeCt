@@ -14,8 +14,11 @@
  * with tools/eq). */
 #include "hud.h"
 #include "game_stack.h"
+#include "poll.h"
+#include "libgs.h"
 
 void n_fx_LoadSet(void);
+void n_fx_LoadBuiltin(void);
 void n_fx_LoadStageSet(void);
 void n_fx_StreamStageSet(void);
 void n_fx_ResetSet(void);
@@ -39,6 +42,7 @@ void n_hud_StartAnimA(void);
 #define FX_SPRITES      0x800A6F5Cu
 #define F_UNPROJECT     0x8009B71Cu           /* (sx, sy, depth, out, flag): screen -> world */
 #define F_ANIM_ONCE_A   0x8009414Cu
+#undef F_RAND                                 /* libgs.h: the BIOS one */
 #define F_RAND          0x80011570u
 #define F_LOAD_FILE     0x800115C0u
 
@@ -468,4 +472,172 @@ void n_fx_Flash(void) {
     if (anim) start_anim(anim);
     P32(g_curPanel, PANEL_UPDATE) = F_ANIM_ONCE_A;
     V0 = g_curPanel;
+}
+
+/* 80097C14 (set): a built-in effect set: its file (0x800A6F1C's sector
+ * table, read to the free memory at 0x800B3D54, which moves on by its
+ * size) holds a count of models and their offsets. For each model (a
+ * record of 0xEC bytes from 0x800C3A98): the HMD mapped, then for each
+ * of its blocks the primitives scanned (GsScanUnit, scratch at
+ * 0x800AFC88/0x1F800000): a shared vertex list popped into +0x44 for
+ * types 0, 1, 5, 6 when flagged; the drivers set by type (0: 8006EB78,
+ * keeping the flag; 1: 8006EB04; 2: 8006F16C; 3: 8006E9FC with its
+ * animation blocks at +0xAC, +0xA8 their count); the coordinate list
+ * linked (+0x44, 0x50 each) and its end set to +0x58, then the model
+ * started (8006F69C). Last, every model's animation parts reset. */
+void n_fx_LoadBuiltin(void) {
+    FRAME(0x50);
+    u32 in_s[8];
+    for (int i = 0; i < 8; i++) { in_s[i] = R[16 + i]; GS(u32, sp + 0x28 + 4 * i) = R[16 + i]; }
+    GS(u32, sp + 0x48) = R[30];
+    GS(u32, sp + 0x4C) = R[31];
+    const u32 in_fp = R[30];
+    const u32 idx = A0;
+    {
+        const u32 tab = 0x800A6F1Cu;
+        const u32 sz = GV(u32, tab + (idx + 1) * 4) - GV(u32, tab + idx * 4);
+        const u32 t0 = GV(u32, 0x800B3D54u);
+        GV(u32, 0x800C3A88u) = t0;
+        GV(u32, 0x800B3D54u) = t0 + (sz << 11);
+        GS(u32, sp + 0x10) = t0;
+        R[16] = 0x800C0000u;
+        gcall_ra(0x80097CA0u, 0x800115C0u, 0x8006C964u, 0x80058544u, tab, idx);
+    }
+    u32 list = GV(u32, 0x800C3A88u);
+    const s32 n = GV(s32, list);
+    list += 4;
+    GS(u32, sp + 0x20) = (u32)n;
+    if (n > 0) {
+        GS(u32, sp + 0x24) = 0;
+        for (s32 u = 0;;) {
+            const u32 m = 0x800C3A98u + GS(u32, sp + 0x24);
+            GV(u8, m + 2) = 0;
+            const u32 h = GV(u32, 0x800C3A88u) + GV(u32, list);
+            list += 4;
+            gcall_ra(0x80097CECu, 0x80033508u, h, A1, A2, A3);
+            const u32 nb = GV(u8, h + 0xC);
+            GV(u32, m + 0xA8) = 0;
+            GV(u32, m + 0x44) = 0;
+            GV(u8, m) = (u8)nb;
+            if (nb != 0) {
+                u32 blk = m, src = h + 0x10;
+                for (u32 j = 0;;) {
+                    const u32 a0 = GV(u32, src);
+                    GV(u32, blk + 8) = a0;
+                    if (a0 != 0) {
+                        gcall_ra(0x80097D34u, 0x80033208u, a0, 0, 0, 0);
+                        for (;;) {
+                            if (gcall_ra(0x80097D4Cu, 0x80033208u, 0, sp + 0x18, 0x800AFC88u, 0x1F800000u) == 0) {
+                                GV(u32, blk + 4) = 0;
+                                break;
+                            }
+                            const u32 t = GS(u8, sp + 0x1B);
+                            if ((t < 2 || t == 5 || t == 6) && (GS(u32, sp + 0x18) & 0x800000)) {
+                                GV(u32, m + 0x44) = gcall_ra(0x80097D98u, 0x800336A8u, h, GS(u32, sp + 0x1C), A2, A3);
+                                GS(u32, sp + 0x18) &= 0xFF7FFFFFu;
+                            }
+                            const u32 w = GS(u32, sp + 0x18);
+                            const u32 type = w >> 24;
+                            if (type == 1) {
+                                const u32 v = gcall_ra(0x80097E2Cu, 0x8006EB04u, w, A1, A2, A3);
+                                GV(u32, GS(u32, sp + 0x1C)) = v;
+                                LOOP_POLL(0x80097E40u);
+                            } else if (type == 0) {
+                                const u32 fl = w & 0x240000u;
+                                const u32 v = gcall_ra(0x80097DF0u, 0x8006EB78u, w, A1, A2, A3);
+                                GV(u32, GS(u32, sp + 0x1C)) = v;
+                                if (fl != 0x40000) { LOOP_POLL(0x80097E00u); continue; }
+                                const u32 p = GS(u32, sp + 0x1C);
+                                GV(u32, p + 8) |= 0x1000000u;
+                                LOOP_POLL(0x80097E1Cu);
+                            } else if (type == 2) {
+                                const u32 v = gcall_ra(0x80097E3Cu, 0x8006F16Cu, w, A1, A2, A3);
+                                GV(u32, GS(u32, sp + 0x1C)) = v;
+                                LOOP_POLL(0x80097E40u);
+                            } else if (type == 3) {
+                                const u32 v = gcall_ra(0x80097E50u, 0x8006E9FCu, w, A1, A2, A3);
+                                GV(u32, GS(u32, sp + 0x1C)) = v;
+                                GV(u32, m + 0xA8) = gcall_ra(0x80097E68u, 0x8002F9E0u, m + 0xAC, GS(u32, sp + 0x1C), A2, A3);
+                                if (gcall_ra(0x80097E78u, 0x8002F938u, GS(u32, sp + 0x1C), 0, A2, A3) == 0) {
+                                    LOOP_POLL(0x80097E78u);
+                                    continue;
+                                }
+                                gcall_ra(0x80097E88u, 0x8006EA18u, 0, A1, A2, A3);
+                                LOOP_POLL(0x80097E88u);
+                            } else {
+                                LOOP_POLL(0x80097DDCu);
+                            }
+                        }
+                    }
+                    blk += 8;
+                    j++;
+                    src += 4;
+                    if (!((s32)j < (s32)nb)) break;
+                    LOOP_POLL(0x80097EA0u);
+                }
+            }
+            if (GV(u32, m + 0x44) != 0) {
+                const s32 lim = (s32)nb - 1;
+                if (1 < lim) {
+                    u32 v1 = m + 8, off = 0;
+                    for (s32 k = 1;;) {
+                        const u32 b = GV(u32, m + 0x44);
+                        k++;
+                        GV(u32, v1 + 4) = b + off;
+                        off += 0x50;
+                        v1 += 8;
+                        if (!(k < lim)) break;
+                        LOOP_POLL(0x80097EE4u);
+                    }
+                }
+            }
+            {
+                u32 k = 0, c = GV(u32, m + 0x44);
+                for (;;) {
+                    if (GV(u32, c + 0x4C) == 0) break;
+                    c += 0x50;
+                    k++;
+                    LOOP_POLL(0x80097F0Cu);
+                }
+                GS(u32, sp + 0x24) += 0xEC;
+                GV(u32, GV(u32, m + 0x44) + k * 0x50 + 0x4C) = m + 0x58;
+                GV(u32, m + 0xA4) = 0;
+                gcall_ra(0x80097F44u, 0x8006F69Cu, m + 0x58, 0, A2, A3);
+            }
+            u++;
+            if (!(u < (s32)GS(u32, sp + 0x20))) break;
+            LOOP_POLL(0x80097F50u);
+        }
+    }
+    {
+        const s32 cnt = (s32)GS(u32, sp + 0x20);
+        if (cnt > 0) {
+            for (s32 i = 0;;) {
+                const u32 m = 0x800C3A98u + (u32)i * 0xEC;
+                const s32 np = GV(s32, m + 0xA8);
+                if (np > 0) {
+                    for (s32 k = 0;;) {
+                        const u32 pp = m + 0xAC + (u32)k * 4, ap = m + 0xCC + (u32)k * 4;
+                        GV(u32, ap) = GV(u32, pp) + 0x18;
+                        GV(u16, GV(u32, pp) + 0xA) = 0xFFFF;
+                        GV(u16, GV(u32, pp) + 8) = 0xFFFF;
+                        GV(u8, GV(u32, pp) + 0xD) = 0x10;
+                        GV(u16, GV(u32, pp) + 0x16) = (u16)(GV(u16, GV(u32, ap)) + 1);
+                        GV(u8, GV(u32, pp) + 0xC) = GV(u8, GV(u32, ap) + 2);
+                        k++;
+                        if (!(k < np)) break;
+                        LOOP_POLL(0x80098000u);
+                    }
+                }
+                GV(u8, m + 1) = 0;
+                i++;
+                if (!(i < (s32)GS(u32, sp + 0x20))) break;
+                LOOP_POLL(0x80098020u);
+            }
+        }
+    }
+    GV(u32, 0x800C3A1Cu) = 0;
+    GV(u32, 0x800C3A8Cu) = 0xFFFFFFFFu;
+    for (int i = 0; i < 8; i++) R[16 + i] = in_s[i];
+    R[30] = in_fp;
 }

@@ -332,3 +332,333 @@ void n_sprite_SetImage(void) {
     SP_U16(s, 6) = GV(u8, s + 6);
     V0 = 0x100;
 }
+
+/* 8006C244 (how entered): TITLE's main, run in the mode's thread: set
+ * up, then a frame at a time (title_Frame, the sprites, the drawing, the
+ * pads: buttons, the previous ones, the analog stick as the d-pad on a
+ * DualShock, then a vertical blank by a mode switch) until a screen sets
+ * T_START; then 50 frames, fade the picture back up (by 4) and, once
+ * drawn, stop the sound and the callbacks and load the next mode: TEST
+ * (1) for a new or loaded game, else 5. The native keeps the original's
+ * frame, registers and return addresses: the thread, switched away in
+ * it, resumes in the translation after a save state. */
+void n_title_Main(void) {
+    { extern void sg_hook_title(void); sg_hook_title(); }   /* hooks.txt */
+    FRAME(0x30);
+    u32 in_s[6];
+    for (int i = 0; i < 6; i++) { in_s[i] = R[16 + i]; GS(u32, sp + 0x10 + 4 * i) = R[16 + i]; }
+    GS(u32, sp + 0x28) = R[31];
+    g_gameType = 0;
+    T_MODE = (s32)A0;
+    gcall_ra(0x8006C278u, 0x8006C55Cu, A0, A1, A2, A3);
+    R[21] = 0x80080000u;
+    gcall_ra(0x8006C280u, 0x8006C88Cu, A0, A1, A2, A3);
+    gcall_ra(0x8006C288u, 0x800255F8u, 0, A1, A2, A3);
+    gcall_ra(0x8006C290u, 0x800352DCu, 1, A1, A2, A3);
+    R[16] = R[19] = R[20] = R[17] = 0x80080000u;
+    R[18] = 0x80080608u;
+    T_START = 0;
+    for (;;) {
+        gcall_ss(0x8006C2B4u, 0x8006CF24u, A0, A1, A2, A3);
+        gcall_ra(0x8006C2BCu, 0x8006D094u, A0, A1, A2, A3);
+        gcall_ra(0x8006C2C4u, 0x8006C9D8u, A0, A1, A2, A3);
+        T_PAD_PREV = T_PAD;
+        GV(u32, 0x80080E4Cu) = GV(u32, 0x800805D0u);
+        const u32 b = gcall_ra(0x8006C2E0u, 0x80013A5Cu, 0, A1, A2, A3);
+        const u32 m = gcall_ra(0x8006C2E8u, 0x8001189Cu, b, A1, A2, A3);
+        GV(u32, 0x800805D0u) = m >> 16;
+        const u32 p2 = T_PAD2;
+        T_PAD = m;
+        T_PAD = m & 0xFFFF;
+        T_PAD2_PREV = p2;
+        T_PAD2 = gcall_ra(0x8006C30Cu, 0x80013D18u, 0, A1, A2, A3);
+        if ((GV(u32, 0x80062ED0u) & 0x400030u) == 0x400000u) {
+            if (!(GV(u8, 0x80080609u) < 0xB1)) T_PAD |= 0x2000;
+            if (GV(u8, 0x80080609u) < 0x50) T_PAD |= 0x8000;
+            const u32 x = GV(u8, 0x80080608u);
+            if (!(x < 0xB1)) T_PAD |= 0x4000;
+            if (x < 0x50) T_PAD |= 0x1000;
+        }
+        T_FRAMES += 1;
+        gcall_ra(0x8006C3D0u, 0x8001306Cu, 1, A1, A2, A3);
+        if (T_START != 0) break;
+        LOOP_POLL(0x8006C3DCu);
+    }
+    gcall_ra(0x8006C3ECu, 0x8001306Cu, 1, A1, A2, A3);
+    R[16] = 0;
+    T_FADE = 0;
+    T_TEXT_FADE = 0x80;
+    for (;;) {
+        gcall_ra(0x8006C40Cu, 0x8001306Cu, 1, A1, A2, A3);
+        R[16]++;
+        if (!((s32)R[16] < 50)) break;
+        LOOP_POLL(0x8006C414u);
+    }
+    R[19] = 0x80060000u;
+    if (T_FADE < 128) {
+        R[18] = 0x800805D8u;
+        R[16] = R[17] = 0x80080000u;
+        for (;;) {
+            gcall_ra(0x8006C460u, 0x8002DED8u, 0, 0, 0x800805D8u + GV(u8, 0x80062D1Cu) * 20, A3);
+            T_FADE += 4;
+            if (!(T_FADE < 129)) T_FADE = 0x80;
+            T_FRAME_READY = 1;
+            gcall_ra(0x8006C490u, 0x8001306Cu, 1, A1, A2, A3);
+            if (!(T_FADE < 128)) break;
+            LOOP_POLL(0x8006C49Cu);
+        }
+    }
+    gcall_ra(0x8006C4D0u, 0x8002DED8u, 0, 0, 0x800805D8u + GV(u8, 0x80062D1Cu) * 20, A3);
+    T_FRAME_READY = 1;
+    gcall_ra(0x8006C4E4u, 0x8001306Cu, 1, A1, A2, A3);
+    gcall_ra(0x8006C4ECu, 0x80011D48u, 1, A1, A2, A3);
+    gcall_ra(0x8006C4F4u, 0x80011558u, 0, A1, A2, A3);
+    gcall_ra(0x8006C4FCu, 0x80011564u, 0, A1, A2, A3);
+    GV(u32, 0x80062DB8u) = 7;
+    GV(u32, 0x80062D9Cu) = 4;
+    gcall_ra(0x8006C538u, 0x80012FF4u, (u32)(g_gameType - 2) < 2 ? 1 : 5, A1, A2, A3);
+    for (int i = 0; i < 6; i++) R[16 + i] = in_s[i];
+}
+
+/* 8006CBF8, 8006CC38, 8006CC58: TITLE's entries (title, 2, 3). */
+static void title_entry(u32 ra, u32 how) {
+    FRAME(0x18);
+    GS(u32, sp + 0x10) = R[31];
+    gcall_ss(ra, 0x8006C244u, how, A1, A2, A3);
+    V0 = 0;
+}
+void n_title_Entry0(void) { title_entry(0x8006CC08u, 0); }
+void n_title_Entry2(void) { title_entry(0x8006CC48u, 2); }
+void n_title_Entry3(void) { title_entry(0x8006CC68u, 3); }
+
+/* 8006CF24: title_Frame: the screen's step for this frame, by T_SCREEN
+ * (below 19) through the jump table at 0x8006C144. */
+void n_title_Frame(void) {
+    { extern void sg_hook_title_frame(void); sg_hook_title_frame(); }   /* hooks.txt */
+    FRAME(0x18);
+    GS(u32, sp + 0x10) = R[31];
+    const u32 scr = (u32)T_SCREEN;
+    if (!(scr < 0x13)) return;
+    static const u32 step[19][2] = {
+        {0x8006CF5Cu, 0x8006D11Cu}, {0x8006CF6Cu, 0x8006D628u}, {0x8006CF7Cu, 0x8006D820u},
+        {0x8006CF8Cu, 0x8006F35Cu}, {0x8006CF9Cu, 0x8006F3A4u}, {0x8006CFACu, 0x8006F408u},
+        {0x8006CFBCu, 0x8006F440u}, {0x8006CFCCu, 0x8006F498u}, {0x8006CFDCu, 0x8006F4D0u},
+        {0x8006CFECu, 0x8006DA00u}, {0x8006CFFCu, 0x8006E568u}, {0x8006D00Cu, 0x8006F4F0u},
+        {0x8006D01Cu, 0x8006EE08u}, {0x8006D02Cu, 0x8006F528u}, {0x8006D03Cu, 0x8006F180u},
+        {0x8006D04Cu, 0x8006F65Cu}, {0x8006D05Cu, 0x800740DCu}, {0x8006D06Cu, 0x8007B46Cu},
+        {0x8006D07Cu, 0x8006F620u},
+    };
+    const u32 t = GV(u32, 0x8006C144u + (scr << 2));
+    for (int i = 0; i < 19; i++)
+        if (step[i][0] == t) { gcall_ss(t + 8, step[i][1], A0, A1, A2, A3); return; }
+    rt_badjump(0x8006CF54u, t);
+}
+
+/* 8006C88C: TITLE's set-up by how it was entered (T_MODE): the title
+ * (0) starts at the opening movie (screen 1), the save screen (2) at
+ * screen 17, others at screen 0; sprites and text cleared, the title's
+ * sound bank, the display settings copied in (the screen offset, the
+ * sound mode and volumes) and the game's cleared. */
+void n_title_Setup(void) {
+    FRAME(0x18);
+    GS(u32, sp + 0x10) = R[31];
+    const s32 m = T_MODE;
+    if (m == 0) { T_FADE = 0x80; T_SCREEN = 1; }
+    else if (m != 2) { T_FADE = 0x80; T_SCREEN = 0; }
+    else { T_SCREEN = 0x11; gcall_ra(0x8006C8ECu, 0x8007E538u, A0, A1, A2, A3); }
+    gcall_ra(0x8006C8F4u, 0x80071464u, A0, A1, A2, A3);
+    gcall_ra(0x8006C8FCu, 0x80011994u, 1, A1, A2, A3);
+    gcall_ra(0x8006C908u, 0x80011D24u, 0, 0, A2, A3);
+    gcall_ra(0x8006C914u, 0x80011D24u, 2, 0xF, A2, A3);
+    GV(u8, 0x80062E1Cu) = 0;
+    gcall_ra(0x8006C920u, 0x80071528u, A0, A1, A2, A3);
+    const u16 ox = GV(u16, 0x80062E18u), oy = GV(u16, 0x80062E1Au);
+    const u16 sx = GV(u16, 0x80062DACu), sy = GV(u16, 0x80062DAEu);
+    T_FLASH = 0;
+    GV(u16, 0x80062E1Au) = 0;
+    GV(u16, 0x80062E18u) = 0;
+    GV(u16, 0x80062DAEu) = 0;
+    GV(u16, 0x80062DACu) = 0;
+    GV(u16, 0x80080610u) = ox;
+    GV(u16, 0x80080612u) = oy;
+    GV(s32, 0x80080624u) = GV(s16, 0x80062DD4u);
+    GV(s32, 0x80080628u) = GV(s16, 0x80062DD6u);
+    GV(u16, 0x80080618u) = sx;
+    GV(u16, 0x8008061Au) = (u16)(sy + 4);
+    GV(u32, 0x80080614u) = GV(u32, 0x80062E20u);
+    GV(s32, 0x8008062Cu) = GV(s16, 0x80062DB4u);
+    GV(s32, 0x8008061Cu) = GV(s16, 0x80062DB6u);
+}
+
+/* 8006D628: screen 1, the opening movie: the CD at double speed, the
+ * frame buffers cleared, the movie (its stream record at 0x80080E98:
+ * sector 0x1C0, 224 lines, buffers 0x80138000-0x8017D000) played with
+ * the sound's input volume up, then screen 0. */
+void n_title_Movie(void) {
+    FRAME(0x40);
+    u32 in_s[4];
+    for (int i = 0; i < 4; i++) { in_s[i] = R[16 + i]; GS(u32, sp + 0x28 + 4 * i) = R[16 + i]; }
+    GS(u32, sp + 0x38) = R[31];
+    gcall_ra(0x8006D648u, 0x8001306Cu, 8, A1, A2, A3);
+    gcall_ra(0x8006D650u, 0x80014FF4u, 1, A1, A2, A3);
+    for (;;) {
+        const u32 r = gcall_ra(0x8006D658u, 0x80014B14u, 0x40, A1, A2, A3);
+        R[18] = 0x80080000u;
+        if (r == 0) break;
+        gcall_ss(0x8006D668u, 0x800255F8u, 0, A1, A2, A3);
+        LOOP_POLL(0x8006D668u);
+    }
+    const u32 rc = 0x80080E58u;
+    R[17] = rc;
+    GV(u16, rc) = 0;
+    GV(u16, rc + 4) = 0x140;
+    GV(u16, rc + 2) = 0;
+    GV(u16, rc + 6) = 0x200;
+    gcall_ra(0x8006D6A0u, 0x800354F8u, rc, 0, 0, 0);
+    gcall_ra(0x8006D6A8u, 0x80035374u, 0, A1, A2, A3);
+    gcall_ra(0x8006D6B4u, 0x80014124u, 0x8006F9BCu, A1, A2, A3);
+    gcall_ra(0x8006D6C0u, 0x80038E88u, 0x80148000u, A1, A2, A3);
+    R[19] = 0x100;
+    GV(u16, rc) = 0;
+    GV(u16, rc + 2) = 0;
+    GV(u16, rc + 4) = 0;
+    GV(u16, rc + 6) = 0x100;
+    for (u32 o = 0x10; o <= 0x20; o += 4) GS(u32, sp + o) = 0;
+    GS(u32, sp + 0x24) = 2;
+    gcall_ra(0x8006D704u, 0x80013DDCu, 0x140, 0xF0, rc, 0);
+    const u32 st = 0x80080E98u;
+    R[16] = st;
+    GV(u32, st) = 0x800586C8u;
+    GV(u32, st + 8) = 1;
+    GV(u32, st + 0xC) = 0xE0;
+    GV(u32, st + 4) = 0x1C0;
+    GV(u16, st + 0x10) = 0;
+    GV(u16, st + 0x12) = 0;
+    GV(u32, st + 0x14) = 0;
+    GV(u32, st + 0x1C) = 0x80138000u;
+    GV(u32, st + 0x18) = 0x18;
+    GV(u32, st + 0x20) = 0x80148000u;
+    GV(u32, st + 0x24) = 0x80159000u;
+    GV(u32, st + 0x28) = 0x80169000u;
+    GV(u32, st + 0x2C) = 0x80179000u;
+    GV(u32, st + 0x30) = 0x8017D000u;
+    gcall_ra(0x8006D79Cu, 0x8001D898u, 0, 0x7F, 0x7F, 0x80179000u);
+    R[16] = 0x80060000u;
+    gcall_ss(0x8006D7B8u, 0x80014134u, st, 2, GV(u8, 0x80062D1Cu) < 1, 1);
+    {
+        const u32 z = GV(u8, 0x80062D1Cu) < 1;
+        GV(u16, rc) = 0;
+        GV(u16, rc + 2) = 0;
+        GV(u16, rc + 4) = 0;
+        GV(u16, rc + 6) = 0x100;
+        for (u32 o = 0x10; o <= 0x20; o += 4) GS(u32, sp + o) = 0;
+        GS(u32, sp + 0x24) = z;
+        gcall_ra(0x8006D7FCu, 0x80013DDCu, 0x140, 0xF0, rc, 0);
+    }
+    for (int i = 0; i < 4; i++) R[16 + i] = in_s[i];
+    T_SCREEN = 0;
+}
+
+/* a title sprite set up for the background (0x8007F180), its update
+ * 0x8006D3DC, picture T_PICS */
+static u32 bg_sprite(u32 ra) {
+    const u32 i = gcall_ra(ra, 0x8006FB00u, A0, A1, A2, A3);
+    if (i == 0xFFFFFFFFu) return 0;
+    const u32 s = 0x800813E0u + i * 56;
+    R[16] = s;
+    GV(u16, s + 0x20) |= 6;
+    gcall_ra(ra + 0x3C, 0x80071490u, s, 0x8007F180u, A2, A3);
+    return s;
+}
+
+/* 8006D11C: screen 0, the title picture: the pictures loaded, the
+ * title's CLUT (16x3 at 0x170,0x1E3) given its transparency bits, the
+ * background and its glow as sprites; then the "press start" message
+ * (title), the logos (3), or the menu (others: screen 9, the title's
+ * pictures); the cursor's CLUT row cleared. */
+void n_title_Picture(void) {
+    FRAME(0x88);
+    GS(u32, sp + 0x80) = R[31];
+    GS(u32, sp + 0x7C) = R[17];
+    GS(u32, sp + 0x78) = R[16];
+    const u32 in_s0 = R[16], in_s1 = R[17];
+    gcall_ra(0x8006D134u, 0x8006CE20u, 0, A1, A2, A3);
+    gcall_ra(0x8006D140u, 0x8006F2CCu, 0, 3, A2, A3);
+    gcall_ra(0x8006D14Cu, 0x8006F2CCu, 4, 1, A2, A3);
+    const u32 rc = sp + 0x10, buf = sp + 0x18;
+    GS(u16, rc) = 0x170;
+    GS(u16, rc + 2) = 0x1E3;
+    GS(u16, rc + 4) = 0x10;
+    GS(u16, rc + 6) = 3;
+    gcall_ra(0x8006D17Cu, 0x80035680u, rc, buf, A2, A3);
+    gcall_ra(0x8006D184u, 0x80035374u, 0, A1, A2, A3);
+    for (u32 i = 0;;) {
+        const u32 a = buf + i * 2;
+        const u16 v = GS(u16, a);
+        if (v != 0) GS(u16, a) = v | 0x8000;
+        i++;
+        if (!((s32)i < 48)) break;
+        LOOP_POLL(0x8006D1A4u);
+    }
+    gcall_ra(0x8006D1B8u, 0x80035620u, rc, buf, A2, A3);
+    gcall_ra(0x8006D1C0u, 0x80035374u, 0, A1, A2, A3);
+    R[17] = 0xFFFFFFFFu;
+    u32 s = bg_sprite(0x8006D1C8u);
+    if (s) {
+        GV(u16, s + 0x14) = 0xFF;
+        GV(u16, s + 0x08) = 0xFF;
+        GV(u16, s + 0x18) = 5;
+        GV(u32, s + 0x34) = 0x8006D3DCu;
+        const u16 pic = GV(u16, 0x800805C8u);
+        GV(u16, s + 0x10) = 0;
+        GV(u16, s + 0x12) = 0;
+        GV(u16, s + 0x26) = 0;
+        GV(u16, s + 0x1E) = 0x40;
+        GV(u16, s + 0x1C) = 0x40;
+        GV(u16, s + 0x1A) = 0x40;
+        GV(u16, s + 0x24) = pic;
+    }
+    s = bg_sprite(0x8006D254u);
+    if (s) {
+        GV(u16, s + 0x10) = 0xFF0;
+        GV(u16, s + 0x18) = 5;
+        GV(u16, s + 0x26) = 1;
+        GV(u16, s + 0x14) = 0x40;
+        GV(u16, s + 0x08) = 0x40;
+        GV(u16, s + 0x1E) = 0x40;
+        GV(u16, s + 0x1C) = 0x40;
+        GV(u16, s + 0x1A) = 0x40;
+        GV(u32, s + 0x34) = 0x8006D3DCu;
+        const u16 y = GV(u16, s + 2);
+        const u16 pic = GV(u16, 0x800805C8u);
+        GV(u16, s + 4) = 0;
+        GV(u16, s + 0x12) = 0;
+        GV(u16, s + 2) = (u16)(y + 2);
+        GV(u16, s + 0x24) = pic;
+    }
+    const s32 m = T_MODE;
+    T_FADE = 0;
+    if (m == 0) {
+        R[16] = 0x8007F2ECu;
+        T_SCREEN = 3;
+        gcall_ra(0x8006D328u, 0x8007154Cu, GV(u32, 0x8007F2ECu), 0, 0x28, 0x5C);
+        gcall_ra(0x8006D33Cu, 0x8007154Cu, GV(u32, 0x8007F2F0u), 1, 0x10, 0x50);
+    } else if (m == 3) {
+        T_SCREEN = 2;
+        T_STATE = 0;
+        T_STATE2 = 0;
+    } else {
+        T_SCREEN = 9;
+        T_STATE = 0;
+        T_STATE2 = 0;
+        gcall_ra(0x8006D390u, 0x8006CE20u, 5, A1, A2, A3);
+    }
+    GV(u8, 0x80062DECu) = 0;
+    GS(u16, rc) = 0x140;
+    GS(u16, rc + 2) = 0xFF;
+    GS(u16, rc + 4) = 0x10;
+    GS(u16, rc + 6) = 1;
+    gcall_ra(0x8006D3C8u, 0x80035620u, rc, 0x8007F3A0u, A2, A3);
+    R[16] = in_s0;
+    R[17] = in_s1;
+}

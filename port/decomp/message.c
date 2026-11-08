@@ -28,6 +28,7 @@
  * with tools/eq). */
 #include "game_vars.h"
 #include "poll.h"
+#include "libgs.h"
 #include "modfs_pc_text.h"
 #include "modio.h"
 #include "rt.h"
@@ -43,6 +44,7 @@ void n_msg_InitSprites(void);
 void n_msg_Cancel(void);
 void n_msg_DrawText(void);
 void n_hint_DrawIcon(void);
+void n_hint_Setup(void);
 void n_msg_Update(void);
 void n_textwin_Draw(void);
 
@@ -840,4 +842,34 @@ void n_caption_Run(void) {
 void n_op_Caption(void) {
     FRAME(0x18);
     V0 = GCALL2(F_CAPTION_RUN, A0, 0);
+}
+
+/* 8007F028: load the button hint icons (8008F1A0) and set up their two
+ * GsSPRITEs, 144x16 at (-77, -8): 0x800BAFC8 from texture row 0x88,
+ * 0x800BAFF0 from row 0x9A, page (640, 0), clut (0x280, 0x98). */
+void n_hint_Setup(void) {
+    FRAME(0x38);
+    GCALL0(0x8008F1A0u);
+    static const u8 rows[2] = { 0x88, 0x9A };
+    for (int i = 0; i < 2; i++) {
+        u32 s = 0x800BAFC8u + (u32)i * 0x28;
+        GV(u32, s) = 0;
+        GV(u16, s + 0x8) = 0x90;
+        GV(u16, s + 0xA) = 0x10;
+        GV(u16, s + 0xC) = (u16)GCALL4(F_GET_TPAGE, 0, 0, 0x280, rows[i]);
+        GV(u8, s + 0xE) = 0;
+        GV(u8, s + 0xF) = rows[i];
+        GV(u16, s + 0x10) = 0x280;
+        GV(u16, s + 0x12) = 0x98;
+        GV(u8, s + 0x16) = 0x80;
+        GV(u8, s + 0x15) = 0x80;
+        GV(u8, s + 0x14) = 0x80;
+        GV(u16, s + 0x1A) = 0;
+        GV(u16, s + 0x18) = 0;
+        GV(u16, s + 0x1E) = 0;
+        GV(u16, s + 0x1C) = 0;
+        GV(u32, s + 0x20) = 0;
+        GV(u16, s + 0x4) = (u16)-77;
+        GV(u16, s + 0x6) = (u16)-8;
+    }
 }

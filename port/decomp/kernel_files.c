@@ -570,3 +570,43 @@ void n_lz_Unpack(void) {
     }
     V0 = size;
 }
+
+/* 800115C0 (name, directory, sector table, index; dest on the stack): a
+ * whole file: wait for room in the CD queue, find the directory's file
+ * (0x80029F0C) and its position (0x80029E08, into 0x80062F44), queue the
+ * read of its sectors to dest, wait for it, stop the queue. Returns its
+ * size in words. The waits are vertical blanks a save state can be made
+ * in (gcall_ss, with s0-s3 as the original keeps them). */
+void n_kernel_LoadFile(void) {
+    FRAME(0x28);
+    GS(u32, sp + 0x14) = R[17];
+    GS(u32, sp + 0x10) = R[16];
+    GS(u32, sp + 0x20) = R[31];
+    GS(u32, sp + 0x1C) = R[19];
+    GS(u32, sp + 0x18) = R[18];
+    const u32 in_s0 = R[16], in_s1 = R[17], in_s2 = R[18], in_s3 = R[19];
+    R[17] = A2;
+    R[16] = A3;
+    R[18] = A1;
+    {
+        const u32 e = R[17] + (R[16] << 2);
+        R[19] = (u32)((s32)((GV(u32, e + 4) - GV(u32, e)) << 11) >> 2);
+    }
+    for (;;) {
+        if (gcall_ss(0x80011608u, 0x80014B14u, 0x40, A1, A2, A3) == 0) break;
+        gcall_ss(0x80011618u, 0x800255F8u, 0, A1, A2, A3);
+        LOOP_POLL(0x80011618u);
+    }
+    const u32 d = gcall_ss(0x80011628u, 0x80029F0Cu, R[18], A1, A2, A3);
+    R[16] = R[17] + (R[16] << 2);
+    const u32 pos = gcall_ss(0x80011644u, 0x80029E08u, d + GV(u32, R[16]), 0x80062F44u, A2, A3);
+    gcall_ss(0x8001165Cu, 0x80015D44u, GS(u32, sp + 0x38), GV(u32, R[16] + 4) - GV(u32, R[16]), pos, A3);
+    for (;;) {
+        if (gcall_ss(0x80011664u, 0x80014B14u, 0x40, A1, A2, A3) == 0) break;
+        gcall_ss(0x80011674u, 0x800255F8u, 0, A1, A2, A3);
+        LOOP_POLL(0x80011674u);
+    }
+    gcall_ss(0x80011684u, 0x80015AE8u, 0, A1, A2, A3);
+    V0 = R[19];
+    R[16] = in_s0; R[17] = in_s1; R[18] = in_s2; R[19] = in_s3;
+}

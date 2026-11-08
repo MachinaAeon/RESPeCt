@@ -17,6 +17,16 @@
 
 #define LOOP_POLL(pc) RT_POLL_NOSAVE(pc)
 
+/* SAVE_POLL(pc): a poll a save state can be made at, for a native that
+ * waits over many frames in the thread that is running (not one switched
+ * away). The state continues in the translation at pc, so everything the
+ * translation uses from there on must be as it has it: the frame (FRAME,
+ * the saved registers at the original's offsets, the return addresses
+ * passed by gcall_ra) and the registers it reads before writing them. A
+ * save is only made when no native is below on the call chain (nothing
+ * called through gcall), so this costs nothing otherwise. */
+#define SAVE_POLL(pc) RT_POLL_AT(pc)
+
 /* Copy a 0x8C4-byte object record the way the game's inlined memcpy does:
  * 16 bytes per loop pass (the loop branch at pc), then the last word. */
 static inline void copy_record_polled(u32 dst, u32 src, u32 pc) {

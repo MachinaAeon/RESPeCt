@@ -24,6 +24,7 @@
 #include "libgs.h"
 
 void n_script_ResetThread(void);
+void n_script_StageOp(void);
 void n_script_RunThreads(void);
 void n_script_Init(void);
 void n_script_Start(void);
@@ -292,4 +293,20 @@ void n_room_LoadEvents(void) {
         GCALL2(F_FLAG_SET, 0x80062F60u, 0x74);
         GCALL2(F_FLAG_SET, 0x80062F60u, 0x75);
     }
+}
+
+/* 80088614 (thread): the opcode that runs a stage program's own op: the
+ * op (s16 at pc + 2) from the stage's table (0x800BBB5C), its result
+ * returned; with no table, skip it (pc + 4, 0). */
+void n_script_StageOp(void) {
+    FRAME(0x18);
+    GS(u32, sp + 0x10) = R[31];
+    const u32 tab = GV(u32, 0x800BBB5Cu);
+    if (tab != 0) {
+        const u32 f = GV(u32, tab + ((u32)(s32)GV(s16, GV(u32, A0) + 2) << 2));
+        V0 = gcall_ss(0x80088650u, f, A0, A1, A2, A3);
+        return;
+    }
+    GV(u32, A0) += 4;
+    V0 = 0;
 }

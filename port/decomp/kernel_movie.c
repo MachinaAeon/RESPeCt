@@ -311,3 +311,105 @@ void n_movie_WaitFrame(void) {
     }
     GV(u32, m + 0x34) = 0;
 }
+
+/* 80014134 (stream record, vsync mode, buffer, frame callback arg):
+ * play a movie (needs 10+ frames, not mode 1): the decoder set up
+ * (0x800144BC with 0x8001456C), the two buffers' display areas from the
+ * record and the screen offsets (x * 1.5 in 24-bit mode), the first frame
+ * decoded (0x8001473C), the display on; then a frame at a time: the
+ * decoded image loaded, the next decoded, the frame's sound
+ * (0x800148E4), the per-frame callback (0x80062F40) and VSync(mode), the
+ * buffers swapped, until the decoder says it's done; then the CD and the
+ * decoder stopped and the CD set back (mode 0xE, the stream's mode at
+ * 0x80062F00, and unless +0x14 the normal speed), its callback. Returns
+ * 0 if it was skipped... (0x80064488 ^ 1). It runs for the whole movie in
+ * the thread that called it: every call is gcall_ss with s0-s6 as the
+ * original keeps them, so save states are made in it as in the
+ * translation. */
+void n_movie_Play(void) {
+    FRAME(0x38);
+    GS(u32, sp + 0x1C) = R[17];
+    GS(u32, sp + 0x2C) = R[21];
+    GS(u32, sp + 0x24) = R[19];
+    GS(u32, sp + 0x30) = R[22];
+    GS(u32, sp + 0x34) = R[31];
+    GS(u32, sp + 0x28) = R[20];
+    GS(u32, sp + 0x20) = R[18];
+    GS(u32, sp + 0x18) = R[16];
+    u32 in_s[7];
+    for (int i = 0; i < 7; i++) in_s[i] = R[16 + i];
+    R[17] = A0; R[21] = A1; R[19] = A2; R[22] = A3;
+    const u32 rec = R[17];
+    u32 ret;
+#define MV(ra, f, a, b, c, d) gcall_ss((ra), (f), (u32)(a), (u32)(b), (u32)(c), (u32)(d))
+    if (R[21] == 1 || (s32)GV(u32, rec + 0x18) < 0xA) { ret = 0xFFFFFFFFu; goto out; }
+    GV(u32, 0x80062F30u) = 1;
+    R[18] = 0x80060000u;
+    R[16] = 0x80064480u;
+    if (MV(0x800141A4u, 0x800144BCu, 0x8001456Cu, rec, A2, A3) == 0) goto stop;
+    {
+        const u32 d = 0x80064480u;
+        GV(u32, d + 8) = R[19];
+        GV(u32, d + 0x14) = R[19];
+        GV(u32, d + 0x28) = R[19];
+        GV(u32, d + 0x34) = 0;
+        GV(u32, d + 0xC) = GV(u32, rec + 0x2C);
+        GV(u32, d + 0x10) = GV(u32, rec + 0x30);
+        GV(u32, d) = GV(u32, rec + 0x24);
+        GV(u32, d + 4) = GV(u32, rec + 0x28);
+        for (int k = 0; k < 2; k++) {
+            const s32 ox = GV(s16, k ? 0x80062F3Cu : 0x80062F38u);
+            s32 x = GV(s16, rec + 0x10);
+            if (GV(u8, 0x80064591u)) { x *= 3; x = (x + (s32)((u32)x >> 31)) >> 1; }
+            GV(u16, d + (k ? 0x20 : 0x18)) = (u16)(ox + x);
+            GV(u16, d + (k ? 0x22 : 0x1A)) = (u16)(GV(u16, k ? 0x80062F3Eu : 0x80062F3Au) + GV(u16, rec + 0x12));
+        }
+        R[20] = 0x80064580u;
+        const u32 bpp = GV(u8, 0x80064591u) ? 0x18 : 0x10;
+        const u32 b = d + R[19] * 8;
+        R[18] = d;
+        GV(u16, d + 0x30) = (u16)bpp;
+        GV(u16, d + 0x2C) = GV(u16, b + 0x18);
+        GV(u16, d + 0x2E) = GV(u16, b + 0x1A);
+        GV(u32, 0x80062F34u) = MV(0x800142E8u, 0x8001473Cu, d, rec, A2, A3);
+        MV(0x800142F4u, 0x800352DCu, 1, A1, A2, A3);
+        if (GV(u32, 0x80062F34u) != 0) goto stop;
+        R[16] = d;
+        R[18] = 0x80064580u;
+        for (;;) {
+            MV(0x80014328u, 0x800385E0u, GV(u32, d + (GV(u32, d + 8) << 2)), GV(u8, R[18] + 0x11) + 2, A2, A3);
+            {
+                const s32 w = GV(s16, d + 0x32);
+                const s32 h = (s32)GV(s16, d + 0x30) << 4;
+                s32 a = w - 1;
+                if (a < 0) a = w + 0xE;
+                const u32 a2 = d + (GV(u32, d + 0x14) << 2);
+                const s32 lo = (s32)((u32)h * (u32)((a >> 4) + 1));
+                MV(0x80014368u, 0x8003865Cu, GV(u32, a2 + 0xC), (u32)(lo >> 1), A2, A3);
+            }
+            GV(u32, 0x80062F34u) |= MV(0x80014374u, 0x8001473Cu, d, rec, A2, A3);
+            MV(0x8001438Cu, 0x800148E4u, d, A1, A2, A3);
+            {
+                const u32 f = GV(u32, 0x80062F40u);
+                if (f) GV(u32, 0x80062F34u) |= MV(0x800143A8u, f, R[22], GV(u32, d + 8), A2, A3);
+            }
+            MV(0x800143C0u, 0x800255F8u, R[21], A1, A2, A3);
+            MV(0x800143E0u, 0x80035BA4u, R[18] + (GV(u32, d + 8) ^ 1) * 20, A1, A2, A3);
+            MV(0x8001440Cu, 0x800359D8u, 0x800644C0u + (GV(u32, d + 8) ^ 1) * 92, A1, A2, A3);
+            if (GV(u32, 0x80062F34u) != 0) break;
+            SAVE_POLL(0x80014414u);
+        }
+    }
+stop:
+    MV(0x80014424u, 0x80038718u, 0, A1, A2, A3);
+    MV(0x8001442Cu, 0x80028F48u, A0, A1, A2, A3);
+    if (MV(0x80014438u, 0x8002657Cu, 0, 0, A2, A3) == 5) MV(0x8001444Cu, 0x80016DA8u, A0, A1, A2, A3);
+    MV(0x8001445Cu, 0x800265E4u, 0xE, 0x80062F00u, 0, A3);
+    if (GV(u32, rec + 0x14) == 0) MV(0x80014478u, 0x800265E4u, 9, 0, 0, A3);
+    MV(0x80014484u, 0x800265D0u, 0x80016C54u, A1, A2, A3);
+    ret = GV(u32, 0x80064488u) ^ 1;
+#undef MV
+out:
+    for (int i = 0; i < 7; i++) R[16 + i] = in_s[i];
+    V0 = ret;
+}

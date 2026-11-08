@@ -74,6 +74,9 @@ void n_cerberus_StateActive(void);
 #define CERBERUS_WORK_BASE 0x801041FCu
 #define CERBERUS_WORK_SIZE 0x40
 
+/* The high half a lui loads for address a (as it pairs with a signed low
+ * half). */
+#define LUI_OF(a) ((u32)((((a) + 0x8000u) >> 16) << 16))
 #define g_cerberusAlert  GV(s32, 0x801043C0)  /* 1 one dog started howling, 2 ... */
 #define CERBERUS_SPEED   0x80104188u          /* s32 run speed (its low half for +0x866) */
 #define CERBERUS_HIT_COOLDOWN GV(u16, 0x8010418C)
@@ -795,7 +798,7 @@ void n_cerberus_Setup(void) {
     }
     if (EN_SLOT(e) >= 3) GV(u8, e + 0x2B) |= 2;
     g_cerberusAlert = 0;
-    V0 = 0x80100000;
+    V0 = LUI_OF(0x801043C0);         /* what the original's lui leaves in v0 */
 }
 
 /* 801031FC (e): a dog's frame (see the top of the file). */

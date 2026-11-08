@@ -1,8 +1,9 @@
 /* The staff credits (the STAFF module, loaded in slot 0 at 0x8006C118 after
  * the ending).
  *
- * staff's main (0x8006C11C, left translated: it runs for the whole
- * credits) loads the credits picture, sets up the display and the fade,
+ * staff's main (0x8006C11C; it runs for the whole credits in the mode's
+ * thread, keeping the original's frame and registers so that the thread
+ * resumes in the translation after a save state) loads the credits picture, sets up the display and the fade,
  * starts the music and then, every frame, runs the state's handler
  * (0x80076428[0x8007641C]: 0 scrolling, 1 fading out) and builds the
  * frame (credits_FrameBegin). The frame callback (credits_Flip) shows
@@ -35,6 +36,9 @@ void n_credits_FrameBegin(void);
 void n_credits_LoadImage(void);
 void n_credits_UploadTim(void);
 void n_credits_InitFade(void);
+void n_credits_FadeOutWait(void);
+void n_credits_FadeStart(void);
+void n_credits_FadeFlags(void);
 
 #define g_pad           GV(u32, 0x8007640C)   /* buttons this frame */
 #define g_padLast       GV(u32, 0x80076410)
@@ -71,7 +75,7 @@ void n_credits_InitFade(void);
 #define F_PAD_BUTTONS   0x80013A5Cu
 #define F_MAP_BUTTONS   0x8001189Cu
 #define F_MASTER_VOLUME 0x80015484u   /* (l, r, l2, r2) */
-#define F_FADE_START    0x8006CF78u   /* (speed): fade out (staff, translated) */
+#define F_FADE_START    0x8006CF78u   /* (speed): fade out (credits_FadeStart) */
 
 /* Put primitive p first in ordering table entry ot (addPrim). */
 static void add_prim(u32 ot, u32 p) {
@@ -342,4 +346,144 @@ void n_credits_InitFade(void) {
         if (++k >= 2) break;
         LOOP_POLL(0x8006CF50u);
     }
+}
+
+/* 8006C770 (state 1): the music fades (by 17 a frame); once the screen
+ * is black (fade flags 6), stop the music (waiting a frame at a time
+ * until it's stopped) and mark the credits done. */
+void n_credits_FadeOutWait(void) {
+    FRAME(0x18);
+    if ((s16)g_volume > 0) {
+        g_volume = (u16)(g_volume - 0x11);
+        s32 vol = (s16)g_volume;
+        if (g_stereo == 0) {
+            GCALL4(F_MASTER_VOLUME, (u32)vol, 0, (u32)vol, 0);
+        } else {
+            s32 h = vol / 2;
+            GCALL4(F_MASTER_VOLUME, (u32)h, (u32)h, (u32)h, (u32)h);
+        }
+    } else {
+        GCALL4(F_MASTER_VOLUME, 0, 0, 0, 0);
+    }
+    u32 f = GCALL0(0x8006CF94u) & 0xFFFF;
+    V0 = f;
+    if (f != 6) return;
+    for (;;) {
+        if ((s32)GCALL1(0x80015AE8u, 0) >= 0) break;     /* stop the music */
+        GCALL1(F_VSYNC, 0);
+        LOOP_POLL(0x8006C814u);
+    }
+    GV(u16, g_scroll + 2) = 1;
+    V0 = 1;
+}
+
+/* 8006CF78 (speed): fade to black: level 0, going up. */
+void n_credits_FadeStart(void) {
+    GV(u16, FADE + 2) = (u16)((A0 << 8) | 6);
+    GV(u16, FADE) = 0;
+    V0 = FADE;
+}
+
+/* 8006CF94: the fade's flags. */
+void n_credits_FadeFlags(void) {
+    V0 = GV(u16, FADE + 2);
+}
+
+
+#define CD_RETRY(cond, poll) for (;;) { if (cond) break; \
+        gcall_ra((poll), 0x800255F8u, 0, A1, A2, A3); LOOP_POLL(poll); }
+
+/* 8006C11C: the credits: the CD queue made ready and the music's XA
+ * track (0x80082100, channel 0) started at the sound volume (as 0..255,
+ * centred on mono), then a frame at a time the state's handler, the
+ * frame and the vertical blank (mode switch) until the scroll is done. */
+void n_credits_Main(void) {
+    FRAME(0x20);
+    MEM_W32(sp + 0x1C, R[31]);
+    MEM_W32(sp + 0x18, R[18]);
+    MEM_W32(sp + 0x14, R[17]);
+    MEM_W32(sp + 0x10, R[16]);
+    const u32 in_s0 = R[16], in_s1 = R[17], in_s2 = R[18];
+    CD_RETRY(gcall_ra(0x8006C138u, 0x80014B14u, 0x40, A1, A2, A3) == 0, 0x8006C148u);
+    CD_RETRY((s32)gcall_ra(0x8006C158u, 0x80015AE8u, 0, A1, A2, A3) >= 0, 0x8006C168u);
+    for (;;) {
+        const s32 r = (s32)gcall_ra(0x8006C178u, 0x80014FF4u, 0, A1, A2, A3);
+        R[17] = 0x80080000u;
+        if (r >= 0) break;
+        gcall_ra(0x8006C188u, 0x800255F8u, 0, A1, A2, A3);
+        LOOP_POLL(0x8006C188u);
+    }
+    R[16] = 0x80060000u;
+    CD_RETRY((s32)gcall_ra(0x8006C1A4u, 0x80015D44u, 0x80082100u, 1, 0x800585D4u, A3) >= 0, 0x8006C1B4u);
+    CD_RETRY((s32)gcall_ra(0x8006C1C4u, 0x80015840u, 1, 0, A2, A3) >= 0, 0x8006C1D4u);
+    CD_RETRY(gcall_ra(0x8006C1E4u, 0x80014B14u, 0x40, A1, A2, A3) == 0, 0x8006C1F4u);
+    {
+        const s32 v0 = (s32)GV(s16, 0x80062DB6u) * 255;
+        const s32 v = (s32)(((s64)v0 * 0x51EB851FLL) >> 37) - (v0 >> 31);
+        GV(u16, 0x80076438u) = (u16)v;
+        const s32 vs = (s32)(s16)v;
+        if (GV(u32, 0x80062E20u) == 0) gcall_ra(0x8006C278u, 0x80015484u, (u32)vs, 0, (u32)vs, 0);
+        else {
+            const u32 h = (u32)((vs + (s32)(((u32)v << 16) >> 31)) >> 1);
+            gcall_ra(0x8006C278u, 0x80015484u, h, h, h, h);
+        }
+    }
+    gcall_ra(0x8006C284u, 0x8001569Cu, 0x800585D8u, A1, A2, A3);
+    if (GV(s16, MEM_R32(0x8008293Cu) + 2) == 0) {
+        R[18] = 0x80076428u;
+        R[17] = 0x80070000u;
+        R[16] = 0x80080000u;
+        for (;;) {
+            gcall_ra(0x8006C2CCu, GV(u32, 0x80076428u + (GV(u32, 0x8007641Cu) << 2)), A0, A1, A2, A3);
+            gcall_ra(0x8006C2D4u, 0x8006CD90u, A0, A1, A2, A3);
+            gcall_ra(0x8006C2DCu, 0x8001306Cu, 1, A1, A2, A3);
+            if (GV(s16, MEM_R32(0x8008293Cu) + 2) != 0) break;
+            LOOP_POLL(0x8006C2ECu);
+        }
+    }
+    R[16] = in_s0;
+    R[17] = in_s1;
+    R[18] = in_s2;
+}
+
+/* 8006CCF8: the credits' state: the sound bank, state 0, the scroll
+ * record (0x80082940: speed 0xE6, not done, position 0), the first line
+ * on screen 0. */
+void n_credits_Reset(void) {
+    FRAME(0x18);
+    MEM_W32(sp + 0x10, R[31]);
+    GV(u8, 0x80062E1Cu) = 0;
+    gcall_ra(0x8006CD10u, 0x80011994u, 1, A1, A2, A3);
+    const u32 r = 0x80082940u;
+    GV(u32, 0x8007641Cu) = 0;
+    GV(u16, r + 2) = 0;
+    GV(u32, r + 4) = 0;
+    GV(u32, 0x8008293Cu) = r;
+    GV(u16, r) = 0xE6;
+    GV(u32, 0x800820F0u) = 0;
+}
+
+/* 8006CD4C: the end: the sound stopped, the frame callbacks cleared,
+ * the next mode (3) asked for and a vertical blank. */
+void n_credits_End(void) {
+    FRAME(0x18);
+    MEM_W32(sp + 0x10, R[31]);
+    gcall_ra(0x8006CD5Cu, 0x80011D48u, 1, A1, A2, A3);
+    gcall_ra(0x8006CD64u, 0x80011558u, 0, A1, A2, A3);
+    gcall_ra(0x8006CD6Cu, 0x80011564u, 0, A1, A2, A3);
+    GV(u8, 0x80062DFCu) = 3;
+    gcall_ra(0x8006CD80u, 0x8001306Cu, 1, A1, A2, A3);
+}
+
+/* 8006CCB0: STAFF's main: reset, the picture, the display, the fade,
+ * the credits, the end. */
+void n_credits_Entry(void) {
+    FRAME(0x18);
+    MEM_W32(sp + 0x10, R[31]);
+    gcall_ra(0x8006CCC0u, 0x8006CCF8u, A0, A1, A2, A3);
+    gcall_ra(0x8006CCC8u, 0x8006CDF8u, A0, A1, A2, A3);
+    gcall_ra(0x8006CCD0u, 0x8006C30Cu, A0, A1, A2, A3);
+    gcall_ra(0x8006CCD8u, 0x8006CEB8u, A0, A1, A2, A3);
+    gcall_ra(0x8006CCE0u, 0x8006C11Cu, A0, A1, A2, A3);
+    gcall_ra(0x8006CCE8u, 0x8006CD4Cu, A0, A1, A2, A3);
 }

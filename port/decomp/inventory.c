@@ -16,6 +16,7 @@ void n_item_RemoveC(void);
 void n_weapon_LoadSounds(void);
 void n_weapon_ShotSound(void);
 void n_shots_Clear(void);
+void n_item_InitListC(void);
 
 #define ITEM_EMPTY      0x1E
 #define F_SOUND_LOAD    0x80011CB4u   /* (slot, bank file, buffer) */
@@ -84,5 +85,30 @@ void n_shots_Clear(void) {
         GV(u32, r + 4) = 0;
         GV(u32, r + 8) = 0;
         GV(u32, r + 12) = 0;
+    }
+}
+
+/* 80071514: list C's first entry when a game starts, by the demo stage
+ * (0x800B3D1C): item 0x20 for a normal game, 0x25 with its extra words
+ * from 0x800A0AF0 for demo 8; demo 9 leaves the list alone. */
+void n_item_InitListC(void) {
+    s32 demo = GV(s32, 0x800B3D1C);
+    const u32 e = 0x800AFA00u;
+    if (demo == 8) {
+        GV(u16, e) = 0x25;
+        GV(u16, e + 2) = 0;
+        u32 x = GV(u32, 0x800A0AF0);
+        GV(u16, 0x800B4C38) = 1;
+        GV(u32, e + 4) = x;
+        V0 = 1;
+    } else if (demo >= 9) {
+        V0 = 0;
+    } else if (demo != 0) {
+        V0 = 0x20;
+    } else {
+        GV(u16, e) = 0x20;
+        GV(u16, e + 2) = 0;
+        GV(u16, 0x800B4C38) = 1;
+        V0 = 1;
     }
 }

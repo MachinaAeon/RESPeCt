@@ -97,6 +97,13 @@ FILES IT MAKES
 data\ (the installed game data), resurv.ini (settings), resurv.log (a log, helpful for bug reports),
 memcard1.mcd (memory card), saves\ (quick saves).
 
+CREDITS
+-------
+Graphics card renderer (up to 8x), steadier 3D, smooth textures, 24-bit
+colour, the depth and close-up fixes, full-motion mouse turning, and mod
+support: Trigger117 (github.com/Trigger117).
+HD texture pack (separate download): Leigiboy.
+
 LEGAL
 -----
 RESPeCt is an unofficial fan project. It is not affiliated with, endorsed

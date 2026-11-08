@@ -8,6 +8,7 @@
 
 void n_reticle_LoadImage(void);
 void n_opening_SetupText(void);
+void n_hint_LoadImage(void);
 
 #define ENEMY_FILES  0x800A3EDCu
 #define F_TIM_LOAD   0x8006F370u
@@ -79,4 +80,13 @@ void n_opening_SetupText(void) {
         GV(u16, q + 0xE) = (u16)GCALL2(F_GET_CLUT, 0x140, 0x1F1);
         GV(u16, q + 0x16) = (u16)GCALL4(F_GET_TPAGE, 0, 0, 0x200, 0);
     }
+}
+
+/* 8008F1A0: load the button hint icons' image (file 0x52). */
+void n_hint_LoadImage(void) {
+    FRAME(0x20);
+    const u32 buf = 0x800C3E50u;
+    GS(u32, sp + 0x10) = buf;
+    GCALL4(F_FILE_LOAD, 0x8006C6A8u, 0x8005855Cu, ENEMY_FILES, 0x52);
+    GCALL1(F_TIM_LOAD, buf);
 }

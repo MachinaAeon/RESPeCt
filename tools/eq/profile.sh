@@ -61,7 +61,7 @@ void prof_poll(void) { for (ProfNode *p = prof_top; p; p = p->prev) if (g_frame 
 PY
 make -C "$W/src" -j2 >/dev/null 2>&1 || { echo "build failed"; exit 1; }
 B="$W/src/build/linux/resurv_headless"
-"$ROOT/tools/eq/run.sh" "$B" "$B" "$W/runs" "$@" > /dev/null 2>&1
+EQ_SIDES=base EQ_NODUMP=1 "$ROOT/tools/eq/run.sh" "$B" "$B" "$W/runs" "$@" > /dev/null 2>&1
 python3 - "$W" "$ROOT" <<'PY'
 import glob, sys, collections, re, os
 w, root = sys.argv[1], sys.argv[2]

@@ -7,6 +7,7 @@
  * Decompiled from the game's code; RAM-identical to the originals (checked
  * with tools/eq). */
 #include "title.h"
+#include "libgs.h"
 
 #define PAD_MOUSE      0x200000u
 #define PAD_DUALSHOCK  0x400000u
@@ -566,4 +567,81 @@ void n_title_FadeToStart(void) {
     v -= 8;
     T_FADE = v;
     if (v < 0) T_FADE = 0;
+}
+
+/* 8006D820: the logos screen: load the logo pictures, fade in, show
+ * for up to 480 frames (fire, or start on a pad, moves on early; not
+ * with a GunCon), then fade out; after the third logo, load the title
+ * pictures and go to screen 9. */
+void n_title_Logos(void) {
+    FRAME(0x20);
+    GS(u32, sp + 0x14) = R[17];
+    GS(u32, sp + 0x18) = R[31];
+    GS(u32, sp + 0x10) = R[16];
+    const u32 in_s0 = R[16], in_s1 = R[17];
+    R[17] = 0x80080000u;
+    const s32 st = T_STATE;
+    if (st == 0) {
+        gcall_ra(0x8006D844u, 0x8006CE20u, 2, A1, A2, A3);
+        T_PICS = 0x1E;
+        T_STATE = T_STATE + 1;
+    } else if (st == 1) {
+        T_FADE += 0x20;
+        if (T_FADE >= 128) {
+            T_FADE = 0x80;
+            T_STATE = 2;
+            T_STATE2 = 0;
+        }
+    } else if (st == 2) {
+        int next = 0;
+        T_STATE2 += 1;
+        if (!(T_STATE2 < 480)) next = 1;
+        else {
+            const u32 pt = g_padTypeBit;
+            if (pt == PAD_MOUSE) {
+                if (!(T_PAD & 0x20)) goto out;
+                next = !(T_PAD_PREV & 0x20);
+                if (!next) goto out;
+            } else {
+                if (pt != 0x8000u && (T_PAD & 0x800) && !(T_PAD_PREV & 0x800)) next = 1;
+                else {
+                    const u32 p2 = g_padTypeBit;
+                    if (p2 == PAD_MOUSE || p2 == 0x8000u) goto out;
+                    if (!(T_PAD & 0x20)) goto out;
+                    if (T_PAD_PREV & 0x20) goto out;
+                    next = 1;
+                }
+            }
+        }
+        if (next) {
+            T_STATE2 = 0;
+            T_STATE = T_STATE + 1;
+        }
+    } else {
+        T_FADE -= 8;
+        if (T_FADE <= 0) {
+            R[16] = 0x80080000u;
+            T_FADE = 0;
+            T_STATE2 += 1;
+            if (T_STATE2 == 3) {
+                gcall_ra(0x8006D9D8u, 0x8006CE20u, 5, A1, A2, A3);
+                T_SCREEN = 9;
+                T_STATE = 0;
+                T_STATE2 = 0;
+            }
+        }
+    }
+out:
+    R[16] = in_s0;
+    R[17] = in_s1;
+}
+
+/* 8006F620: to the attract demo: fade out, then leave the
+ * title as the demo (game type 3) through screen 0xE. */
+void n_title_ToDemo(void) {
+    T_FADE -= 8;
+    if (T_FADE > 0) return;
+    T_FADE = 0;
+    g_gameType = 3;
+    T_SCREEN = 0xE;
 }
