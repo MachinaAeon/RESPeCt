@@ -36,6 +36,7 @@ typedef struct {
     int hd_texture_memory;         /* MB of decoded HD textures kept */
     int depth_buffer;              /* depth-test 3D at high resolution */           /* bicubic, deblocked movies at the internal resolution */
     int skip_intro;
+    int fast_forward_hint;     /* "Hold Space to fast-forward" in cutscenes */
     int god_mode, infinite_ammo, no_reload;
     int auto_resolution;       /* lower the resolution when falling behind */
     int perspective;           /* perspective-correct textures */

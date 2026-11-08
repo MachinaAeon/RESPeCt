@@ -417,7 +417,7 @@ static void paint(HDC dc) {
     {   /* saved games: the payphone prompt */
         const char *hint = NULL;
         if (!menu_open && sg_at_payphone()) hint = "Left click: save your game here";
-        if (!menu_open && cutscene_frames > 90 && !ff_held()) hint = pad_ok ? "Hold A to fast-forward" : "Hold Space to fast-forward";
+        if (g_cfg.fast_forward_hint && !menu_open && cutscene_frames > 90 && !ff_held()) hint = pad_ok ? "Hold A to fast-forward" : "Hold Space to fast-forward";
         if (hint) {
             int fh = ch / 26 < 14 ? 14 : ch / 26;
             HFONT f = CreateFontA(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, "Segoe UI");
@@ -952,6 +952,7 @@ static void menu_build(void) {
     add_item(0, IT_BOOL, "Controller invert look", &g_cfg.pad_invert_y, 0, 1, 1, "On: pushing the right stick up looks down.");
     add_item(0, IT_INT, "Controller dead zone", &g_cfg.pad_deadzone, 0, 50, 1, "How much stick movement around the centre is ignored, in %.");
     add_item(0, IT_BOOL, "Skip intro", &g_cfg.skip_intro, 0, 1, 1, "Fast-forward the logos and warnings at startup.");
+    add_item(0, IT_BOOL, "Fast-forward hint", &g_cfg.fast_forward_hint, 0, 1, 1, "Show \"Hold Space to fast-forward\" (A on a controller) during cutscenes.");
     add_item(1, IT_BOOL, "Fullscreen", &g_cfg.fullscreen, 0, 1, 1, "F11 or Alt+Enter also switches.");
     add_item(1, IT_BOOL, "Graphics card", &g_cfg.graphics_card, 0, 1, 1,
              "Draw with the graphics card (Direct3D 11): much faster, and resolutions up to 8x. HD texture packs are supported.");

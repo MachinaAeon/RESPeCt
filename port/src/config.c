@@ -147,6 +147,8 @@ static const char *default_ini =
     "[game]\n"
     "; Fast-forward the logos, warnings and disc check at startup.\n"
     "skip_intro = 0\n"
+    "; Show \"Hold Space to fast-forward\" during cutscenes.\n"
+    "fast_forward_hint = 0\n"
     "\n"
     "[mods]\n"
     "; Experimental: model/animation room arena in the extra RAM. Restart required.\n"
@@ -190,6 +192,7 @@ static void set_defaults(void) {
     g_cfg.hd_textures = 1;
     g_cfg.hd_texture_memory = 1536;
     g_cfg.skip_intro = 0;
+    g_cfg.fast_forward_hint = 0;
     g_cfg.volume = 100;
     g_cfg.music_volume = 100;
     g_cfg.sfx_volume = 100;
@@ -274,6 +277,7 @@ static void parse_line(const char *section, char *key, char *val) {
     else if (!strcmp(key, "dynamic_mod_buffers")) g_cfg.dynamic_mod_buffers = i == 1;
     else if (!strcmp(key, "mod_plugins")) g_cfg.mod_plugins = i == 1;
     else if (!strcmp(key, "skip_intro")) g_cfg.skip_intro = i;
+    else if (!strcmp(key, "fast_forward_hint")) g_cfg.fast_forward_hint = i;
     else if (!strcmp(key, "god_mode")) g_cfg.god_mode = i;
     else if (!strcmp(key, "infinite_ammo")) g_cfg.infinite_ammo = i;
     else if (!strcmp(key, "no_reload")) g_cfg.no_reload = i;
@@ -416,6 +420,7 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "hd_textures")) snprintf(out, n, "%d", g_cfg.hd_textures);
     else if (!strcmp(key, "hd_texture_memory")) snprintf(out, n, "%d", g_cfg.hd_texture_memory);
     else if (!strcmp(key, "skip_intro")) snprintf(out, n, "%d", g_cfg.skip_intro);
+    else if (!strcmp(key, "fast_forward_hint")) snprintf(out, n, "%d", g_cfg.fast_forward_hint);
     else if (!strcmp(key, "dynamic_mod_buffers")) snprintf(out, n, "%d", g_cfg.dynamic_mod_buffers);
     else if (!strcmp(key, "mod_plugins")) snprintf(out, n, "%d", g_cfg.mod_plugins);
     else if (!strcmp(key, "god_mode")) snprintf(out, n, "%d", g_cfg.god_mode);
