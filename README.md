@@ -97,7 +97,7 @@ search, A OK/run, B cancel, X reload, LB/RB change weapon, L3 sprint. Hold A
 to fast-forward cutscenes. L3 + R3 opens the settings. Buttons can be changed
 in `resurv.ini`.
 
-The game's own saves (typewriters and payphones) go on a memory card file
+The game's own memory card save (offered after dying) goes on a memory card file
 next to the exe.
 
 ## How it works

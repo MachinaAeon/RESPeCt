@@ -1668,7 +1668,6 @@ void n_script_TriggerEnemy(void);
 void n_script_TriggerFlag(void);
 void n_script_TriggerZone(void);
 void n_seq_Rewind(void);
-void n_sg_Monologue(void);
 void n_shadow_Add(void);
 void n_shadow_Init(void);
 void n_shadow_Update(void);
@@ -5347,7 +5346,7 @@ static const RtFunc tab_test[] = {
     {0x8008F0E0u, n_reticle_LoadImage, 0, &in_test[435]},
     {0x8008F1A0u, n_hint_LoadImage, 0, &in_test[436]},
     {0x8008F1F0u, n_opening_SetupText, 0, &in_test[437]},
-    {0x8008F3BCu, n_sg_Monologue, 0, &in_test[438]},
+    {0x8008F3BCu, 0, 0, &in_test[438]},
     {0x8008F5F8u, n_flag_Set, 0, &in_test[439]},
     {0x8008F620u, 0, 0, &in_test[440]},
     {0x8008F64Cu, n_flag_Test, 0, &in_test[441]},
@@ -11925,4 +11924,3 @@ const RtModule rt_modules[] = {
 const int rt_module_count = 57;
 
 /* Translations the decompiled wrappers ("~name" in native.txt) call. */
-void f_test_8008F3BC(void) { interp_resume(&rt_modules[1], &tab_test[438]); }

@@ -50,8 +50,7 @@ ENV[fight1s]="RT_LOAD=$SAVES/slot1.sav RT_GIVE_AT=8520 RT_WEAPON_AT=8525:6,8800:
 ARGS[fight1s]=""; FRAMES[fight1s]=9300
 ENV[fight1g]="RT_LOAD=$SAVES/slot1.sav RT_GIVE_AT=8520 RT_WEAPON_AT=8525:9 RT_CLICK=8530,9300 RT_CLICK_EVERY=20 RT_MOUSE=0,0,0,1"
 ARGS[fight1g]=""; FRAMES[fight1g]=9300
-# Game flow (slot5.sav: at the first payphone, after its call; game1.sav:
-# a saved game made there with RT_GSAVE_AT=...:1):
+# Game flow (slot5.sav: at the first payphone, after its call):
 # through the street door into the next room
 ENV[door]="RT_LOAD=$SAVES/slot5.sav RT_MOUSE=4,0,18800,18860"
 ARGS[door]="--press 18800:40:150 --press 19000:10:1400"; FRAMES[door]=20000
@@ -59,13 +58,6 @@ ARGS[door]="--press 18800:40:150 --press 19000:10:1400"; FRAMES[door]=20000
 DP=""; for f in $(seq 9600 40 10400); do DP="$DP --press $f:4000:4"; done
 ENV[death]="RT_LOAD=$SAVES/slot1.sav RT_POKE16=8530:800A8584=1 RT_MOUSE=0,0,0,1"
 ARGS[death]="$DP"; FRAMES[death]=10500
-# save at the payphone (the save screen, a memory card save), then play on
-PP=""; for f in $(seq 18900 60 19800); do PP="$PP --press $f:4000:4"; done
-ENV[phone]="RT_GDIR=. RT_GUSE_AT=18790 RT_LOAD=$SAVES/slot5.sav RT_MOUSE=0,0,0,1"
-ARGS[phone]="$PP"; FRAMES[phone]=20000
-# load a saved game from the title screen
-ENV[gload]="RT_GDIR=$SAVES RT_GLOAD_AT=1700:1 RT_MOUSE=0,0,0,1"
-ARGS[gload]="--press 2300:10:300"; FRAMES[gload]=2800
 # Other areas (areaN.sav: save states around the game, stage/room in the
 # name below): walk forward turning and shooting, 1500 frames
 ENV[area6]="RT_LOAD=$SAVES/area6.sav RT_CLICK=7756,9246 RT_CLICK_EVERY=9 RT_MOUSE=2,1,7756,9246"
@@ -213,6 +205,29 @@ ENV[play16]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play16.sav RT_CLICK=9396
 ARGS[play16]="--press 93962:10:700 --press 94762:40:300"; FRAMES[play16]=95452
 ENV[play17]="RT_MODS=$SAVES/mods_handgun RT_LOAD=$SAVES/play17.sav RT_CLICK=94756,96246 RT_CLICK_EVERY=9 RT_MOUSE=2,1,94756,96246"
 ARGS[play17]="--press 94756:10:700 --press 95556:40:300"; FRAMES[play17]=96246
+# Saves from a speedrun (2026-11-12, the v0.3.1 test build, no mods)
+ENV[run1]="RT_LOAD=$SAVES/run1.sav RT_CLICK=54308,55798 RT_CLICK_EVERY=9 RT_MOUSE=2,1,54308,55798"
+ARGS[run1]="--press 54308:10:700 --press 55108:40:300"; FRAMES[run1]=55798
+ENV[run2]="RT_LOAD=$SAVES/run2.sav RT_CLICK=55867,57357 RT_CLICK_EVERY=9 RT_MOUSE=2,1,55867,57357"
+ARGS[run2]="--press 55867:10:700 --press 56667:40:300"; FRAMES[run2]=57357
+ENV[run3]="RT_LOAD=$SAVES/run3.sav RT_CLICK=57622,59112 RT_CLICK_EVERY=9 RT_MOUSE=2,1,57622,59112"
+ARGS[run3]="--press 57622:10:700 --press 58422:40:300"; FRAMES[run3]=59112
+ENV[run4]="RT_LOAD=$SAVES/run4.sav RT_CLICK=66671,68161 RT_CLICK_EVERY=9 RT_MOUSE=2,1,66671,68161"
+ARGS[run4]="--press 66671:10:700 --press 67471:40:300"; FRAMES[run4]=68161
+ENV[run5]="RT_LOAD=$SAVES/run5.sav RT_CLICK=68143,69633 RT_CLICK_EVERY=9 RT_MOUSE=2,1,68143,69633"
+ARGS[run5]="--press 68143:10:700 --press 68943:40:300"; FRAMES[run5]=69633
+ENV[run6]="RT_LOAD=$SAVES/run6.sav RT_CLICK=77250,78740 RT_CLICK_EVERY=9 RT_MOUSE=2,1,77250,78740"
+ARGS[run6]="--press 77250:10:700 --press 78050:40:300"; FRAMES[run6]=78740
+ENV[run7]="RT_LOAD=$SAVES/run7.sav RT_CLICK=79601,81091 RT_CLICK_EVERY=9 RT_MOUSE=2,1,79601,81091"
+ARGS[run7]="--press 79601:10:700 --press 80401:40:300"; FRAMES[run7]=81091
+ENV[run8]="RT_LOAD=$SAVES/run8.sav RT_CLICK=82560,84050 RT_CLICK_EVERY=9 RT_MOUSE=2,1,82560,84050"
+ARGS[run8]="--press 82560:10:700 --press 83360:40:300"; FRAMES[run8]=84050
+ENV[run9]="RT_LOAD=$SAVES/run9.sav RT_CLICK=82994,84484 RT_CLICK_EVERY=9 RT_MOUSE=2,1,82994,84484"
+ARGS[run9]="--press 82994:10:700 --press 83794:40:300"; FRAMES[run9]=84484
+ENV[run10]="RT_LOAD=$SAVES/run10.sav RT_CLICK=83839,85329 RT_CLICK_EVERY=9 RT_MOUSE=2,1,83839,85329"
+ARGS[run10]="--press 83839:10:700 --press 84639:40:300"; FRAMES[run10]=85329
+ENV[run11]="RT_LOAD=$SAVES/run11.sav RT_CLICK=112859,114349 RT_CLICK_EVERY=9 RT_MOUSE=2,1,112859,114349"
+ARGS[run11]="--press 112859:10:700 --press 113659:40:300"; FRAMES[run11]=114349
 # the ending: staff credits, skipped with start, and the results screen
 # coming up (area67); the results screen, its "save
 # the weapons?" prompt, the memory card save and back to the title (area68)
@@ -235,8 +250,8 @@ ARGS[options_game]="--press 3900:1:4 --press 4050:20:4 --press 4090:4000:4 --pre
 # the attract demos: start at the title, then left alone
 ENV[demo]="RT_MOUSE=0,0,0,1"; NOSTART[demo]=1
 ARGS[demo]="--press 1650:8:4"; FRAMES[demo]=20000
-AREAS="demo area67 area68 area6 area7 area8 area9 area10 area11 area12 area13 area14 area19 area21 area22 area23 area24 area25 area98 area99 area26 area27 area28 area29 area30 area31 area32 area33 area34 area35 area37 area39 area40 area41 area42 area43 area44 area45 area46 area47 area48 area49 area50 area51 area52 area53 area54 area55 area56 area57 area58 area59 area60 area61 area62 play1 play2 play3 play4 play5 play6 play7 play8 play9 play10 play11 play12 play13 play14 play15 play16 play17"
-LIST=${*:-intro weapons walk menu ammo launcher reloads heavy fight1 hurt1 fight2 fight1s fight1g door death phone gload $AREAS}
+AREAS="demo area67 area68 area6 area7 area8 area9 area10 area11 area12 area13 area14 area19 area21 area22 area23 area24 area25 area98 area99 area26 area27 area28 area29 area30 area31 area32 area33 area34 area35 area37 area39 area40 area41 area42 area43 area44 area45 area46 area47 area48 area49 area50 area51 area52 area53 area54 area55 area56 area57 area58 area59 area60 area61 area62 play1 play2 play3 play4 play5 play6 play7 play8 play9 play10 play11 play12 play13 play14 play15 play16 play17 run1 run2 run3 run4 run5 run6 run7 run8 run9 run10 run11"
+LIST=${*:-intro weapons walk menu ammo launcher reloads heavy fight1 hurt1 fight2 fight1s fight1g door death $AREAS}
 for s in $LIST; do
   for side in ${EQ_SIDES:-base new}; do
     BIN=$A; [ $side = new ] && BIN=$B

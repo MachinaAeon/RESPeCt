@@ -208,21 +208,6 @@ void plat_frame(void) {
         for (const char *q = pk; q && *q; q = strchr(q, ';') ? strchr(q, ';') + 1 : NULL)
             if (sscanf(q, "%u:%x=%x", &pf, &pa, &pv) == 3 && pf == g_frame) MEM_W16(pa, pv);
         if (getenv("RT_PCLOG") && g_frame % 50 == 0) rt_log("pc %08X ra %08X", g_poll_pc, R[31]);
-        /* RT_GSAVE_AT=frame:slot  RT_GLOAD_AT=frame:slot  RT_GUSE_AT=frame,frame */
-        {
-            extern volatile int g_sg_use;
-            void sg_request_save(int), sg_set_dir(const char *);
-            int sg_request_load(int);
-            static int dir_set;
-            if (!dir_set) { dir_set = 1; if (getenv("RT_GDIR")) sg_set_dir(getenv("RT_GDIR")); }
-            unsigned gf; int gs;
-            const char *gsv = getenv("RT_GSAVE_AT"), *glo = getenv("RT_GLOAD_AT");
-            if (gsv && sscanf(gsv, "%u:%d", &gf, &gs) == 2 && gf == g_frame) sg_request_save(gs);
-            if (glo && sscanf(glo, "%u:%d", &gf, &gs) == 2 && gf == g_frame)
-                rt_log("savegame: load request -> %d", sg_request_load(gs));
-            for (const char *q = getenv("RT_GUSE_AT"); q && *q; q = strchr(q, ',') ? strchr(q, ',') + 1 : NULL)
-                if ((unsigned)atoi(q) == g_frame) g_sg_use = 1;
-        }
         /* RT_DOOR_AT=frame:n: take the room's door n then, as the door script
          * does once it opens (room_change.c, n_op_Door) */
         const char *dr = getenv("RT_DOOR_AT");
@@ -365,7 +350,6 @@ int plat_quit(void) { return 0; }
 void plat_poll_look(void) {}
 void plat_fatal(const char *msg) { (void)msg; }
 
-void sg_save_done(int ok) { rt_log("savegame: save %s", ok ? "ok" : "FAILED"); }
 
 int main(int argc, char **argv) {
     if (argc < 2) {

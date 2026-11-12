@@ -1,4 +1,4 @@
-/* The save screen (TITLE overlay, entered after dying or at a payphone)
+/* The save screen (TITLE overlay, entered after dying)
  * and the memory card code it and LOAD GAME use.
  *
  * Its steps (save_Frame calls one per frame by SV_STEP, through the

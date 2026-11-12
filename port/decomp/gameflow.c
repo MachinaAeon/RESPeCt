@@ -267,7 +267,7 @@ static void add_stage_stats(void) {
 /* 8008369C, handler 3: game over. The player falls (camera pitches down and
  * drops to the floor, sliding back), the screen dims and spins away, then
  * the GAME OVER text and the menu: save (step 15: make the checkpoint and
- * switch to TITLE's save screen; the payphones open it here too) or
+ * switch to TITLE's save screen) or
  * continue (16: restore the checkpoint). 17 is like 15 for another ending. */
 void n_flow_GameOver(void) {
     FRAME(0x30);

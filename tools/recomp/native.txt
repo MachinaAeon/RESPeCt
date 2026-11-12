@@ -85,7 +85,6 @@ test      8008E0E8  weapon_Damage
 test      800710FC  enemy_AddHit
 kernel    80039C58  card_FirstFile
 test      8009B71C  fov_Unproject
-test      8008F3BC  ~sg_Monologue
 # gameflow.c
 test      80083000  flow_StageStart
 test      80083048  flow_Playing

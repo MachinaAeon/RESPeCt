@@ -29,8 +29,7 @@ the change. The scenarios need the disc image and the save states in
 Scenarios: `intro` (new game), `weapons`, `walk`, `menu` (status screen),
 `ammo`, `launcher`, `reloads`, `heavy`, `fight1`, `hurt1`, `fight2`,
 `fight1s`, `fight1g` (zombies), `door` (a door into the next room), `death`
-(killed, game over, continue), `phone` (saving at the payphone: save screen,
-memory card), `gload` (loading a saved game from the title screen).
+(killed, game over, continue).
 
 ### Save states still needed
 

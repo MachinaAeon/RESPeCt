@@ -241,7 +241,7 @@ static void fps_section(void) {
     /* Only the mouse fires; Cross is sprint. A held click stays in
      * g_buttons for the frame, so it counts once. */
     b &= ~BTN_FIRE;
-    if (ok && !(m[3] & MOUSE_LEFT) && !sg_at_payphone()) b |= BTN_FIRE;   /* no shots at a payphone */
+    if (ok && !(m[3] & MOUSE_LEFT)) b |= BTN_FIRE;
 
     /* the mouse's whole motion since the last game frame (the PC side
      * scales it by sensitivity), not the pad buffer's last vblank */
@@ -410,8 +410,6 @@ void port_weapon_frame(void);                /* cheats.c */
 
 void n_player_Update(void) {
     port_weapon_frame();
-    sg_game_frame(g_sg_use);
-    g_sg_use = 0;
     if (g_playerFrozen && fps_active()) {
         int dx, dy;
         input_take_look(&dx, &dy);           /* frozen: motion meanwhile doesn't turn you afterwards */

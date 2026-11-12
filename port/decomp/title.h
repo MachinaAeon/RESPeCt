@@ -1,6 +1,6 @@
 /* The TITLE overlay (TITLE.BIN, loaded at 0x8006C118 like TEST): the
- * title screen, LOAD GAME, and the save screen offered after dying or at
- * a payphone. Shared by title_screen.c, title_sprites.c, title_menu.c,
+ * title screen, LOAD GAME, and the save screen offered after dying.
+ * Shared by title_screen.c, title_sprites.c, title_menu.c,
  * title_text.c and save_screen.c.
  *
  * TITLE's natives are listed under the module "title" in native.txt: the

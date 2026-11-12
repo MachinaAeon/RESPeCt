@@ -89,8 +89,8 @@ Controller (Xbox controllers; PlayStation and others through Steam Input):
   (stays on until you stop), R3 circle. Hold A to fast-forward cutscenes.
   L3 + R3 opens the settings: LB / RB pages, d-pad choose and change,
   A change, B close. Buttons can be changed in resurv.ini [controller].
-The game's own saves (at the typewriters and payphones) go on a memory card
-file next to the exe.
+The game's own memory card save (offered after you die) goes on a memory
+card file next to the exe.
 
 FILES IT MAKES
 --------------

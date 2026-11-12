@@ -173,7 +173,10 @@ static int audio_queued(void) {
 static double slow_frame_ms, slow_paint_ms;   /* worst this log period */
 static LARGE_INTEGER last_end;                 /* end of the last plat_frame */
 
-static void audio_pump(void) {
+static uint32_t ff_frame = 0xFFFFFFFFu;        /* last fast-forwarded frame */
+
+/* limit: queue no more than this many blocks (0: as many as there are). */
+static void audio_pump_to(int limit) {
     if (!wave) {
         int16_t junk[1024 * 2];
         while (spu_take_samples(junk, 1024) > 0) {}
@@ -181,12 +184,16 @@ static void audio_pump(void) {
     }
     /* The device ran dry (it played everything we gave it): a gap, heard as
      * a crackle. Counted for the log. */
-    static int started, underruns, logged_frame, rebuffer;
-    if (started && audio_queued() == 0) { underruns++; rebuffer = 1; }
+    static int started, underruns, after_ff, logged_frame, rebuffer;
+    if (started && audio_queued() == 0) {
+        underruns++;
+        if (g_frame - ff_frame < 60) after_ff++;
+        rebuffer = 1;
+    }
     if (underruns && g_frame - (uint32_t)logged_frame > 600) {
-        rt_log("audio: %d underruns in the last 10 s (the game ran behind; slowest frame %.1f ms, picture %.1f ms)",
-               underruns, slow_frame_ms, slow_paint_ms);
-        underruns = 0;
+        rt_log("audio: %d underruns in the last 10 s, %d right after fast-forwarding (slowest frame %.1f ms, picture %.1f ms)",
+               underruns, after_ff, slow_frame_ms, slow_paint_ms);
+        underruns = after_ff = 0;
         slow_frame_ms = slow_paint_ms = 0;
         logged_frame = (int)g_frame;
     }
@@ -197,6 +204,7 @@ static void audio_pump(void) {
         rebuffer = 0;
     }
     for (;;) {
+        if (limit && audio_queued() >= limit) return;
         WAVEHDR *h = &whdr[wnext];
         /* Every buffer queued: keep the rest in the SPU's ring buffer; the
          * frame pacing slows down until the device catches up. Sound is
@@ -221,6 +229,8 @@ static void audio_pump(void) {
         started = 1;
     }
 }
+
+static void audio_pump(void) { audio_pump_to(0); }
 
 /* PS1 pad bits (1 = pressed) */
 enum {
@@ -466,9 +476,8 @@ static void draw_overlays(HDC dc) {
     int dw = cw, dh = cw * ad / an;
     if (dh > ch) { dh = ch; dw = ch * an / ad; }
     int dx = (cw - dw) / 2, dy = (ch - dh) / 2;
-    {   /* saved games: the payphone prompt */
+    {   /* the fast-forward hint */
         const char *hint = NULL;
-        if (!menu_open && sg_at_payphone()) hint = "Left click: save your game here";
         if (g_cfg.fast_forward_hint && !menu_open && cutscene_frames > 90 && !ff_held()) hint = pad_ok ? "Hold A to fast-forward" : "Hold Space to fast-forward";
         if (hint) {
             int fh = ch / 26 < 14 ? 14 : ch / 26;
@@ -500,24 +509,6 @@ static void draw_overlays(HDC dc) {
         DeleteObject(f);
     }
 }
-
-/* ------------------------------------------------------------ saved games
- * (decomp/savegame.c): a payphone opens the game's save screen; the
- * progress goes to saves\ next to the card save, and LOAD GAME picks it
- * up again. */
-
-static void games_dir(void) {
-    char dir[MAX_PATH];
-    GetModuleFileNameA(NULL, dir, MAX_PATH);
-    char *sl = strrchr(dir, '\\');
-    if (sl) sl[1] = 0;
-    char sub[MAX_PATH + 8];
-    snprintf(sub, sizeof sub, "%ssaves", dir);
-    CreateDirectoryA(sub, NULL);
-    sg_set_dir(sub);
-}
-
-void sg_save_done(int ok) { show_toast(ok ? "Game saved" : "Saving the game's progress failed"); }
 
 static void paint(HDC dc);
 static void save_settings(void);
@@ -840,11 +831,6 @@ static void read_input(void) {
     } else {
         menu_acc_x = menu_acc_y = 0;
         g_input.mouse_left = (captured && !suppress_keys && key_down(VK_LBUTTON)) || pad_fire;
-        {   /* a click at a payphone uses it (savegame.c turns the shot off there) */
-            static int was;
-            if (g_input.mouse_left && !was && sg_at_payphone()) g_sg_use = 1;
-            was = g_input.mouse_left;
-        }
         g_input.mouse_right = 0;
         int mx = scaled(&frac_x, dx * 2.0 * g_cfg.sens_x) + scaled(&pad_fx, pad_dx);
         int my = scaled(&frac_y, dy * 2.0 * g_cfg.sens_y * (g_cfg.invert_y ? -1 : 1)) + scaled(&pad_fy, pad_dy);
@@ -1595,6 +1581,12 @@ void plat_frame(void) {
     }
     read_input();
     if (fast) {
+        /* Fast-forwarding (Space held at a door, in a cutscene): the sound
+         * still goes out, as much of it as keeps the device playing, the
+         * rest is skipped. Draining it all left the device with nothing:
+         * a gap, and a crackle, at every door taken with Space (run) held. */
+        ff_frame = g_frame;
+        audio_pump_to(AUDIO_TARGET);
         int16_t junk[1024 * 2];
         while (spu_take_samples(junk, 1024) > 0) {}
         next_frame.QuadPart = 0;
@@ -1693,7 +1685,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
         g_opt_fov = g_cfg.field_of_view;
     { extern int g_opt_movie_upscale; g_opt_movie_upscale = g_cfg.movie_upscaling; g_depth_buffer = g_cfg.depth_buffer; g_gap_fill = g_cfg.gap_fill; { extern int g_brightness, g_persp, g_smooth_tex, g_true_color; g_brightness = g_cfg.brightness; g_persp = g_cfg.perspective; g_smooth_tex = g_cfg.smooth_textures; g_true_color = g_cfg.true_color; } g_hd_textures = g_cfg.hd_textures; g_hd_budget = (size_t)g_cfg.hd_texture_memory << 20; }
         apply_audio();
-        games_dir();
         pick_latest_slot();
         extern int g_opt_scale, g_opt_threads;
         g_opt_scale = g_cfg.resolution_scale;
