@@ -49,16 +49,16 @@ resolution for a moment while its HD image loads.
 
 RUNNING SLOWLY?
 ---------------
-RESPeCt draws the game with your CPU unless you turn on F1 > Video >
-Graphics card: then the graphics card draws it (Direct3D 11), much faster,
-and resolutions up to 8x become available. Drawn larger than your screen,
-the picture is shrunk to fit and edges come out smooth. HD texture packs
-work on both the graphics card and CPU. With the CPU the resolution
-setting matters most. The first start picks a resolution to
-suit your CPU, and if the game still can't keep up it lowers it by itself
-(with a message). You can change it any time in F1 > Video > Resolution:
-1x is the PlayStation's own, 2x is four times the work, 4x sixteen. HD
-textures add a little more.
+RESPeCt draws the game with your graphics card (Direct3D 11), and the
+picture goes straight to the screen from there: fast, with resolutions
+up to 8x. Drawn larger than your screen, the picture is shrunk to fit and
+edges come out smooth. If your graphics card can't be used, or you turn
+off F1 > Video > Graphics card, the CPU draws it instead. With the CPU
+the resolution setting matters most: the first start picks a resolution
+to suit your CPU, and if the game still can't keep up it lowers it by
+itself (with a message). You can change it any time in F1 > Video >
+Resolution: 1x is the PlayStation's own, 2x is four times the work, 4x
+sixteen. HD texture packs work on both, and add a little more work.
 
 MODS
 ----
