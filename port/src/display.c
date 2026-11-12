@@ -147,8 +147,12 @@ static void movie_upscale(const GpuDisplay *d, int f, uint32_t *out) {
  * bare pixels (still the screen clear, nothing drawn) at most one PS1 pixel
  * long between drawn ones, across or down, shows the drawn pixel before it.
  * Runs are found row by row, then column by column, so it costs little
- * even when much of the screen is bare (dark scenes, transitions). */
-static void close_cracks(uint32_t *out, const uint8_t *bare, int stride, int s, int X, int Y, int W, int H) {
+ * even when much of the screen is bare (dark scenes, transitions).
+ * Only between two pixels of 3D (depth > 0): a crack is in a room's
+ * surfaces. Next to 2D (the HUD, the reticle) a bare run is just the gap
+ * beside it, and closing it from the 2D frayed the reticle against the
+ * sky (its yellow spread into the gaps by the fence's posts). */
+static void close_cracks(uint32_t *out, const uint8_t *bare, const float *depth, int stride, int s, int X, int Y, int W, int H) {
     static uint8_t *mask;
     static int *start;
     static size_t mask_n, start_n;
@@ -156,6 +160,7 @@ static void close_cracks(uint32_t *out, const uint8_t *bare, int stride, int s, 
     if ((size_t)W > start_n) { free(start); start_n = (size_t)W; start = malloc(start_n * sizeof *start); }
     if (!mask || !start) return;
     int mw = 1024 * s, mh = 512 * s;
+#define CRACK_3D(xx, yy) (!depth || depth[(size_t)((Y + (yy)) % mh) * stride + (X + (xx)) % mw] > 0)
     for (int x = 0; x < W; x++) start[x] = -1;
     for (int y = 0; y <= H; y++) {
         uint8_t *m = mask + (size_t)(y < H ? y : 0) * W;
@@ -169,7 +174,7 @@ static void close_cracks(uint32_t *out, const uint8_t *bare, int stride, int s, 
                 if (!m[x]) { x++; continue; }
                 int e = x;
                 while (e < W && m[e]) e++;
-                if (e < W && !m[x - 1] && e - x <= s)
+                if (e < W && !m[x - 1] && e - x <= s && CRACK_3D(x - 1, y) && CRACK_3D(e, y))
                     for (int k = x; k < e; k++) { o[k] = o[x - 1]; m[k] = 0; }
                 x = e;
             }
@@ -181,7 +186,7 @@ static void close_cracks(uint32_t *out, const uint8_t *bare, int stride, int s, 
             int st = start[x];
             if (st < 0) continue;
             start[x] = -1;
-            if (st > 0 && y < H && y - st <= s) {
+            if (st > 0 && y < H && y - st <= s && CRACK_3D(x, st - 1) && CRACK_3D(x, y)) {
                 uint32_t c = out[(size_t)(st - 1) * W + x];
                 for (int k = st; k < y; k++) out[(size_t)k * W + x] = c;
             }
@@ -418,7 +423,7 @@ static void display_grab_bgrx_base(uint32_t *out, int *w, int *h) {
     if (k > 1) return;
     const float *depth = render_depth();
     if (depth && display_holes()) close_holes(out, depth, stride, s, X, Y, W, H);
-    if (bare) close_cracks(out, bare, stride, s, X, Y, W, H);
+    if (bare) close_cracks(out, bare, depth, stride, s, X, Y, W, H);
 }
 
 /* The GUI and headless captures both use this final CPU/GPU presentation path. */

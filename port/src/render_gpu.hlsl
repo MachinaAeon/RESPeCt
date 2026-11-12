@@ -561,7 +561,7 @@ void cracks_across(uint3 t : SV_DispatchThreadID) {
         if (!pmask[o + x]) { x++; continue; }
         int e = x;
         while (e < Wp && pmask[o + e]) e++;
-        if (e < Wp && !pmask[o + x - 1] && e - x <= s)
+        if (e < Wp && !pmask[o + x - 1] && e - x <= s && zb[src_at(x - 1, y)] > 0 && zb[src_at(e, y)] > 0)
             for (int k = x; k < e; k++) { pic[o + k] = pic[o + x - 1]; pmask[o + k] = 0; }
         x = e;
     }
@@ -579,7 +579,7 @@ void cracks_down(uint3 t : SV_DispatchThreadID) {
         int st = start;
         if (st < 0) continue;
         start = -1;
-        if (st > 0 && y < (int)pic_h && y - st <= s) {
+        if (st > 0 && y < (int)pic_h && y - st <= s && zb[src_at(x, st - 1)] > 0 && zb[src_at(x, y)] > 0) {
             uint c = pic[(st - 1) * pic_w + x];
             for (int k = st; k < y; k++) pic[k * pic_w + x] = c;
         }
