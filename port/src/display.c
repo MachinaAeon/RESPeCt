@@ -328,6 +328,8 @@ static void picture_scale(const uint32_t *in, int iw, int ih, uint32_t *out, int
     }
 }
 
+extern int g_display_keep_gpu, g_display_kept;
+
 static void display_grab_bgrx_base(uint32_t *out, int *w, int *h) {
     build_luts();
     GpuDisplay d;
@@ -381,7 +383,9 @@ static void display_grab_bgrx_base(uint32_t *out, int *w, int *h) {
             ow = 0;
         if (ow > 0) {
             render_sync();
-            rgpu_picture(X, Y, W, H, g_gap_fill, gamma8, out, ow, oh, g_display_smooth);
+            int keep = g_display_keep_gpu && rgpu_present_active();
+            rgpu_picture(X, Y, W, H, g_gap_fill, gamma8, keep ? NULL : out, ow, oh, g_display_smooth);
+            g_display_kept = keep;
             *w = ow;
             *h = oh;
             return;
@@ -418,8 +422,17 @@ static void display_grab_bgrx_base(uint32_t *out, int *w, int *h) {
 }
 
 /* The GUI and headless captures both use this final CPU/GPU presentation path. */
+/* g_display_keep_gpu: the caller shows the picture with the card
+ * (rgpu_present), so one made there may stay there: g_display_kept says it
+ * did (out not filled). */
+int g_display_keep_gpu, g_display_kept;
+
 void display_grab_bgrx(uint32_t *out, int *w, int *h) {
+    int keep = g_display_keep_gpu;
+    g_display_kept = 0;
+    if (modfs_pc_has_bitmaps()) g_display_keep_gpu = 0;   /* the PC version's pictures go over it here */
     display_grab_bgrx_base(out, w, h);
+    g_display_keep_gpu = keep;
     if (modfs_pc_has_bitmaps()) {
         GpuDisplay d; gpu_display(&d);
         if (d.enabled && !d.rgb24) modfs_pc_composite(out, *w, *h, d.w, d.h);

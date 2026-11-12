@@ -18,6 +18,7 @@
 #include "rt.h"
 #include "config.h"
 #include "render.h"
+#include "render_gpu.h"
 #include "texpack.h"
 #include "savestate.h"
 #include <ctype.h>
@@ -321,8 +322,20 @@ static void toggle_fullscreen(void) {
 /* The frame to show: drawing on the graphics card, made at the size it's
  * shown at (paint's picture area), so a picture drawn larger than the
  * window comes out smoothed rather than with rows and columns dropped. */
+static int present_failed;                 /* the card couldn't show the picture: GDI does */
+static int gpu_shows(void) {
+    if (present_failed || !render_on_gpu()) return 0;
+    if (!rgpu_present_active()) {
+        static int off = -1;
+        if (off < 0) off = getenv("RT_GDI_PRESENT") != NULL;   /* the old way, for comparing */
+        if (off || !rgpu_present_on(hwnd)) { present_failed = 1; return 0; }
+    }
+    return 1;
+}
+
 static void grab_frame(void) {
-    extern int g_display_w, g_display_h, g_display_smooth;
+    extern int g_display_w, g_display_h, g_display_smooth, g_display_keep_gpu;
+    g_display_keep_gpu = gpu_shows();
     RECT r;
     GetClientRect(hwnd, &r);
     int cw = r.right, ch = r.bottom;
@@ -387,6 +400,33 @@ static void mods_folder(const char *dir) {
 }
 
 static int key_down(int vk);
+static void draw_overlays(HDC dc);
+static void menu_draw(HDC dc);
+
+/* The picture shown by the graphics card (rgpu_present), the text and, while
+ * it's open, the F1 menu drawn over it. 0: GDI shows it (paint). */
+static void overlay_cb(void *hdc, void *with_menu) {
+    draw_overlays((HDC)hdc);
+    if (with_menu) menu_draw((HDC)hdc);
+}
+static int gpu_show(int with_menu) {
+    extern int g_display_kept;
+    if (!gpu_shows()) return 0;
+    RECT r;
+    GetClientRect(hwnd, &r);
+    int cw = r.right, ch = r.bottom;
+    int an = g_widescreen ? 16 : 4, ad = g_widescreen ? 9 : 3;
+    int dw = cw, dh = cw * ad / an;
+    if (dh > ch) { dh = ch; dw = ch * an / ad; }
+    int dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+    if (rgpu_present(g_display_kept ? NULL : frame_buf, frame_w, frame_h, dx, dy, dw, dh, g_cfg.smooth_scaling, overlay_cb,
+                     with_menu ? (void *)1 : NULL))
+        return 1;
+    present_failed = 1;                          /* from now on: GDI */
+    grab_frame();
+    return 0;
+}
+
 static void paint(HDC dc) {
     RECT r;
     GetClientRect(hwnd, &r);
@@ -414,6 +454,18 @@ static void paint(HDC dc) {
     HBRUSH black = (HBRUSH)GetStockObject(BLACK_BRUSH);
     RECT bars[4] = {{0, 0, cw, dy}, {0, dy + dh, cw, ch}, {0, dy, dx, dy + dh}, {dx + dw, dy, cw, dy + dh}};
     for (int i = 0; i < 4; i++) FillRect(dc, &bars[i], black);
+    draw_overlays(dc);
+}
+
+/* The text over the picture: hints and messages. */
+static void draw_overlays(HDC dc) {
+    RECT r;
+    GetClientRect(hwnd, &r);
+    int cw = r.right, ch = r.bottom;
+    int an = g_widescreen ? 16 : 4, ad = g_widescreen ? 9 : 3;
+    int dw = cw, dh = cw * ad / an;
+    if (dh > ch) { dh = ch; dw = ch * an / ad; }
+    int dx = (cw - dw) / 2, dy = (ch - dh) / 2;
     {   /* saved games: the payphone prompt */
         const char *hint = NULL;
         if (!menu_open && sg_at_payphone()) hint = "Left click: save your game here";
@@ -487,7 +539,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC dc = BeginPaint(h, &ps);
-        paint(dc);
+        if (!gpu_show(menu_open)) paint(dc);
         EndPaint(h, &ps);
         return 0;
     }
@@ -1419,6 +1471,7 @@ static void menu_run(void) {
         menu_pad();
         if (!menu_open) break;
         if (menu_binding >= 0 && GetForegroundWindow() == hwnd) poll_binding();
+        if (gpu_show(1)) { Sleep(16); continue; }
         RECT cr;
         GetClientRect(hwnd, &cr);
         HDC dc = GetDC(hwnd);
@@ -1447,10 +1500,12 @@ static int in_cutscene(void) {
 
 /* Auto resolution: the game falling behind (most frames of the last few
  * seconds finished late) at a resolution above 1x: one step lower, with a
- * message. Never raised again by itself; F1 > Video sets it back. */
+ * message. Never raised again by itself; F1 > Video sets it back. Only
+ * while the CPU draws: with the graphics card the resolution costs the
+ * CPU little, and lowering it to 1x on a fast PC helped nobody. */
 static void auto_resolution(int late) {
     static int frames, lates, quiet = 300;
-    if (!g_cfg.auto_resolution || menu_open || render_scale() <= 1) { frames = lates = 0; return; }
+    if (!g_cfg.auto_resolution || menu_open || render_scale() <= 1 || render_gpu_active()) { frames = lates = 0; return; }
     if (quiet > 0) { quiet--; return; }                 /* just started or changed */
     frames++;
     lates += late;
@@ -1521,9 +1576,11 @@ void plat_frame(void) {
     if (!fast || t0.QuadPart - last_paint.QuadPart >= qpf.QuadPart / 60) {
         last_paint = t0;
         grab_frame();
-        HDC dc = GetDC(hwnd);
-        paint(dc);
-        ReleaseDC(hwnd, dc);
+        if (!gpu_show(0)) {
+            HDC dc = GetDC(hwnd);
+            paint(dc);
+            ReleaseDC(hwnd, dc);
+        }
     }
     QueryPerformanceCounter(&t1);
     {

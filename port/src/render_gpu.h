@@ -79,6 +79,16 @@ void rgpu_read(int x0, int y0, int w, int h, uint16_t *hires, uint16_t *low, uin
  * pixels) as 32-bit BGRX through gamma8, with Close model gaps if gaps;
  * made ow x oh (the window's size: smooth, by area) if ow > 0. */
 void rgpu_picture(int x, int y, int w, int h, int gaps, const uint8_t gamma8[256], uint32_t *out, int ow, int oh, int smooth);
+/* out == NULL: the picture stays on the card for rgpu_present. */
+
+/* Showing the picture with the card, in a swap chain for the window (hwnd):
+ * the last rgpu_picture, or cpu (a picture made on the processor, pw x ph),
+ * at dx, dy, dw x dh in the window, black around it; overlay draws on the
+ * result with GDI before it's shown. 0: not available, use GDI. */
+int rgpu_present_on(void *hwnd);
+int rgpu_present(const uint32_t *cpu, int pw, int ph, int dx, int dy, int dw, int dh, int smooth,
+                 void (*overlay)(void *hdc, void *arg), void *arg);
+int rgpu_present_active(void);
 /* Replace the card's copy with these (after a load or a change of scale). */
 void rgpu_write(const uint16_t *hires, const uint16_t *low, const uint8_t *bare, const float *z, const uint32_t *zid);
 

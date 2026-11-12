@@ -1041,6 +1041,8 @@ int render_on_gpu(void) { return gpu_on; }
 /* The graphics card setting changed while running: the high-resolution
  * picture moves over to the card or back. 0: drawing stays as it was (no
  * usable card). */
+int render_gpu_active(void) { return gpu_on; }
+
 int render_set_gpu(int on) {
     g_gpu = on;
     if (!!on == gpu_on || S == 1) return 1;

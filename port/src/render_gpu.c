@@ -48,6 +48,9 @@ static Buf b_hl, b_bare, b_z, b_zid, b_tmp;      /* the picture; scratch */
 static Buf b_ops, b_vram, b_pool, b_tiles, b_bins, b_hd;
 static Buf b_gamma, b_pic, b_pmask, b_pic2;      /* the picture shown */
 static ID3D11Buffer *staging, *pic_staging;
+static PFN_D3DCompile d3d_compile;               /* kept for the present shaders */
+static Buf *last_pic;                            /* the picture rgpu_picture left on the card */
+static int last_pw, last_ph;
 static UINT staging_n, pic_staging_n;
 static int S, W, H;
 
@@ -214,6 +217,7 @@ int rgpu_init(int scale) {
     PFN_CreateDXGIFactory1 factory = (PFN_CreateDXGIFactory1)(void *)GetProcAddress(mdxgi, "CreateDXGIFactory1");
     PFN_D3DCompile comp = (PFN_D3DCompile)(void *)GetProcAddress(mcomp, "D3DCompile");
     if (!create || !factory || !comp) return 0;
+    d3d_compile = comp;
     /* the card with the most memory of its own (not a processor's graphics) */
     IDXGIFactory1 *f = NULL;
     IDXGIAdapter1 *best = NULL;
@@ -483,7 +487,7 @@ void rgpu_picture(int x, int y, int w, int h, int gaps, const uint8_t gamma8[256
         n = n2;
     } else if (!b_pic2.buf && !buf_make(&b_pic2, 16, 4, 1, NULL))
         return;
-    if (pic_staging_n < n) {
+    if (out && pic_staging_n < n) {
         if (pic_staging) ID3D11Buffer_Release(pic_staging);
         D3D11_BUFFER_DESC d = {0};
         d.ByteWidth = n * 4;
@@ -534,6 +538,10 @@ void rgpu_picture(int x, int y, int w, int h, int gaps, const uint8_t gamma8[256
         ID3D11DeviceContext_CSSetShader(ctx, cs_pic_scale, NULL, 0);
         ID3D11DeviceContext_Dispatch(ctx, ((UINT)ow + 15) / 16, ((UINT)oh + 15) / 16, 1);
     }
+    last_pic = scaled ? &b_pic2 : &b_pic;
+    last_pw = scaled ? ow : w;
+    last_ph = scaled ? oh : h;
+    if (!out) return;                            /* shown from the card (rgpu_present) */
     if (pic_staging_n < n) {
         if (pic_staging) ID3D11Buffer_Release(pic_staging);
         D3D11_BUFFER_DESC d = {0};
@@ -552,6 +560,180 @@ void rgpu_picture(int x, int y, int w, int h, int gaps, const uint8_t gamma8[256
     memcpy(out, m.pData, (size_t)n * 4);
     ID3D11DeviceContext_Unmap(ctx, (ID3D11Resource *)pic_staging, 0);
 }
+
+/* ------------------------------------------------------------ showing it
+ * The picture straight from the card into the window (a swap chain), with
+ * no trip back to the processor: reading a 4x picture back and handing it
+ * to Windows' GDI took 10-15 ms a frame, most of a frame's 16.7. The swap
+ * chain is GDI compatible, so the text drawn over the picture (hints,
+ * messages, the F1 menu) is still drawn with GDI, on its back buffer. */
+static const char present_hlsl[] =
+    "StructuredBuffer<uint> pic : register(t0);\n"
+    "cbuffer P : register(b0) { uint pw, ph, smooth, pad0; float dx, dy, dw, dh; };\n"
+    "float4 vs(uint id : SV_VertexID) : SV_Position {\n"
+    "    float2 p = float2((id << 1) & 2, id & 2);\n"
+    "    return float4(p * float2(2, -2) + float2(-1, 1), 0, 1);\n"
+    "}\n"
+    "float3 px(int x, int y) {\n"
+    "    x = clamp(x, 0, (int)pw - 1); y = clamp(y, 0, (int)ph - 1);\n"
+    "    uint c = pic[(uint)y * pw + (uint)x];\n"
+    "    return float3((c >> 16) & 255, (c >> 8) & 255, c & 255) / 255.0;\n"
+    "}\n"
+    "float4 ps(float4 pos : SV_Position) : SV_Target {\n"
+    "    float2 q = (pos.xy - float2(dx, dy)) * float2(pw / dw, ph / dh);\n"
+    "    if (!smooth || (abs(dw - pw) < 0.5 && abs(dh - ph) < 0.5)) return float4(px((int)floor(q.x), (int)floor(q.y)), 1);\n"
+    "    float2 t = q - 0.5, f = frac(t); int2 i = (int2)floor(t);\n"
+    "    float3 a = lerp(px(i.x, i.y), px(i.x + 1, i.y), f.x), b = lerp(px(i.x, i.y + 1), px(i.x + 1, i.y + 1), f.x);\n"
+    "    return float4(lerp(a, b, f.y), 1);\n"
+    "}\n";
+
+static IDXGISwapChain *chain;
+static ID3D11RenderTargetView *rtv;
+static ID3D11VertexShader *vs_present;
+static ID3D11PixelShader *ps_present;
+static ID3D11Buffer *cb_present;
+static Buf b_up;                                 /* a picture made on the processor (movies, 1x) */
+static int chain_w, chain_h;
+static HWND chain_hwnd;
+
+static ID3DBlob *compile_blob(const char *entry, const char *target) {
+    ID3DBlob *code = NULL, *err = NULL;
+    HRESULT hr = d3d_compile(present_hlsl, sizeof present_hlsl - 1, "present", NULL, NULL, entry, target,
+                             D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, &code, &err);
+    if (FAILED(hr)) {
+        rt_log("gpu: shader %s: %s", entry, err ? (const char *)ID3D10Blob_GetBufferPointer(err) : "failed");
+        if (err) ID3D10Blob_Release(err);
+        return NULL;
+    }
+    if (err) ID3D10Blob_Release(err);
+    return code;
+}
+
+static int make_rtv(void) {
+    ID3D11Texture2D *bb = NULL;
+    if (FAILED(IDXGISwapChain_GetBuffer(chain, 0, &IID_ID3D11Texture2D, (void **)&bb))) return 0;
+    HRESULT hr = ID3D11Device_CreateRenderTargetView(dev, (ID3D11Resource *)bb, NULL, &rtv);
+    ID3D11Texture2D_Release(bb);
+    return SUCCEEDED(hr);
+}
+
+int rgpu_present_on(void *hwnd) {
+    if (chain) return 1;
+    if (!dev || !d3d_compile) return 0;
+    ID3DBlob *v = compile_blob("vs", "vs_5_0"), *p = compile_blob("ps", "ps_5_0");
+    int ok = v && p &&
+             SUCCEEDED(ID3D11Device_CreateVertexShader(dev, ID3D10Blob_GetBufferPointer(v), ID3D10Blob_GetBufferSize(v), NULL, &vs_present)) &&
+             SUCCEEDED(ID3D11Device_CreatePixelShader(dev, ID3D10Blob_GetBufferPointer(p), ID3D10Blob_GetBufferSize(p), NULL, &ps_present));
+    if (v) ID3D10Blob_Release(v);
+    if (p) ID3D10Blob_Release(p);
+    if (!ok) return 0;
+    D3D11_BUFFER_DESC cd = {0};
+    cd.ByteWidth = 32;
+    cd.Usage = D3D11_USAGE_DEFAULT;
+    cd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    if (FAILED(ID3D11Device_CreateBuffer(dev, &cd, NULL, &cb_present))) return 0;
+    IDXGIDevice *xd = NULL;
+    IDXGIAdapter *ad = NULL;
+    IDXGIFactory *xf = NULL;
+    if (FAILED(ID3D11Device_QueryInterface(dev, &IID_IDXGIDevice, (void **)&xd))) return 0;
+    if (SUCCEEDED(IDXGIDevice_GetAdapter(xd, &ad))) IDXGIAdapter_GetParent(ad, &IID_IDXGIFactory, (void **)&xf);
+    if (ad) IDXGIAdapter_Release(ad);
+    IDXGIDevice_Release(xd);
+    if (!xf) return 0;
+    RECT r;
+    GetClientRect((HWND)hwnd, &r);
+    DXGI_SWAP_CHAIN_DESC d = {0};
+    d.BufferDesc.Width = (UINT)(r.right > 0 ? r.right : 1);
+    d.BufferDesc.Height = (UINT)(r.bottom > 0 ? r.bottom : 1);
+    d.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;     /* what GDI draws on */
+    d.SampleDesc.Count = 1;
+    d.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    d.BufferCount = 1;
+    d.OutputWindow = (HWND)hwnd;
+    d.Windowed = TRUE;
+    d.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+    d.Flags = DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE;
+    HRESULT hr = IDXGIFactory_CreateSwapChain(xf, (IUnknown *)dev, &d, &chain);
+    if (SUCCEEDED(hr)) IDXGIFactory_MakeWindowAssociation(xf, (HWND)hwnd, DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_WINDOW_CHANGES);
+    IDXGIFactory_Release(xf);
+    if (FAILED(hr)) { rt_log("gpu: no swap chain (%08lX): the picture goes through the processor", (unsigned long)hr); chain = NULL; return 0; }
+    chain_w = (int)d.BufferDesc.Width;
+    chain_h = (int)d.BufferDesc.Height;
+    chain_hwnd = (HWND)hwnd;
+    if (!make_rtv()) { IDXGISwapChain_Release(chain); chain = NULL; return 0; }
+    rt_log("gpu: the picture is shown by the graphics card");
+    return 1;
+}
+
+int rgpu_present(const uint32_t *cpu, int pw, int ph, int dx, int dy, int dw, int dh, int smooth,
+                 void (*overlay)(void *hdc, void *arg), void *arg) {
+    if (!chain) return 0;
+    RECT r;
+    GetClientRect(chain_hwnd, &r);
+    int cw = r.right > 0 ? r.right : 1, ch = r.bottom > 0 ? r.bottom : 1;
+    if (cw != chain_w || ch != chain_h) {
+        ID3D11DeviceContext_OMSetRenderTargets(ctx, 0, NULL, NULL);
+        if (rtv) { ID3D11RenderTargetView_Release(rtv); rtv = NULL; }
+        if (FAILED(IDXGISwapChain_ResizeBuffers(chain, 0, (UINT)cw, (UINT)ch, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE)) ||
+            !make_rtv())
+            return 0;
+        chain_w = cw;
+        chain_h = ch;
+    }
+    Buf *src = last_pic;
+    if (cpu) {
+        UINT n = (UINT)pw * ph;
+        if (!buf_fit(&b_up, n, 4, 0)) return 0;
+        buf_put(&b_up, cpu, n);
+        src = &b_up;
+    } else {
+        pw = last_pw;
+        ph = last_ph;
+    }
+    if (!src || !src->srv || pw <= 0 || ph <= 0) return 0;
+    /* the picture's buffers were the compute shaders' outputs */
+    ID3D11UnorderedAccessView *nu[8] = {0};
+    ID3D11DeviceContext_CSSetUnorderedAccessViews(ctx, 0, 8, nu, NULL);
+    const float black[4] = {0, 0, 0, 1};
+    ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &rtv, NULL);
+    ID3D11DeviceContext_ClearRenderTargetView(ctx, rtv, black);
+    if (dw > 0 && dh > 0) {
+        struct { uint32_t pw, ph, smooth, pad; float dx, dy, dw, dh; } c = {(uint32_t)pw, (uint32_t)ph, (uint32_t)smooth, 0,
+                                                                             (float)dx, (float)dy, (float)dw, (float)dh};
+        ID3D11DeviceContext_UpdateSubresource(ctx, (ID3D11Resource *)cb_present, 0, NULL, &c, 0, 0);
+        D3D11_VIEWPORT vp = {(float)dx, (float)dy, (float)dw, (float)dh, 0, 1};
+        ID3D11DeviceContext_RSSetViewports(ctx, 1, &vp);
+        ID3D11DeviceContext_IASetInputLayout(ctx, NULL);
+        ID3D11DeviceContext_IASetPrimitiveTopology(ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        ID3D11DeviceContext_VSSetShader(ctx, vs_present, NULL, 0);
+        ID3D11DeviceContext_PSSetShader(ctx, ps_present, NULL, 0);
+        ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &src->srv);
+        ID3D11DeviceContext_PSSetConstantBuffers(ctx, 0, 1, &cb_present);
+        ID3D11DeviceContext_Draw(ctx, 3, 0);
+        ID3D11ShaderResourceView *ns = NULL;
+        ID3D11DeviceContext_PSSetShaderResources(ctx, 0, 1, &ns);
+    }
+    ID3D11DeviceContext_OMSetRenderTargets(ctx, 0, NULL, NULL);
+    if (overlay) {                               /* text over the picture, with GDI */
+        ID3D11Texture2D *bb = NULL;
+        IDXGISurface1 *s = NULL;
+        HDC hdc = NULL;
+        if (SUCCEEDED(IDXGISwapChain_GetBuffer(chain, 0, &IID_ID3D11Texture2D, (void **)&bb))) {
+            if (SUCCEEDED(ID3D11Texture2D_QueryInterface(bb, &IID_IDXGISurface1, (void **)&s)) &&
+                SUCCEEDED(IDXGISurface1_GetDC(s, FALSE, &hdc))) {
+                overlay(hdc, arg);
+                IDXGISurface1_ReleaseDC(s, NULL);
+            }
+            if (s) IDXGISurface1_Release(s);
+            ID3D11Texture2D_Release(bb);
+        }
+    }
+    HRESULT hr = IDXGISwapChain_Present(chain, 0, 0);
+    if (FAILED(hr)) { rt_log("gpu: showing the picture failed (%08lX)", (unsigned long)hr); return 0; }
+    return 1;
+}
+
+int rgpu_present_active(void) { return chain != NULL; }
 
 void rgpu_write(const uint16_t *hires, const uint16_t *low, const uint8_t *bare, const float *z, const uint32_t *zid) {
     if (!dev) return;
@@ -588,4 +770,11 @@ void rgpu_picture(int x, int y, int w, int h, int gaps, const uint8_t gamma8[256
 void rgpu_write(const uint16_t *hires, const uint16_t *low, const uint8_t *bare, const float *z, const uint32_t *zid) {
     (void)hires; (void)low; (void)bare; (void)z; (void)zid;
 }
+int rgpu_present_on(void *hwnd) { (void)hwnd; return 0; }
+int rgpu_present(const uint32_t *cpu, int pw, int ph, int dx, int dy, int dw, int dh, int smooth,
+                 void (*overlay)(void *hdc, void *arg), void *arg) {
+    (void)cpu; (void)pw; (void)ph; (void)dx; (void)dy; (void)dw; (void)dh; (void)smooth; (void)overlay; (void)arg;
+    return 0;
+}
+int rgpu_present_active(void) { return 0; }
 #endif

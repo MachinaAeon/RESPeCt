@@ -60,8 +60,9 @@ static const char *default_ini =
     "; 5-8 with graphics_card = 1.\n"
     "resolution_scale = 4\n"
     "; Draw the sharper picture with the graphics card (Direct3D 11) instead of\n"
-    "; the processor: much faster, and resolutions up to 8x (2560x1920).\n"
-    "graphics_card = 0\n"
+    "; the processor: much faster, and resolutions up to 8x (2560x1920). Without\n"
+    "; a usable card the processor draws.\n"
+    "graphics_card = 1\n"
     "; Widescreen 16:9: wider view of the 3D scene (the HUD keeps its shape).\n"
     "; Experimental: some full-screen menus are stretched.\n"
     "widescreen = 0\n"
@@ -164,7 +165,11 @@ static const char *default_ini =
     "infinite_ammo = 0\n"
     "; The magazine is refilled from your spare ammo as you fire, so you\n"
     "; never have to reload (ammo is still used up).\n"
-    "no_reload = 0\n";
+    "no_reload = 0\n"
+    "\n"
+    "[file]\n"
+    "; Which RESPeCt wrote this file (settings from older ones are updated).\n"
+    "settings_version = 2\n";
 
 static const char *action_names[ACT_COUNT] = {
     "forward", "back", "left", "right", "sprint", "quick_search", "cross", "triangle",
@@ -182,7 +187,7 @@ static void set_defaults(void) {
     g_cfg.menu_mouse = 1;
     g_cfg.menu_mouse_step = 240;
     g_cfg.resolution_scale = 4;
-    g_cfg.graphics_card = 0;
+    g_cfg.graphics_card = 1;
     g_cfg.subpixel = 1;
     g_cfg.fullscreen = 1;
     g_cfg.smooth_scaling = 1;
@@ -355,7 +360,11 @@ void config_load(const char *path) {
     buf[got] = 0;
     fclose(f);
     int had_reload = strstr(buf, "reload") != NULL && strstr(buf, "\nreload") != NULL;
+    /* Settings from before v0.3.1 have graphics_card = 0 written in only
+     * because it was the default then: the card draws now, once. */
+    int had_version = strstr(buf, "\nsettings_version") != NULL;
     parse(buf);
+    if (!had_version) g_cfg.graphics_card = 1;
     free(buf);
     if (!had_reload) {
         /* Settings from before the reload key: R moves from quick search to
@@ -411,6 +420,7 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "fullscreen")) snprintf(out, n, "%d", g_cfg.fullscreen);
     else if (!strcmp(key, "resolution_scale")) snprintf(out, n, "%d", g_cfg.resolution_scale);
     else if (!strcmp(key, "graphics_card")) snprintf(out, n, "%d", g_cfg.graphics_card);
+    else if (!strcmp(key, "settings_version")) snprintf(out, n, "2");
     else if (!strcmp(key, "widescreen")) snprintf(out, n, "%d", g_cfg.widescreen);
     else if (!strcmp(key, "subpixel")) snprintf(out, n, "%d", g_cfg.subpixel);
     else if (!strcmp(key, "smooth_scaling")) snprintf(out, n, "%d", g_cfg.smooth_scaling);

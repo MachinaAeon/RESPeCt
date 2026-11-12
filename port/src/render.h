@@ -49,6 +49,7 @@ void render_uploaded(int x, int y, int w, int h);  /* g_vram area written by the
 void render_sync(void);
 void render_want(int x, int y, int w, int h);      /* the high-res area the picture shown needs next */
 int render_on_gpu(void);                           /* drawing with the graphics card */
+int render_gpu_active(void);                       /* the graphics card is drawing */
 int render_set_gpu(int on);                        /* the setting changed while running; 0: no usable card */
 void render_zclear(int x, int y, int w, int h);    /* a new frame starts drawing here */
 extern int g_depth_buffer;                         /* setting */                            /* finish queued high-res drawing */
