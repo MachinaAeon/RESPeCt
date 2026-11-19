@@ -135,6 +135,13 @@ CAPTIONS = [
     (0, 2744, 256, 2808, 272, 0x31A53053, "CANCELAR"),
     (1, 1487, 271, 1650, 288, 0x22C60DF3, "AJUSTAR PANTALLA"),
     (1, 1440, 488, 1632, 504, 0x9E788A01, "PULSA START"),
+    (1, 1485, 273, 1586, 288, 0x0155CC85, "NUEVA PARTIDA"),
+    (1, 1482, 289, 1586, 304, 0x04121055, "CARGAR PARTIDA"),
+    (1, 1503, 305, 1569, 320, 0xE1BF3899, "OPCIONES"),
+    (0, 2817, 289, 2879, 303, 0xA775F1E4, "EQUIPAR"),
+    (0, 2881, 289, 2935, 303, 0x69831AB1, "COMBINAR"),
+    (0, 2937, 289, 2991, 303, 0x70B33E5C, "EXAMINAR"),
+    (0, 2993, 289, 3047, 303, 0xA6B62DF8, "CANCELAR"),
 ]
 
 class Disc:
@@ -250,6 +257,9 @@ def main():
                 if kind == "a":
                     codes = [plain_glyph(c) for c in codes]
                 f.write(struct.pack("<%dH" % len(codes), *codes).hex() + "\n")
+    with open(os.path.join(out, "text", "UI.txt"), "w", encoding="utf-8", newline="\n") as f:   # RESPeCt's own words (the disc's are packed)
+        f.write("# The inventory's labels, in RESPeCt's own Spanish (the Spanish disc's are in a packed file).\n"
+                "@RETURN\n{color 2}Volver{color 0}\n@NO_ITEM\nVACÍO\n@FULLY_LOADED\nYa está cargada.\n")
     with open(os.path.join(out, "text", "CAPTIONS.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("# RESPeCt's own Spanish words over menu words that are pictures: @depth x0 y0 x1 y1 hash, then the words.\n")
         for d, x0, y0, x1, y1, h, t in CAPTIONS:

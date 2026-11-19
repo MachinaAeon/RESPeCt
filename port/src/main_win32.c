@@ -512,8 +512,8 @@ static void draw_overlays(HDC dc) {
             RECT box = {dx + (int)(c->x * dw) - 1, dy + (int)(c->y * dh) - 1,
                         dx + (int)((c->x + c->w) * dw) + 1, dy + (int)((c->y + c->h) * dh) + 1};
             if (box.right <= box.left || box.bottom <= box.top) continue;
-            int shade = 12 * a / 128;
-            HBRUSH bg = CreateSolidBrush(RGB(shade, shade, shade + 4));
+            int br = c->r * a / 128, bgc = c->g * a / 128, bb = c->b * a / 128;   /* the picture's own background there */
+            HBRUSH bg = CreateSolidBrush(RGB(br, bgc, bb));
             FillRect(dc, &box, bg);                  /* over the English word */
             DeleteObject(bg);
             wchar_t w[128];
@@ -532,8 +532,7 @@ static void draw_overlays(HDC dc) {
             }
             HGDIOBJ of = SelectObject(dc, f);
             SetBkMode(dc, TRANSPARENT);
-            int lv = 235 * a / 128;
-            SetTextColor(dc, RGB(lv, lv, lv));
+            SetTextColor(dc, RGB(c->tr * a / 128, c->tg * a / 128, c->tb * a / 128));   /* the picture's own word colour */
             DrawTextW(dc, w, wl - 1, &box, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
             SelectObject(dc, of);
             DeleteObject(f);

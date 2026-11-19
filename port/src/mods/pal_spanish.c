@@ -129,6 +129,13 @@ static const struct { int depth, x0, y0, x1, y1; uint32_t hash; const char *text
     {0, 2744, 256, 2808, 272, 0x31A53053u, "CANCELAR"},
     {1, 1487, 271, 1650, 288, 0x22C60DF3u, "AJUSTAR PANTALLA"},
     {1, 1440, 488, 1632, 504, 0x9E788A01u, "PULSA START"},
+    {1, 1485, 273, 1586, 288, 0x0155CC85u, "NUEVA PARTIDA"},
+    {1, 1482, 289, 1586, 304, 0x04121055u, "CARGAR PARTIDA"},
+    {1, 1503, 305, 1569, 320, 0xE1BF3899u, "OPCIONES"},
+    {0, 2817, 289, 2879, 303, 0xA775F1E4u, "EQUIPAR"},
+    {0, 2881, 289, 2935, 303, 0x69831AB1u, "COMBINAR"},
+    {0, 2937, 289, 2991, 303, 0x70B33E5Cu, "EXAMINAR"},
+    {0, 2993, 289, 3047, 303, 0xA6B62DF8u, "CANCELAR"},
 };
 
 typedef struct { char name[64]; uint32_t lba, size; } DFile;
@@ -341,6 +348,12 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
         free(score);
         free(title);
     }
+    snprintf(path, sizeof path, "%s/text/UI.txt", out_dir);   /* the inventory's own labels: RESPeCt's words (the disc has none) */
+    f = fopen(path, "wb");
+    if (!f) { snprintf(why, wn, "couldn't write %s", path); goto done; }
+    fprintf(f, "# The inventory's labels, in RESPeCt's own Spanish (the Spanish disc's are in a packed file).\n"
+               "@RETURN\n{color 2}Volver{color 0}\n@NO_ITEM\nVAC\xC3\x8DO\n@FULLY_LOADED\nYa est\xC3\xA1 cargada.\n");
+    fclose(f);
     snprintf(path, sizeof path, "%s/text/CAPTIONS.txt", out_dir);
     f = fopen(path, "wb");
     if (!f) { snprintf(why, wn, "couldn't write %s", path); goto done; }

@@ -185,7 +185,7 @@ static void prim_2d(const RPrim *p, int umin, int vmin, int umax, int vmax, floa
     if (log) rt_log("prim: page %d,%d d%d uv %d,%d-%d,%d at %.0f,%.0f-%.0f,%.0f (area %d,%d) bright %d",
                     p->tx, p->ty, p->depth, umin, vmin, umax, vmax, x0 - g.da_x1, y0 - g.da_y1, x1 - g.da_x1, y1 - g.da_y1,
                     g.da_x1, g.da_y1, bright);
-    caption_prim(p->tx, p->ty, p->depth, umin, vmin, umax, vmax, x0, y0, x1, y1, bright, g.da_x1, g.da_y1, dw, dh);
+    caption_prim(p->tx, p->ty, p->depth, p->clut_x, p->clut_y, umin, vmin, umax, vmax, x0, y0, x1, y1, bright, g.da_x1, g.da_y1, dw, dh);
 }
 
 static void exec_poly(void) {

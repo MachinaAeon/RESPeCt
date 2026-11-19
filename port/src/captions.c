@@ -64,7 +64,46 @@ static Buffer *buffer_at(int ox, int oy, int make) {
     return b;
 }
 
-void caption_prim(int tx, int ty, int depth, int umin, int vmin, int umax, int vmax,
+/* The commonest colour of a picture's texel rectangle, through its CLUT:
+ * the box drawn under a caption takes it (a highlighted button stays red). */
+static void back_colour(int depth, int clut_x, int clut_y, const Source *s, Caption *c) {
+    enum { N = 64 };
+    uint16_t col[N];
+    int cnt[N] = {0}, n = 0;
+    for (int y = s->y0; y < s->y1; y++)
+        for (int x = s->x0; x < s->x1; x++) {
+            uint16_t px;
+            if (depth == 2) px = g_vram[y & 511][x & 1023];
+            else {
+                uint16_t w = g_vram[y & 511][(depth == 0 ? x >> 2 : x >> 1) & 1023];
+                int idx = depth == 0 ? (w >> ((x & 3) * 4)) & 0xF : (w >> ((x & 1) * 8)) & 0xFF;
+                px = g_vram[clut_y & 511][(clut_x + idx) & 1023];
+            }
+            if (!px) continue;                       /* (see-through) */
+            int k = 0;
+            for (; k < n; k++) if (col[k] == px) break;
+            if (k == n) { if (n == N) continue; col[n++] = px; }
+            cnt[k]++;
+        }
+    int best = -1;
+    for (int k = 0; k < n; k++) if (best < 0 || cnt[k] > cnt[best]) best = k;
+    uint16_t px = best < 0 ? 0 : col[best];
+    c->r = (px & 31) << 3; c->g = ((px >> 5) & 31) << 3; c->b = ((px >> 10) & 31) << 3;
+    int text = -1;                                   /* the words: the commonest colour far from it */
+    for (int k = 0; k < n; k++) {
+        int r = (col[k] & 31) << 3, g = ((col[k] >> 5) & 31) << 3, b = ((col[k] >> 10) & 31) << 3;
+        int d = abs(r - c->r) + abs(g - c->g) + abs(b - c->b);
+        if (d >= 160 && (text < 0 || cnt[k] > cnt[text])) text = k;
+    }
+    if (text < 0) {                                  /* none: white or black, whichever shows */
+        int l = (c->r * 3 + c->g * 6 + c->b) / 10 > 128 ? 20 : 235;
+        c->tr = c->tg = c->tb = l;
+    } else {
+        c->tr = (col[text] & 31) << 3; c->tg = ((col[text] >> 5) & 31) << 3; c->tb = ((col[text] >> 10) & 31) << 3;
+    }
+}
+
+void caption_prim(int tx, int ty, int depth, int clut_x, int clut_y, int umin, int vmin, int umax, int vmax,
                   float x0, float y0, float x1, float y1, int bright, int da_x, int da_y, int disp_w, int disp_h) {
     if (!nsources || umax <= umin || vmax <= vmin) return;
     int per = depth == 0 ? 4 : depth == 1 ? 2 : 1;
@@ -84,6 +123,7 @@ void caption_prim(int tx, int ty, int depth, int umin, int vmin, int umax, int v
         c.h = (float)(s->y1 - s->y0) * ky / (float)disp_h;
         c.bright = bright > 255 ? 255 : bright;
         c.text = s->text;
+        back_colour(depth, clut_x, clut_y, s, &c);
         Buffer *b = buffer_at(da_x, da_y, 1);
         int dup = 0;
         for (int k = 0; k < b->n; k++)
@@ -91,7 +131,7 @@ void caption_prim(int tx, int ty, int depth, int umin, int vmin, int umax, int v
         if (!dup && b->n < MAX_SHOWN) b->c[b->n++] = c;
         static int log = -1;
         if (log < 0) log = getenv("RT_CAPLOG") != NULL;
-        if (log && !dup) rt_log("caption: \"%s\" %.3f %.3f %.3f %.3f bright %d", c.text, c.x, c.y, c.w, c.h, c.bright);
+        if (log && !dup) rt_log("caption: \"%s\" %.3f %.3f %.3f %.3f bright %d rgb %d,%d,%d text %d,%d,%d", c.text, c.x, c.y, c.w, c.h, c.bright, c.r, c.g, c.b, c.tr, c.tg, c.tb);
     }
 }
 
