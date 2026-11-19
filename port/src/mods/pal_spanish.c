@@ -80,6 +80,13 @@ static const struct { const char *file; uint32_t usa, es; char kind; } screens[]
     {"SCORE.BIN", 0x8006D948u, 0x8006D930u, 'a'}, {"SCORE.BIN", 0x8006D960u, 0x8006D940u, 'a'},
     {"SCORE.BIN", 0x8006D978u, 0x8006D954u, 'a'}, {"SCORE.BIN", 0x8006D998u, 0x8006D964u, 'a'},
     {"SCORE.BIN", 0x8006D9ACu, 0x8006D984u, 'a'},
+    {"TITLE.BIN", 0x8007FCB4u, 0x8007FDC0u, 'w'}, {"TITLE.BIN", 0x8007FCC0u, 0x8007FDCCu, 'b'},   /* the title screen's options */
+    {"TITLE.BIN", 0x8007FCD0u, 0x8007FDD0u, 'w'}, {"TITLE.BIN", 0x8007FCE0u, 0x8007FDE0u, 'w'},
+    {"TITLE.BIN", 0x8007FCE8u, 0x8007FDE8u, 'b'}, {"TITLE.BIN", 0x8007FCF8u, 0x8007FDF4u, 'w'},
+    {"TITLE.BIN", 0x8007FD10u, 0x8007FE28u, 'w'}, {"TITLE.BIN", 0x8007FEB0u, 0x8007F828u, 'w'},
+    {"TITLE.BIN", 0x8007FF0Cu, 0x80080020u, 'w'}, {"TITLE.BIN", 0x8007FD8Cu, 0x8007FEA0u, 'n'},
+    {"TITLE.BIN", 0x8007FEF4u, 0x80080008u, 'n'}, {"TITLE.BIN", 0x8007FEFBu, 0x8008000Fu, 'n'},
+    {"TITLE.BIN", 0x8007FF02u, 0x80080016u, 'n'},
 };
 #define PAL_OPTION_BASE 0x800C4008u   /* where the Spanish OPTION.BIN loads */
 
@@ -278,18 +285,19 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
     }
     fclose(f);
     {   /* the menus' strings */
-        uint32_t osize, ssize;
-        uint8_t *opt = disc_read(&d, "OPTION.BIN", &osize), *score = disc_read(&d, "SCORE.BIN", &ssize);
+        uint32_t osize, ssize, tlsize;
+        uint8_t *opt = disc_read(&d, "OPTION.BIN", &osize), *score = disc_read(&d, "SCORE.BIN", &ssize),
+                *title = disc_read(&d, "TITLE.BIN", &tlsize);
         snprintf(path, sizeof path, "%s/text/SCREENS.txt", out_dir);
         f = opt ? fopen(path, "wb") : NULL;
-        if (!f || !score) { if (f) fclose(f); free(opt); free(score); snprintf(why, wn, "couldn't write %s", path); goto done; }
+        if (!f || !score || !title) { if (f) fclose(f); free(opt); free(score); free(title); snprintf(why, wn, "couldn't write %s", path); goto done; }
         fprintf(f, "# The menus' strings from the Spanish disc: @address (USA), then the bytes the game reads.\n");
         for (size_t i = 0; i < sizeof screens / sizeof *screens; i++) {
             const char *fn = screens[i].file;
-            int is_opt = !strcmp(fn, "OPTION.BIN"), is_score = !strcmp(fn, "SCORE.BIN");
-            const uint8_t *b = is_opt ? opt : is_score ? score : test;
-            uint32_t n = is_opt ? osize : is_score ? ssize : tsize;
-            uint32_t o = screens[i].es - (is_opt ? PAL_OPTION_BASE : PAL_TEST_BASE), e = o;   /* (SCORE.BIN loads where TEST.BIN does) */
+            int is_opt = !strcmp(fn, "OPTION.BIN"), is_score = !strcmp(fn, "SCORE.BIN"), is_title = !strcmp(fn, "TITLE.BIN");
+            const uint8_t *b = is_opt ? opt : is_score ? score : is_title ? title : test;
+            uint32_t n = is_opt ? osize : is_score ? ssize : is_title ? tlsize : tsize;
+            uint32_t o = screens[i].es - (is_opt ? PAL_OPTION_BASE : PAL_TEST_BASE), e = o;   /* (SCORE and TITLE load where TEST does) */
             if (o >= n) continue;
             fprintf(f, "@%08X\n", screens[i].usa);
             if (screens[i].kind == 'b') { fprintf(f, "0000ffff\n"); continue; }
@@ -310,6 +318,7 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
         fclose(f);
         free(opt);
         free(score);
+        free(title);
     }
     snprintf(path, sizeof path, "%s/text/CHARS.txt", out_dir);
     f = fopen(path, "wb");

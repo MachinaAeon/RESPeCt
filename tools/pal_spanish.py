@@ -77,6 +77,13 @@ SCREENS = [
     ("SCORE.BIN", 0x8006D948, 0x8006D930, "a"), ("SCORE.BIN", 0x8006D960, 0x8006D940, "a"),
     ("SCORE.BIN", 0x8006D978, 0x8006D954, "a"), ("SCORE.BIN", 0x8006D998, 0x8006D964, "a"),
     ("SCORE.BIN", 0x8006D9AC, 0x8006D984, "a"),
+    ("TITLE.BIN", 0x8007FCB4, 0x8007FDC0, "w"), ("TITLE.BIN", 0x8007FCC0, 0x8007FDCC, "b"),   # the title screen's options
+    ("TITLE.BIN", 0x8007FCD0, 0x8007FDD0, "w"), ("TITLE.BIN", 0x8007FCE0, 0x8007FDE0, "w"),
+    ("TITLE.BIN", 0x8007FCE8, 0x8007FDE8, "b"), ("TITLE.BIN", 0x8007FCF8, 0x8007FDF4, "w"),
+    ("TITLE.BIN", 0x8007FD10, 0x8007FE28, "w"), ("TITLE.BIN", 0x8007FEB0, 0x8007F828, "w"),
+    ("TITLE.BIN", 0x8007FF0C, 0x80080020, "w"), ("TITLE.BIN", 0x8007FD8C, 0x8007FEA0, "n"),
+    ("TITLE.BIN", 0x8007FEF4, 0x80080008, "n"), ("TITLE.BIN", 0x8007FEFB, 0x8008000F, "n"),
+    ("TITLE.BIN", 0x8007FF02, 0x80080016, "n"),
 ]
 PAL_OPTION_BASE = 0x800C4008     # where the Spanish OPTION.BIN loads
 _ACCENTS = "AaIiOoUu?!Nn" "eEe" "oa\"\"Uu" "OoUuUuCc"     # cells 87..114 without accents
@@ -201,11 +208,12 @@ def main():
         for entry, slot in sorted(ENTRY_SLOT.items()):
             ptr = struct.unpack_from("<I", test, PAL_NAME_PTRS + 4 * slot)[0] - PAL_TEST_BASE
             f.write(f"@{entry}\n{decode(test, ptr).strip(' ')}\n")
-    opt, score = disc.read("OPTION.BIN"), disc.read("SCORE.BIN")
+    opt, score, title = disc.read("OPTION.BIN"), disc.read("SCORE.BIN"), disc.read("TITLE.BIN")
     with open(os.path.join(out, "text", "SCREENS.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("# The menus' strings from the Spanish disc: @address (USA), then the bytes the game reads.\n")
         for name, usa, es, kind in SCREENS:
-            b, o = {"TEST.BIN": (test, es - PAL_TEST_BASE), "SCORE.BIN": (score, es - PAL_TEST_BASE),   # (SCORE loads where TEST does)
+            b, o = {"TEST.BIN": (test, es - PAL_TEST_BASE), "SCORE.BIN": (score, es - PAL_TEST_BASE),   # (SCORE and TITLE load where TEST does)
+                    "TITLE.BIN": (title, es - PAL_TEST_BASE),
                     "OPTION.BIN": (opt, es - PAL_OPTION_BASE)}[name]
             f.write("@%08X\n" % usa)
             if kind == "b":

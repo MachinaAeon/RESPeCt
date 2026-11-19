@@ -35,7 +35,7 @@ void n_title_DrawSprites(void) {
             GS(s32, sp + 0x14) = SP_S16(s, 0x18);
             GS(u32, sp + 0x18) = 2;
             GS(u32, sp + 0x1C) = SP_U16(s, 0x22);
-            GCALL4(F_T_TEXT_A, GV(u32, s + 0x30), SP_U16(s, 0x1A), (u32)whole(s, 0x10), (u32)whole(s, 0x12));
+            GCALL4(F_T_TEXT_A, modfs_screen_text(GV(u32, s + 0x30), 7), SP_U16(s, 0x1A), (u32)whole(s, 0x10), (u32)whole(s, 0x12));
             pk = GS(u32, sp + 0x20);
             goto next;
         }
@@ -44,7 +44,7 @@ void n_title_DrawSprites(void) {
             T_TEXT_CLUT = SP_U16(s, 0xE);
             GS(s32, sp + 0x10) = SP_S16(s, 0x18);
             GS(u32, sp + 0x14) = SP_U16(s, 0x22);
-            GCALL4(F_T_TEXT_B, GV(u32, s + 0x30), (u32)whole(s, 0x10), (u32)whole(s, 0x12), sp + 0x24);
+            GCALL4(F_T_TEXT_B, modfs_screen_text(GV(u32, s + 0x30), 8), (u32)whole(s, 0x10), (u32)whole(s, 0x12), sp + 0x24);
             pk = GS(u32, sp + 0x24);
             goto next;
         }
@@ -56,7 +56,7 @@ void n_title_DrawSprites(void) {
             GS(s32, sp + 0x14) = SP_S16(s, 0x18);
             GS(u32, sp + 0x1C) = SP_U16(s, 0x22);
             T_TEXT_CLUT = SP_U16(s, 0xE);
-            GCALL4(F_T_TEXT, GV(u32, s + 0x30), SP_U16(s, 0x1A), (u32)whole(s, 0x10), (u32)whole(s, 0x12));
+            GCALL4(F_T_TEXT, modfs_screen_text(GV(u32, s + 0x30), 9), SP_U16(s, 0x1A), (u32)whole(s, 0x10), (u32)whole(s, 0x12));
             pk = GS(u32, sp + 0x28);
             goto next;
         }
