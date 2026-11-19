@@ -260,6 +260,17 @@ messages, pickup images and adapted diary crops to original identities,
 while preserving native control streams. It does not infer missing text
 or ambiguous page correspondence.
 
+### Spanish text from the PAL disc
+
+The Spanish release (SLES-02732) keeps the USA data layout. F1 > Mods >
+"Build the Spanish mod from a PAL disc" (or `tools/pal_spanish.py DISC OUT`)
+copies its changed data files into `mods/espanol` by disc name, reads its
+item names out of its TEST.BIN into `text/GAME.txt`, and maps its font's
+letters (Á á Í í Ó ó Ú ú ¿ ¡ Ñ ñ º ª « » Ü ü, in the cells the USA font
+uses for German and French ones) in `text/CHARS.txt`. Everything comes from
+the player's own disc. The screens whose text is in code (title, options,
+typewriter, results, credits) and `UI.txt`'s labels aren't covered yet.
+
 ## Item pictures and HD replacements
 
 `BIGTIM/00.png` through the indices provided by `extract` replace the

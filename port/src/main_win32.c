@@ -1072,6 +1072,8 @@ static void menu_build(void) {
     add_item(6, IT_BOOL, "Bigger enemy models (experimental)", &g_cfg.dynamic_mod_buffers, 0, 1, 1,
              "Enemy models and animations bigger than the PS1's memory takes, in the extra memory. Next start.");
     add_item(6, IT_ACTION, "Open the mods folder", (void *)4, 0, 0, 0, "Opens the mods folder: one folder per mod.");
+    add_item(6, IT_ACTION, "Build the Spanish mod from a PAL disc", (void *)6, 0, 0, 0,
+             "Have the Spanish PAL disc (SLES-02732)? Pick its .cue or .bin and its Spanish text is made into mods\\espanol, from your own disc. Next start.");
     add_item(6, IT_ACTION, "Write the originals", (void *)5, 0, 0, 0,
              "Makes an extract folder; on the next start every file a mod can replace is written there, named as a mod names it.");
     add_item(4, IT_SLOT, "Slot", &save_slot, 1, SAVE_SLOTS, 1,
@@ -1177,6 +1179,29 @@ static void change(int i, int dir) {
             extern char g_extract_dir[1024];
             CreateDirectoryA(g_extract_dir, NULL);
             show_toast("The originals will be written to the extract folder on the next start");
+        } else if ((intptr_t)it->val == 6) {
+            extern char g_mods_dir[1024];
+            int pal_spanish_build(const char *disc, const char *out_dir, char *why, size_t wn);
+            char disc[1024] = "", out[1100], why[256];
+            OPENFILENAMEA of = {0};
+            of.lStructSize = sizeof of;
+            of.hwndOwner = hwnd;
+            of.lpstrFilter = "Disc images (*.cue, *.bin)\0*.cue;*.bin\0All files\0*.*\0";
+            of.lpstrFile = disc;
+            of.nMaxFile = sizeof disc;
+            of.lpstrTitle = "Choose your Resident Evil Survivor (Spain, SLES-02732) disc image";
+            of.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+            if (GetOpenFileNameA(&of)) {
+                CreateDirectoryA(g_mods_dir, NULL);
+                snprintf(out, sizeof out, "%s\\espanol", g_mods_dir);
+                if (pal_spanish_build(disc, out, why, sizeof why))
+                    show_toast("Spanish mod made in mods\\espanol: it applies on the next start");
+                else {
+                    char m[300];
+                    snprintf(m, sizeof m, "Couldn't make the Spanish mod: %s", why);
+                    show_toast(m);
+                }
+            }
         }
         else if (game_player_in_control()) { g_give_all_request = 1; show_toast("All weapons added"); }
         else show_toast("Weapons can be given while you're playing");

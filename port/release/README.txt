@@ -72,6 +72,13 @@ names it. mods\README.txt (made on the first start) says the rest; the
 game says on start how many files it used, and resurv.log why any wasn't.
 More in docs/MODDING.md on the RESPeCt page.
 
+Spanish text: if you also have the Spanish PAL disc (SLES-02732), F1 >
+Mods > "Build the Spanish mod from a PAL disc" and pick its .cue or .bin.
+Its Spanish text, font and pictures are made into mods\espanol, from your
+own disc (nothing of it comes with RESPeCt), and apply on the next start.
+The title, options and save screens, and the inventory's commands, are
+still in English for now.
+
 CONTROLS
 --------
 Mouse: aim and shoot (left button). In menus the mouse moves the cursor
@@ -104,6 +111,7 @@ Graphics card renderer (up to 8x), steadier 3D, smooth textures, 24-bit
 colour, the depth and close-up fixes, full-motion mouse turning, and mod
 support: Trigger117 (github.com/Trigger117).
 HD texture pack (separate download): Leigiboy.
+Spanish translation (read from your own Spanish PAL disc): Tío Victor.
 
 LEGAL
 -----
