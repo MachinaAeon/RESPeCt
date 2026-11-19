@@ -116,6 +116,27 @@ def narrow_code(g):
     return ord(c) - 0x20
 
 
+# Words of RESPeCt's own over menu words that are pictures (the Spanish disc
+# left those English): text/CAPTIONS.txt. The picture's colour depth, its
+# texels from VRAM's corner, the hash of that VRAM, the words.
+CAPTIONS = [
+    (1, 1426, 270, 1580, 297, 0xE9FA3DB5, "CONTROLES"),
+    (1, 1598, 267, 1693, 282, 0xCCC4E8D7, "TIPO DE MANDO"),
+    (1, 1454, 330, 1499, 345, 0x162212C3, "SIN USO"),
+    (1, 1641, 330, 1686, 345, 0x1DB97D8B, "SIN USO"),
+    (1, 1433, 352, 1518, 367, 0x962C3148, "BÚSQUEDA RÁPIDA"),
+    (1, 1639, 352, 1689, 367, 0x4B56846B, "APUNTAR"),
+    (1, 1454, 372, 1539, 387, 0x345005BE, "AVANZAR/CORRER"),
+    (1, 1429, 392, 1493, 407, 0xB5D13750, "GIRAR IZQ."),
+    (1, 1500, 392, 1570, 407, 0x6479D9EE, "GIRAR DCHA."),
+    (1, 1662, 392, 1707, 407, 0x162212C3, "SIN USO"),
+    (1, 1482, 413, 1516, 428, 0x70967DF7, "ATRÁS"),
+    (0, 2664, 256, 2728, 272, 0xB4F624C0, "ACEPTAR/ATACAR"),
+    (0, 2744, 256, 2808, 272, 0x31A53053, "CANCELAR"),
+    (1, 1487, 271, 1650, 288, 0x22C60DF3, "AJUSTAR PANTALLA"),
+    (1, 1440, 488, 1632, 504, 0x9E788A01, "PULSA START"),
+]
+
 class Disc:
     def __init__(self, path):
         self.f = open(path, "rb")
@@ -229,6 +250,10 @@ def main():
                 if kind == "a":
                     codes = [plain_glyph(c) for c in codes]
                 f.write(struct.pack("<%dH" % len(codes), *codes).hex() + "\n")
+    with open(os.path.join(out, "text", "CAPTIONS.txt"), "w", encoding="utf-8", newline="\n") as f:
+        f.write("# RESPeCt's own Spanish words over menu words that are pictures: @depth x0 y0 x1 y1 hash, then the words.\n")
+        for d, x0, y0, x1, y1, h, t in CAPTIONS:
+            f.write("@%d %d %d %d %d %08x\n%s\n" % (d, x0, y0, x1, y1, h, t))
     with open(os.path.join(out, "text", "CHARS.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("# The Spanish font's letters (they sit where the USA font has German and French ones).\n")
         for g, ch in sorted(SPANISH.items()):

@@ -110,6 +110,27 @@ static uint8_t narrow_code(uint8_t g) {
     return (uint8_t)(c - 0x20);
 }
 
+/* Words of RESPeCt's own over menu words that are pictures (the Spanish
+ * disc left those English): text/CAPTIONS.txt (captions.c). The picture's
+ * colour depth, its texels from VRAM's corner, the hash of that VRAM. */
+static const struct { int depth, x0, y0, x1, y1; uint32_t hash; const char *text; } captions[] = {
+    {1, 1426, 270, 1580, 297, 0xE9FA3DB5u, "CONTROLES"},
+    {1, 1598, 267, 1693, 282, 0xCCC4E8D7u, "TIPO DE MANDO"},
+    {1, 1454, 330, 1499, 345, 0x162212C3u, "SIN USO"},
+    {1, 1641, 330, 1686, 345, 0x1DB97D8Bu, "SIN USO"},
+    {1, 1433, 352, 1518, 367, 0x962C3148u, "BÚSQUEDA RÁPIDA"},
+    {1, 1639, 352, 1689, 367, 0x4B56846Bu, "APUNTAR"},
+    {1, 1454, 372, 1539, 387, 0x345005BEu, "AVANZAR/CORRER"},
+    {1, 1429, 392, 1493, 407, 0xB5D13750u, "GIRAR IZQ."},
+    {1, 1500, 392, 1570, 407, 0x6479D9EEu, "GIRAR DCHA."},
+    {1, 1662, 392, 1707, 407, 0x162212C3u, "SIN USO"},
+    {1, 1482, 413, 1516, 428, 0x70967DF7u, "ATRÁS"},
+    {0, 2664, 256, 2728, 272, 0xB4F624C0u, "ACEPTAR/ATACAR"},
+    {0, 2744, 256, 2808, 272, 0x31A53053u, "CANCELAR"},
+    {1, 1487, 271, 1650, 288, 0x22C60DF3u, "AJUSTAR PANTALLA"},
+    {1, 1440, 488, 1632, 504, 0x9E788A01u, "PULSA START"},
+};
+
 typedef struct { char name[64]; uint32_t lba, size; } DFile;
 typedef struct { FILE *f; DFile *files; int n, cap; } Disc;
 
@@ -320,6 +341,14 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
         free(score);
         free(title);
     }
+    snprintf(path, sizeof path, "%s/text/CAPTIONS.txt", out_dir);
+    f = fopen(path, "wb");
+    if (!f) { snprintf(why, wn, "couldn't write %s", path); goto done; }
+    fprintf(f, "# RESPeCt's own Spanish words over menu words that are pictures: @depth x0 y0 x1 y1 hash, then the words.\n");
+    for (size_t i = 0; i < sizeof captions / sizeof *captions; i++)
+        fprintf(f, "@%d %d %d %d %d %08x\n%s\n", captions[i].depth, captions[i].x0, captions[i].y0, captions[i].x1, captions[i].y1,
+                (unsigned)captions[i].hash, captions[i].text);
+    fclose(f);
     snprintf(path, sizeof path, "%s/text/CHARS.txt", out_dir);
     f = fopen(path, "wb");
     if (!f) { snprintf(why, wn, "couldn't write %s", path); goto done; }

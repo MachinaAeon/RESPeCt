@@ -76,10 +76,11 @@ Spanish text: if you have the Spanish PAL disc (SLES-02732 with the Tío
 Victor translation, v1.0.1, applied), F1 > Mods > "Build the Spanish mod
 from a PAL disc" and pick its .cue or .bin. Its Spanish text, font,
 pictures and menu words are made into mods\espanol from your own disc
-(nothing of it comes with RESPeCt) and apply on the next start. Still in
-English: the credits, the memory card screens, the inventory's Return /
-NO ITEM labels, and words the Spanish disc draws as
-pictures or with its own letters (EXIT, BGM, KEY CONFIG...).
+(nothing of it comes with RESPeCt) and apply on the next start. Words that are
+pictures (KEY CONFIG, the key names, ADJUST SCREEN, PRESS START BUTTON)
+get RESPeCt's own Spanish captions over them. Still in English: the title
+menu's choices, the inventory's commands and Return / NO ITEM, EXIT, BGM
+and S·E, the credits and the memory card screens.
 
 The Spanish translation is the work of Tío Victor (see CREDITS). They are
 not affiliated with RESPeCt in any way and have not endorsed it. Their
