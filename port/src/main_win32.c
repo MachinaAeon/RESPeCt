@@ -124,6 +124,7 @@ void plat_ss_done(int ok, int was_load, const char *msg) {
 }
 static int menu_open, suppress_keys;
 static int ff_held(void);                  /* controller section */
+static const char *ff_button_label(void);  /* controller section */
 static int pad_ok;
 #include "../decomp/savegame.h"
 
@@ -478,7 +479,11 @@ static void draw_overlays(HDC dc) {
     int dx = (cw - dw) / 2, dy = (ch - dh) / 2;
     {   /* the fast-forward hint */
         const char *hint = NULL;
-        if (g_cfg.fast_forward_hint && !menu_open && cutscene_frames > 90 && !ff_held()) hint = pad_ok ? "Hold A to fast-forward" : "Hold Space to fast-forward";
+        if (g_cfg.fast_forward_hint && !menu_open && cutscene_frames > 90 && !ff_held()) {
+            static char pad_hint[48];
+            snprintf(pad_hint, sizeof pad_hint, "Hold %s to fast-forward", ff_button_label());
+            hint = pad_ok && *ff_button_label() ? pad_hint : "Hold Space to fast-forward";
+        }
         if (hint) {
             int fh = ch / 26 < 14 ? 14 : ch / 26;
             HFONT f = CreateFontA(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, "Segoe UI");
@@ -681,9 +686,32 @@ static void pad_update(void) {
 
 static int pad_down(WORD b) { return pad_ok && (pad_st.Gamepad.wButtons & b) != 0; }
 
-/* Fast-forward held: Space, or the controller's A. */
+/* The controller buttons, as XInput has them (PADB_ order). */
+static const WORD pad_xb[PADB_COUNT] = {XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_X, XINPUT_GAMEPAD_Y,
+                                        XINPUT_GAMEPAD_LEFT_SHOULDER, XINPUT_GAMEPAD_RIGHT_SHOULDER, 0, 0,
+                                        XINPUT_GAMEPAD_BACK, XINPUT_GAMEPAD_START, XINPUT_GAMEPAD_LEFT_THUMB,
+                                        XINPUT_GAMEPAD_RIGHT_THUMB};
+
+/* Fast-forward held: Space, or a controller button set to fast_forward
+ * (Y unless changed). */
 static int ff_held(void) {
-    return (GetForegroundWindow() == hwnd && key_down(VK_SPACE)) || pad_down(XINPUT_GAMEPAD_A);
+    if (GetForegroundWindow() == hwnd && key_down(VK_SPACE)) return 1;
+    if (!pad_ok) return 0;
+    for (int i = 0; i < PADB_COUNT; i++) {
+        if (strcmp(g_cfg.pad_bind[i], "fast_forward")) continue;
+        if (pad_xb[i] && pad_down(pad_xb[i])) return 1;
+        if (i == PADB_LT && pad_st.Gamepad.bLeftTrigger > 64) return 1;
+        if (i == PADB_RT && pad_st.Gamepad.bRightTrigger > 64) return 1;
+    }
+    return 0;
+}
+
+/* The controller button that fast-forwards, for the hint ("" if none). */
+static const char *ff_button_label(void) {
+    static const char *label[PADB_COUNT] = {"A", "B", "X", "Y", "LB", "RB", "LT", "RT", "Back", "Start", "L3", "R3"};
+    for (int i = 0; i < PADB_COUNT; i++)
+        if (!strcmp(g_cfg.pad_bind[i], "fast_forward")) return label[i];
+    return "";
 }
 
 /* A stick, -1..1 each way, past the dead zone (radial), with a curve for
@@ -711,12 +739,8 @@ static uint16_t pad_input(int playing, int *fire, double *look_dx, double *look_
     if (!pad_ok) { pad_prev = 0; pad_sprint = 0; return 0; }
     const XINPUT_GAMEPAD *g = &pad_st.Gamepad;
     uint32_t down = 0;                          /* bit per PADB_ */
-    static const WORD xb[PADB_COUNT] = {XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_X, XINPUT_GAMEPAD_Y,
-                                        XINPUT_GAMEPAD_LEFT_SHOULDER, XINPUT_GAMEPAD_RIGHT_SHOULDER, 0, 0,
-                                        XINPUT_GAMEPAD_BACK, XINPUT_GAMEPAD_START, XINPUT_GAMEPAD_LEFT_THUMB,
-                                        XINPUT_GAMEPAD_RIGHT_THUMB};
     for (int i = 0; i < PADB_COUNT; i++)
-        if (xb[i] && (g->wButtons & xb[i])) down |= 1u << i;
+        if (pad_xb[i] && (g->wButtons & pad_xb[i])) down |= 1u << i;
     if (g->bLeftTrigger > 64) down |= 1u << PADB_LT;
     if (g->bRightTrigger > 64) down |= 1u << PADB_RT;
     uint32_t pressed = down & ~pad_prev;
@@ -990,7 +1014,7 @@ static void menu_build(void) {
     add_item(0, IT_BOOL, "Controller invert look", &g_cfg.pad_invert_y, 0, 1, 1, "On: pushing the right stick up looks down.");
     add_item(0, IT_INT, "Controller dead zone", &g_cfg.pad_deadzone, 0, 50, 1, "How much stick movement around the centre is ignored, in %.");
     add_item(0, IT_BOOL, "Skip intro", &g_cfg.skip_intro, 0, 1, 1, "Fast-forward the logos and warnings at startup.");
-    add_item(0, IT_BOOL, "Fast-forward hint", &g_cfg.fast_forward_hint, 0, 1, 1, "Show \"Hold Space to fast-forward\" (A on a controller) during cutscenes.");
+    add_item(0, IT_BOOL, "Fast-forward hint", &g_cfg.fast_forward_hint, 0, 1, 1, "Show \"Hold Space to fast-forward\" (Y on a controller) during cutscenes.");
     add_item(1, IT_BOOL, "Fullscreen", &g_cfg.fullscreen, 0, 1, 1, "F11 or Alt+Enter also switches.");
     add_item(1, IT_BOOL, "Graphics card", &g_cfg.graphics_card, 0, 1, 1,
              "Draw with the graphics card (Direct3D 11): much faster, and resolutions up to 8x. HD texture packs are supported.");

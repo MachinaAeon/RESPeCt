@@ -84,9 +84,10 @@ Mouse: aim and shoot (left button). In menus the mouse moves the cursor
 Controller (Xbox controllers; PlayStation and others through Steam Input):
   Left stick / d-pad  move and strafe (menus: move the cursor)
   Right stick         look and aim
-  RT fire, LT quick search, A OK / run, B cancel, X reload, Y triangle,
+  RT fire, LT quick search, A OK / run, B cancel, X reload,
   LB / RB previous / next weapon, Start pause, Back select, L3 sprint
-  (stays on until you stop), R3 circle. Hold A to fast-forward cutscenes.
+  (stays on until you stop), R3 circle. Hold Y to fast-forward cutscenes
+  and doors.
   L3 + R3 opens the settings: LB / RB pages, d-pad choose and change,
   A change, B close. Buttons can be changed in resurv.ini [controller].
 The game's own memory card save (offered after you die) goes on a memory

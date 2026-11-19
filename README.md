@@ -93,8 +93,8 @@ gets every original, named the way a mod names it. See
 
 **Controller:** Xbox controllers work out of the box (PlayStation and others
 through Steam Input). Left stick moves, right stick aims, RT fires, LT quick
-search, A OK/run, B cancel, X reload, LB/RB change weapon, L3 sprint. Hold A
-to fast-forward cutscenes. L3 + R3 opens the settings. Buttons can be changed
+search, A OK/run, B cancel, X reload, LB/RB change weapon, L3 sprint. Hold Y
+to fast-forward cutscenes and doors. L3 + R3 opens the settings. Buttons can be changed
 in `resurv.ini`.
 
 The game's own memory card save (offered after dying) goes on a memory card file

@@ -127,15 +127,16 @@ static const char *default_ini =
     "; How much of the sticks' travel is ignored around the centre, in %.\n"
     "deadzone = 20\n"
     "; L3 + R3 opens the settings (LB/RB: pages, d-pad: choose and change,\n"
-    "; A: change, B: close). Hold A to fast-forward cutscenes and doors.\n"
+    "; A: change, B: close).\n"
     "; What each button does: cross (OK, run), square (cancel), circle, triangle,\n"
     "; start, select, r1, l2, r2, quick_search, sprint, reload, fire,\n"
-    "; next_weapon, prev_weapon, or none. sprint is a toggle: it stays on\n"
-    "; until you stop moving.\n"
+    "; next_weapon, prev_weapon, fast_forward (hold it: cutscenes and doors\n"
+    "; go by quickly), or none. sprint is a toggle: it stays on until you\n"
+    "; stop moving.\n"
     "button_a = cross\n"
     "button_b = square\n"
     "button_x = reload\n"
-    "button_y = triangle\n"
+    "button_y = fast_forward\n"
     "button_lb = prev_weapon\n"
     "button_rb = next_weapon\n"
     "button_lt = quick_search\n"
@@ -169,7 +170,7 @@ static const char *default_ini =
     "\n"
     "[file]\n"
     "; Which RESPeCt wrote this file (settings from older ones are updated).\n"
-    "settings_version = 2\n";
+    "settings_version = 3\n";
 
 static const char *action_names[ACT_COUNT] = {
     "forward", "back", "left", "right", "sprint", "quick_search", "cross", "triangle",
@@ -207,7 +208,7 @@ static void set_defaults(void) {
     g_cfg.pad_look_speed = 400;
     g_cfg.pad_look_speed_y = 280;
     g_cfg.pad_deadzone = 20;
-    static const char *def[PADB_COUNT] = {"cross", "square", "reload", "triangle", "prev_weapon", "next_weapon",
+    static const char *def[PADB_COUNT] = {"cross", "square", "reload", "fast_forward", "prev_weapon", "next_weapon",
                                           "quick_search", "fire", "select", "start", "sprint", "circle"};
     for (int i = 0; i < PADB_COUNT; i++) snprintf(g_cfg.pad_bind[i], sizeof g_cfg.pad_bind[i], "%s", def[i]);
 }
@@ -362,9 +363,16 @@ void config_load(const char *path) {
     int had_reload = strstr(buf, "reload") != NULL && strstr(buf, "\nreload") != NULL;
     /* Settings from before v0.3.1 have graphics_card = 0 written in only
      * because it was the default then: the card draws now, once. */
-    int had_version = strstr(buf, "\nsettings_version") != NULL;
+    const char *sv = strstr(buf, "\nsettings_version");
+    int version = 0;
+    if (sv && (sv = strchr(sv, '='))) version = atoi(sv + 1);
     parse(buf);
-    if (!had_version) g_cfg.graphics_card = 1;
+    if (version < 2) g_cfg.graphics_card = 1;
+    /* Before v0.3.2 fast-forward was the controller's A (also OK, so held
+     * after picking something up it skipped on): it's Y's now, in place of
+     * triangle, which the game doesn't use. */
+    if (version < 3 && !strcmp(g_cfg.pad_bind[PADB_Y], "triangle"))
+        snprintf(g_cfg.pad_bind[PADB_Y], sizeof g_cfg.pad_bind[PADB_Y], "fast_forward");
     free(buf);
     if (!had_reload) {
         /* Settings from before the reload key: R moves from quick search to
@@ -420,7 +428,7 @@ static int format_value(const char *section, const char *key, char *out, size_t 
     else if (!strcmp(key, "fullscreen")) snprintf(out, n, "%d", g_cfg.fullscreen);
     else if (!strcmp(key, "resolution_scale")) snprintf(out, n, "%d", g_cfg.resolution_scale);
     else if (!strcmp(key, "graphics_card")) snprintf(out, n, "%d", g_cfg.graphics_card);
-    else if (!strcmp(key, "settings_version")) snprintf(out, n, "2");
+    else if (!strcmp(key, "settings_version")) snprintf(out, n, "3");
     else if (!strcmp(key, "widescreen")) snprintf(out, n, "%d", g_cfg.widescreen);
     else if (!strcmp(key, "subpixel")) snprintf(out, n, "%d", g_cfg.subpixel);
     else if (!strcmp(key, "smooth_scaling")) snprintf(out, n, "%d", g_cfg.smooth_scaling);
