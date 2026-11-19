@@ -58,7 +58,8 @@ ENTRY_SLOT = {1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 10, 11: 
 
 # The menus' strings the Spanish disc changed, which live in its code files:
 # (file, USA address, Spanish disc's address, kind). Kinds: "w" a 16-bit text,
-# copied; "n" an 8-bit small-font text, turned into the USA small font's codes
+# copied; "a" the same with its accents dropped (a screen with the USA font);
+# "n" an 8-bit small-font text, turned into the USA small font's codes
 # (no accents); "b" a line the Spanish disc merged into the one before, blank.
 SCREENS = [
     ("OPTION.BIN", 0x800CC480, 0x800CC610, "n"), ("OPTION.BIN", 0x800CC48C, 0x800CC61C, "n"),
@@ -72,9 +73,25 @@ SCREENS = [
     ("OPTION.BIN", 0x800CCAE0, 0x800CC998, "w"), ("OPTION.BIN", 0x800CCB3C, 0x800CCC54, "w"),
     ("TEST.BIN", 0x800A2ECC, 0x800A3078, "w"), ("TEST.BIN", 0x800A2E84, 0x800A3038, "w"),   # the doors' messages
     ("TEST.BIN", 0x800A2EF4, 0x800A30D8, "w"), ("TEST.BIN", 0x800A2F14, 0x800A30A4, "w"),
+    ("SCORE.BIN", 0x8006D92C, 0x8006D90C, "a"), ("SCORE.BIN", 0x8006D93C, 0x8006D924, "a"),   # the results' labels
+    ("SCORE.BIN", 0x8006D948, 0x8006D930, "a"), ("SCORE.BIN", 0x8006D960, 0x8006D940, "a"),
+    ("SCORE.BIN", 0x8006D978, 0x8006D954, "a"), ("SCORE.BIN", 0x8006D998, 0x8006D964, "a"),
+    ("SCORE.BIN", 0x8006D9AC, 0x8006D984, "a"),
 ]
 PAL_OPTION_BASE = 0x800C4008     # where the Spanish OPTION.BIN loads
 _ACCENTS = "AaIiOoUu?!Nn" "eEe" "oa\"\"Uu" "OoUuUuCc"     # cells 87..114 without accents
+
+
+def plain_glyph(g):
+    """A Spanish font cell with its accent dropped, as a font cell."""
+    if not 87 <= g <= 114:
+        return g
+    c = _ACCENTS[g - 87]
+    if c.isupper():
+        return 29 + ord(c) - ord("A")
+    if c.islower():
+        return 61 + ord(c) - ord("a")
+    return {"?": 27, "!": 26}.get(c, 25)
 
 
 def narrow_code(g):
@@ -184,11 +201,12 @@ def main():
         for entry, slot in sorted(ENTRY_SLOT.items()):
             ptr = struct.unpack_from("<I", test, PAL_NAME_PTRS + 4 * slot)[0] - PAL_TEST_BASE
             f.write(f"@{entry}\n{decode(test, ptr).strip(' ')}\n")
-    opt = disc.read("OPTION.BIN")
+    opt, score = disc.read("OPTION.BIN"), disc.read("SCORE.BIN")
     with open(os.path.join(out, "text", "SCREENS.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("# The menus' strings from the Spanish disc: @address (USA), then the bytes the game reads.\n")
         for name, usa, es, kind in SCREENS:
-            b, o = (test, es - PAL_TEST_BASE) if name == "TEST.BIN" else (opt, es - PAL_OPTION_BASE)
+            b, o = {"TEST.BIN": (test, es - PAL_TEST_BASE), "SCORE.BIN": (score, es - PAL_TEST_BASE),   # (SCORE loads where TEST does)
+                    "OPTION.BIN": (opt, es - PAL_OPTION_BASE)}[name]
             f.write("@%08X\n" % usa)
             if kind == "b":
                 f.write("0000ffff\n")
@@ -199,7 +217,10 @@ def main():
                 e = o
                 while struct.unpack_from("<H", b, e)[0] != 0xFFFF:
                     e += 2
-                f.write(b[o:e + 2].hex() + "\n")
+                codes = struct.unpack("<%dH" % ((e + 2 - o) // 2), b[o:e + 2])
+                if kind == "a":
+                    codes = [plain_glyph(c) for c in codes]
+                f.write(struct.pack("<%dH" % len(codes), *codes).hex() + "\n")
     with open(os.path.join(out, "text", "CHARS.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("# The Spanish font's letters (they sit where the USA font has German and French ones).\n")
         for g, ch in sorted(SPANISH.items()):

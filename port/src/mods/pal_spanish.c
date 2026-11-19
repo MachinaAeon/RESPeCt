@@ -59,7 +59,8 @@ static const uint8_t entry_slot[][2] = {
 
 /* The menus' strings the Spanish disc changed, which live in its code
  * files: (file, USA address, Spanish disc's address, kind). Kinds: 'w' a
- * 16-bit text, copied; 'n' an 8-bit small-font text, its codes turned into
+ * 16-bit text, copied; 'a' the same with its accents dropped (a screen
+ * whose font is the USA one); 'n' an 8-bit small-font text, its codes turned into
  * the USA small font's (which has no accents); 'b' a line the Spanish disc
  * merged into the one before it, left blank. Found by lining up the two
  * discs' code; written to text/SCREENS.txt. */
@@ -75,8 +76,21 @@ static const struct { const char *file; uint32_t usa, es; char kind; } screens[]
     {"OPTION.BIN", 0x800CCAE0u, 0x800CC998u, 'w'}, {"OPTION.BIN", 0x800CCB3Cu, 0x800CCC54u, 'w'},
     {"TEST.BIN", 0x800A2ECCu, 0x800A3078u, 'w'}, {"TEST.BIN", 0x800A2E84u, 0x800A3038u, 'w'},   /* the doors' messages */
     {"TEST.BIN", 0x800A2EF4u, 0x800A30D8u, 'w'}, {"TEST.BIN", 0x800A2F14u, 0x800A30A4u, 'w'},
+    {"SCORE.BIN", 0x8006D92Cu, 0x8006D90Cu, 'a'}, {"SCORE.BIN", 0x8006D93Cu, 0x8006D924u, 'a'},   /* the results' labels */
+    {"SCORE.BIN", 0x8006D948u, 0x8006D930u, 'a'}, {"SCORE.BIN", 0x8006D960u, 0x8006D940u, 'a'},
+    {"SCORE.BIN", 0x8006D978u, 0x8006D954u, 'a'}, {"SCORE.BIN", 0x8006D998u, 0x8006D964u, 'a'},
+    {"SCORE.BIN", 0x8006D9ACu, 0x8006D984u, 'a'},
 };
 #define PAL_OPTION_BASE 0x800C4008u   /* where the Spanish OPTION.BIN loads */
+
+/* A Spanish font cell with its accent dropped, as a font cell. */
+static uint16_t plain_glyph(uint16_t g) {
+    static const char accents[] = "AaIiOoUu?!Nn" "eEe" "oa\"\"Uu" "OoUuUuCc";   /* cells 87..114 */
+    if (g < 87 || g > 114) return g;
+    char c = accents[g - 87];
+    return c >= 'A' && c <= 'Z' ? (uint16_t)(29 + c - 'A') : c >= 'a' && c <= 'z' ? (uint16_t)(61 + c - 'a') :
+           c == '?' ? 27 : c == '!' ? 26 : 25;
+}
 
 /* A Spanish font cell as the USA small font's code (ASCII - 0x20), accents dropped. */
 static uint8_t narrow_code(uint8_t g) {
@@ -264,16 +278,18 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
     }
     fclose(f);
     {   /* the menus' strings */
-        uint32_t osize;
-        uint8_t *opt = disc_read(&d, "OPTION.BIN", &osize);
+        uint32_t osize, ssize;
+        uint8_t *opt = disc_read(&d, "OPTION.BIN", &osize), *score = disc_read(&d, "SCORE.BIN", &ssize);
         snprintf(path, sizeof path, "%s/text/SCREENS.txt", out_dir);
         f = opt ? fopen(path, "wb") : NULL;
-        if (!f) { free(opt); snprintf(why, wn, "couldn't write %s", path); goto done; }
+        if (!f || !score) { if (f) fclose(f); free(opt); free(score); snprintf(why, wn, "couldn't write %s", path); goto done; }
         fprintf(f, "# The menus' strings from the Spanish disc: @address (USA), then the bytes the game reads.\n");
         for (size_t i = 0; i < sizeof screens / sizeof *screens; i++) {
-            int test_file = !strcmp(screens[i].file, "TEST.BIN");
-            const uint8_t *b = test_file ? test : opt;
-            uint32_t n = test_file ? tsize : osize, o = screens[i].es - (test_file ? PAL_TEST_BASE : PAL_OPTION_BASE), e = o;
+            const char *fn = screens[i].file;
+            int is_opt = !strcmp(fn, "OPTION.BIN"), is_score = !strcmp(fn, "SCORE.BIN");
+            const uint8_t *b = is_opt ? opt : is_score ? score : test;
+            uint32_t n = is_opt ? osize : is_score ? ssize : tsize;
+            uint32_t o = screens[i].es - (is_opt ? PAL_OPTION_BASE : PAL_TEST_BASE), e = o;   /* (SCORE.BIN loads where TEST.BIN does) */
             if (o >= n) continue;
             fprintf(f, "@%08X\n", screens[i].usa);
             if (screens[i].kind == 'b') { fprintf(f, "0000ffff\n"); continue; }
@@ -283,12 +299,17 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
                 fprintf(f, "ff\n");
             } else {
                 while (e + 1 < n && rd16(b + e) != 0xFFFF) e += 2;
-                for (uint32_t k = o; k < e + 2 && k < n; k++) fprintf(f, "%02x", b[k]);
+                for (uint32_t k = o; k + 1 < e + 2 && k + 1 < n; k += 2) {
+                    uint16_t c = rd16(b + k);
+                    if (screens[i].kind == 'a') c = plain_glyph(c);
+                    fprintf(f, "%02x%02x", c & 0xFF, c >> 8);
+                }
                 fprintf(f, "\n");
             }
         }
         fclose(f);
         free(opt);
+        free(score);
     }
     snprintf(path, sizeof path, "%s/text/CHARS.txt", out_dir);
     f = fopen(path, "wb");

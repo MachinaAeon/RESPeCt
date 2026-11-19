@@ -77,8 +77,8 @@ Victor translation, v1.0.1, applied), F1 > Mods > "Build the Spanish mod
 from a PAL disc" and pick its .cue or .bin. Its Spanish text, font,
 pictures and menu words are made into mods\espanol from your own disc
 (nothing of it comes with RESPeCt) and apply on the next start. Still in
-English: the title screen's options, the results screen, the credits, the
-inventory's Return / NO ITEM labels, and words the Spanish disc draws as
+English: the title screen's options, the credits, the inventory's Return
+/ NO ITEM labels, and words the Spanish disc draws as
 pictures or with its own letters (EXIT, BGM, KEY CONFIG...).
 
 The Spanish translation is the work of Tío Victor (see CREDITS). They are
