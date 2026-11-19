@@ -262,14 +262,22 @@ or ambiguous page correspondence.
 
 ### Spanish text from the PAL disc
 
-The Spanish release (SLES-02732) keeps the USA data layout. F1 > Mods >
-"Build the Spanish mod from a PAL disc" (or `tools/pal_spanish.py DISC OUT`)
-copies its changed data files into `mods/espanol` by disc name, reads its
-item names out of its TEST.BIN into `text/GAME.txt`, and maps its font's
-letters (Á á Í í Ó ó Ú ú ¿ ¡ Ñ ñ º ª « » Ü ü, in the cells the USA font
-uses for German and French ones) in `text/CHARS.txt`. Everything comes from
-the player's own disc. The screens whose text is in code (title, options,
-typewriter, results, credits) and `UI.txt`'s labels aren't covered yet.
+The Spanish release (SLES-02732 with the Tío Victor translation v1.0.1
+applied) keeps the USA data layout. F1 > Mods > "Build the Spanish mod from
+a PAL disc" (or `tools/pal_spanish.py DISC OUT`) copies its changed data
+files into `mods/espanol` by disc name, reads its item names out of its
+TEST.BIN into `text/GAME.txt`, its menu and door strings into
+`text/SCREENS.txt`, and maps its font's letters (Á á Í í Ó ó Ú ú ¿ ¡ Ñ ñ º ª
+« » Ü ü, in the cells the USA font uses for German and French ones) in
+`text/CHARS.txt`. Everything comes from the player's own disc; the builder
+only knows where to look. The translation is Tío Victor's work; they are
+not affiliated with RESPeCt, so problems go to RESPeCt's issues, not to them.
+
+`text/SCREENS.txt` replaces strings the menus draw (options, title, results,
+credits, doors): `@address` (the string's USA RAM address), then the bytes
+the game reads, in hex, end code included. `@FILE address` also repoints
+FILE's data words that hold the address, for strings reached through tables.
+RT_TEXTLOG=1 (headless) logs each string address the menus draw.
 
 ## Item pictures and HD replacements
 

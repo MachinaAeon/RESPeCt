@@ -56,6 +56,42 @@ ENTRY_SLOT = {1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 10, 11: 
               59: 111}
 
 
+# The menus' strings the Spanish disc changed, which live in its code files:
+# (file, USA address, Spanish disc's address, kind). Kinds: "w" a 16-bit text,
+# copied; "n" an 8-bit small-font text, turned into the USA small font's codes
+# (no accents); "b" a line the Spanish disc merged into the one before, blank.
+SCREENS = [
+    ("OPTION.BIN", 0x800CC480, 0x800CC610, "n"), ("OPTION.BIN", 0x800CC48C, 0x800CC61C, "n"),
+    ("OPTION.BIN", 0x800CC494, 0x800CC71C, "n"), ("OPTION.BIN", 0x800CC984, 0x800CCA9C, "n"),
+    ("OPTION.BIN", 0x800CCB24, 0x800CCC3C, "n"), ("OPTION.BIN", 0x800CCB2B, 0x800CCC43, "n"),
+    ("OPTION.BIN", 0x800CCB32, 0x800CCC4A, "n"), ("OPTION.BIN", 0x800CC8C0, 0x800CC9B0, "w"),
+    ("OPTION.BIN", 0x800CC8CC, 0x800CC9D4, "w"), ("OPTION.BIN", 0x800CC8D4, 0x800CC9DC, "b"),
+    ("OPTION.BIN", 0x800CC8E4, 0x800CC9E8, "w"), ("OPTION.BIN", 0x800CC8FC, 0x800CCA1C, "w"),
+    ("OPTION.BIN", 0x800CC90C, 0x800CC9C0, "w"), ("OPTION.BIN", 0x800CC9C4, 0x800CCAC4, "w"),
+    ("OPTION.BIN", 0x800CC9D0, 0x800CCADC, "w"), ("OPTION.BIN", 0x800CC9E8, 0x800CCAF4, "w"),
+    ("OPTION.BIN", 0x800CCAE0, 0x800CC998, "w"), ("OPTION.BIN", 0x800CCB3C, 0x800CCC54, "w"),
+    ("TEST.BIN", 0x800A2ECC, 0x800A3078, "w"), ("TEST.BIN", 0x800A2E84, 0x800A3038, "w"),   # the doors' messages
+    ("TEST.BIN", 0x800A2EF4, 0x800A30D8, "w"), ("TEST.BIN", 0x800A2F14, 0x800A30A4, "w"),
+]
+PAL_OPTION_BASE = 0x800C4008     # where the Spanish OPTION.BIN loads
+_ACCENTS = "AaIiOoUu?!Nn" "eEe" "oa\"\"Uu" "OoUuUuCc"     # cells 87..114 without accents
+
+
+def narrow_code(g):
+    """A Spanish font cell as the USA small font's code (ASCII - 0x20)."""
+    if 87 <= g <= 114:
+        c = _ACCENTS[g - 87]
+    elif g == 120:
+        c = '"'
+    elif g in (60, 121, 122):
+        c = "."
+    elif g < 128 and len(GLYPHS[g]) == 1:
+        c = GLYPHS[g]
+    else:
+        c = " "
+    return ord(c) - 0x20
+
+
 class Disc:
     def __init__(self, path):
         self.f = open(path, "rb")
@@ -130,19 +166,40 @@ def main():
         sys.exit("That isn't the Spanish disc (SLES-02732).")
     out = sys.argv[2]
 
+    test = disc.read("TEST.BIN")
+    h = 0xCBF29CE484222325
+    for b in test:
+        h = ((h ^ b) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    if h != 0x4DAF01E260EF3EA0:
+        sys.exit("This PAL disc doesn't have the Tio Victor Spanish translation (v1.0.1) applied.")
     for name in DATA_FILES:
         dst = os.path.join(out, *name.split("/"))
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         with open(dst, "wb") as f:
             f.write(disc.read(name))
 
-    test = disc.read("TEST.BIN")
     os.makedirs(os.path.join(out, "text"), exist_ok=True)
     with open(os.path.join(out, "text", "GAME.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("# Item names, from the Spanish disc's TEST.BIN, in the USA order.\n")
         for entry, slot in sorted(ENTRY_SLOT.items()):
             ptr = struct.unpack_from("<I", test, PAL_NAME_PTRS + 4 * slot)[0] - PAL_TEST_BASE
             f.write(f"@{entry}\n{decode(test, ptr).strip(' ')}\n")
+    opt = disc.read("OPTION.BIN")
+    with open(os.path.join(out, "text", "SCREENS.txt"), "w", encoding="utf-8", newline="\n") as f:
+        f.write("# The menus' strings from the Spanish disc: @address (USA), then the bytes the game reads.\n")
+        for name, usa, es, kind in SCREENS:
+            b, o = (test, es - PAL_TEST_BASE) if name == "TEST.BIN" else (opt, es - PAL_OPTION_BASE)
+            f.write("@%08X\n" % usa)
+            if kind == "b":
+                f.write("0000ffff\n")
+            elif kind == "n":
+                e = b.index(0xFF, o)
+                f.write(bytes(c if c >= 0xF0 else narrow_code(c) for c in b[o:e]).hex() + "ff\n")
+            else:
+                e = o
+                while struct.unpack_from("<H", b, e)[0] != 0xFFFF:
+                    e += 2
+                f.write(b[o:e + 2].hex() + "\n")
     with open(os.path.join(out, "text", "CHARS.txt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("# The Spanish font's letters (they sit where the USA font has German and French ones).\n")
         for g, ch in sorted(SPANISH.items()):

@@ -28,6 +28,7 @@
  * with tools/eq). */
 #include "libgs.h"
 #include "poll.h"
+u32 modfs_screen_text(u32 original, int tag);   /* modfs: text/SCREENS.txt's version of a menu string */
 
 void n_results_Init(void);
 void n_results_Flip(void);
@@ -178,8 +179,13 @@ void n_results_Flip(void) {
  * any other font draws nothing. */
 void n_results_DrawText(void) {
     FRAME(0x38);
-    u32 text = A0;
+    u32 text = modfs_screen_text(A0, 5);
     s32 i = (s32)((A1 & 0xFFFF) - 2);
+    if (text != A0) {                             /* (a replacement: its own length, end code included) */
+        i = 0;
+        while (GV(u16, text + (u32)i * 2) != 0xFFFF && i < 256) i++;
+        i--;
+    }
     u32 x = A2;
     u16 y = (u16)A3;
     u32 row = GS(u32, sp + 0x48), font = GS(u32, sp + 0x4C);

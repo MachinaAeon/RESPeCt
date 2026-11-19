@@ -26,6 +26,7 @@
  * Decompiled from the game's code; RAM-identical to the originals (checked
  * with tools/eq, scenario options_game). */
 #include "poll.h"
+u32 modfs_screen_text(u32 original, int tag);   /* modfs: text/SCREENS.txt's version of a menu string */
 
 void n_option_ClearMarks(void);
 void n_option_HideOnClose(void);
@@ -851,7 +852,7 @@ void n_option_Frame(void) {
  * centred on (0xA0, 0x78), into ordering table `depth`. */
 void n_option_DrawText(void) {
     FRAME(0x40);
-    u32 str = A0, pp = A3;
+    u32 str = modfs_screen_text(A0, 1), pp = A3;
     u32 depth = GS(u32, sp + 0x50);
     u32 scale = GS(u32, sp + 0x54);
     GS(u16, sp + 0x12) = (u16)A2;
@@ -934,7 +935,7 @@ void n_option_Draw(void) {
  * tinted grey shade. */
 void n_option_DrawTextEx(void) {
     FRAME(0x58);
-    u32 str = A0, shade = A1;
+    u32 str = modfs_screen_text(A0, 2), shade = A1;
     u32 pp = GS(u32, sp + 0x68), scale = GS(u32, sp + 0x70);
     GS(u32, sp + 0x60) = A2;
     GS(u16, sp + 0x22) = (u16)A3;
@@ -1159,7 +1160,7 @@ void n_option_DrawSprites(void) {
  * 0x180. */
 void n_option_DrawBigText(void) {
     FRAME(0x48);
-    u32 str = A0, pp = GS(u32, sp + 0x58), scale = GS(u32, sp + 0x60);
+    u32 str = modfs_screen_text(A0, 3), pp = GS(u32, sp + 0x58), scale = GS(u32, sp + 0x60);
     GS(u32, sp + 0x4C) = A1;
     GS(u32, sp + 0x50) = A2;
     GS(u16, sp + 0x12) = (u16)A3;

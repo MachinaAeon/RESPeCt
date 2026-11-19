@@ -42,7 +42,7 @@ typedef struct { char *tok; uint16_t code; } CharMap;
 static CharMap *charmap;                         /* the mods' CHARS.txt */
 static int ncharmap;
 
-typedef struct { int kind; uint8_t *d; long n; char what[600]; } TextFile;   /* kind: 0 rooms, 1 game, 2 items, 3 chars, 4 UI, 5 list */
+typedef struct { int kind; uint8_t *d; long n; char what[600]; } TextFile;   /* kind: 0 rooms, 1 game, 2 items, 3 chars, 4 UI, 5 list, 6 screens */
 static TextFile *textfiles;
 static int ntextfiles;
 
@@ -171,7 +171,8 @@ static int text_entries(const uint8_t *d, long n, TextEntry **out, char **buf) {
 
 static int text_apply(const char *mod, const char *rel, const char *up, const char *path) {
     int kind = !strcmp(up, "TEXT/ROOMS.TXT") ? 0 : !strcmp(up, "TEXT/GAME.TXT") ? 1 : !strcmp(up, "TEXT/ITEMS.TXT") ? 2 :
-               !strcmp(up, "TEXT/CHARS.TXT") ? 3 : !strcmp(up, "TEXT/UI.TXT") ? 4 : !strcmp(up, "TEXT/LIST.TXT") ? 5 : -1;
+               !strcmp(up, "TEXT/CHARS.TXT") ? 3 : !strcmp(up, "TEXT/UI.TXT") ? 4 : !strcmp(up, "TEXT/LIST.TXT") ? 5 :
+               !strcmp(up, "TEXT/SCREENS.TXT") ? 6 : -1;
     if (kind < 0) return 0;
     long n = 0;
     uint8_t *d = load(path, &n);
@@ -266,10 +267,85 @@ static struct { const char *name; uint32_t original, replacement; int max; } ui_
     {"DOOR_LOCKED", 0x800A2ECCu, 0, 120}, {"DOOR_LOCKED_OTHER_SIDE", 0x800A2E84u, 0, 120},
     {"DOOR_USED", 0x800A2EF4u, 0, 60}, {"DOOR_UNLOCKED", 0x800A2F14u, 0, 120},
 };
+uint32_t modfs_screen_text(uint32_t original, int tag);
 uint32_t modfs_ui_text(uint32_t original) {
     for (size_t i = 0; i < sizeof ui_texts / sizeof ui_texts[0]; i++)
         if (ui_texts[i].original == original && ui_texts[i].replacement) return ui_texts[i].replacement;
+    return modfs_screen_text(original, 0);     /* (or text/SCREENS.txt's) */
+}
+/* The menus' own strings (options, title, results...), drawn by their
+ * native text functions, which ask here first: text/SCREENS.txt gives a
+ * string's replacement as the bytes the game reads (8- or 16-bit codes,
+ * end code included), keyed by the original's address. Made by the
+ * language builders (pal_spanish.c) from the player's own disc. */
+static struct ScreenText { uint32_t original, replacement; } *screen_texts;
+static int nscreen_texts;
+uint32_t modfs_screen_text(uint32_t original, int tag) {
+    static int logging = -1;
+    if (logging < 0) logging = getenv("RT_TEXTLOG") != NULL;
+    if (logging) {                               /* (RT_TEXTLOG: each string a menu draws, once) */
+        static uint32_t seen[512];
+        static int nseen;
+        int k = 0;
+        for (; k < nseen; k++) if (seen[k] == (original ^ (uint32_t)tag << 28)) break;
+        if (k == nseen && nseen < 512) { seen[nseen++] = original ^ (uint32_t)tag << 28; rt_log("textlog: %d %08X", tag, original); }
+    }
+    for (int i = 0; i < nscreen_texts; i++)
+        if (screen_texts[i].original == original) return screen_texts[i].replacement;
     return original;
+}
+static void texts_screens_done(void) {
+    for (int i = 0; i < ntextfiles; i++) {
+        if (textfiles[i].kind != 6) continue;
+        char *s = malloc((size_t)textfiles[i].n + 1);
+        if (!s) continue;
+        memcpy(s, textfiles[i].d, (size_t)textfiles[i].n);
+        s[textfiles[i].n] = 0;
+        int got = 0;
+        uint32_t addr = 0;
+        char file[32] = "";
+        for (char *line = strtok(s, "\r\n"); line; line = strtok(NULL, "\r\n")) {
+            if (line[0] == '#') continue;
+            if (line[0] == '@') {                /* @address, or @FILE address: its pointers in FILE's data moved too */
+                file[0] = 0;
+                if (sscanf(line + 1, "%31s %x", file, &addr) != 2) { file[0] = 0; addr = (uint32_t)strtoul(line + 1, NULL, 16); }
+                continue;
+            }
+            if (!addr) continue;
+            uint8_t b[1024];
+            uint32_t n = 0;
+            for (char *q = line; *q && n < sizeof b;) {
+                while (*q == ' ') q++;
+                if (!q[0] || !q[1]) break;
+                char hx[3] = {q[0], q[1], 0};
+                b[n++] = (uint8_t)strtoul(hx, NULL, 16);
+                q += 2;
+            }
+            uint32_t r = n ? ext_alloc((n + 3) & ~3u) : 0;
+            if (!r) { note("mods: %s: @%08X: no free mod RAM: not used", textfiles[i].what, addr); addr = 0; continue; }
+            memcpy(ram_ptr(r), b, n);
+            struct ScreenText *t = realloc(screen_texts, (size_t)(nscreen_texts + 1) * sizeof *t);
+            if (!t) break;
+            screen_texts = t;
+            int k = 0;                           /* a later mod's wins */
+            for (; k < nscreen_texts; k++) if (screen_texts[k].original == addr) break;
+            screen_texts[k].original = addr;
+            screen_texts[k].replacement = r;
+            if (k == nscreen_texts) nscreen_texts++;
+            if (file[0]) {                       /* the tables that point at it (read by translated code, which no hook reaches) */
+                Touched *t = touch(disc_index(file));
+                int moved = 0;
+                if (t) for (uint32_t o = 0; o + 4 <= t->nsec * 2048; o += 4)
+                    if (rd32(t->data + o) == addr) { wr32(t->data + o, r); moved++; }
+                if (!t) note("mods: %s: @%s %08X: no such file", textfiles[i].what, file, addr);
+                (void)moved;
+            }
+            got++;
+            addr = 0;
+        }
+        free(s);
+        note("mods: %s: %d menu strings, in mod RAM", textfiles[i].what, got);
+    }
 }
 static void texts_ui_done(void) {
     for (int i = 0; i < ntextfiles; i++) {
@@ -362,6 +438,7 @@ static void texts_done(void) {
         note("mods: %s: %d characters", textfiles[i].what, got);
     }
     texts_ui_done();
+    texts_screens_done();
     Touched *test = touch(disc_index("TEST.BIN"));
     static uint16_t codes[4096];
     char why[160];

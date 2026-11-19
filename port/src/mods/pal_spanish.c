@@ -57,6 +57,38 @@ static const uint8_t entry_slot[][2] = {
     {54, 73}, {55, 74}, {56, 75}, {57, 76}, {58, 108}, {59, 111},
 };
 
+/* The menus' strings the Spanish disc changed, which live in its code
+ * files: (file, USA address, Spanish disc's address, kind). Kinds: 'w' a
+ * 16-bit text, copied; 'n' an 8-bit small-font text, its codes turned into
+ * the USA small font's (which has no accents); 'b' a line the Spanish disc
+ * merged into the one before it, left blank. Found by lining up the two
+ * discs' code; written to text/SCREENS.txt. */
+static const struct { const char *file; uint32_t usa, es; char kind; } screens[] = {
+    {"OPTION.BIN", 0x800CC480u, 0x800CC610u, 'n'}, {"OPTION.BIN", 0x800CC48Cu, 0x800CC61Cu, 'n'},
+    {"OPTION.BIN", 0x800CC494u, 0x800CC71Cu, 'n'}, {"OPTION.BIN", 0x800CC984u, 0x800CCA9Cu, 'n'},
+    {"OPTION.BIN", 0x800CCB24u, 0x800CCC3Cu, 'n'}, {"OPTION.BIN", 0x800CCB2Bu, 0x800CCC43u, 'n'},
+    {"OPTION.BIN", 0x800CCB32u, 0x800CCC4Au, 'n'}, {"OPTION.BIN", 0x800CC8C0u, 0x800CC9B0u, 'w'},
+    {"OPTION.BIN", 0x800CC8CCu, 0x800CC9D4u, 'w'}, {"OPTION.BIN", 0x800CC8D4u, 0x800CC9DCu, 'b'},
+    {"OPTION.BIN", 0x800CC8E4u, 0x800CC9E8u, 'w'}, {"OPTION.BIN", 0x800CC8FCu, 0x800CCA1Cu, 'w'},
+    {"OPTION.BIN", 0x800CC90Cu, 0x800CC9C0u, 'w'}, {"OPTION.BIN", 0x800CC9C4u, 0x800CCAC4u, 'w'},
+    {"OPTION.BIN", 0x800CC9D0u, 0x800CCADCu, 'w'}, {"OPTION.BIN", 0x800CC9E8u, 0x800CCAF4u, 'w'},
+    {"OPTION.BIN", 0x800CCAE0u, 0x800CC998u, 'w'}, {"OPTION.BIN", 0x800CCB3Cu, 0x800CCC54u, 'w'},
+    {"TEST.BIN", 0x800A2ECCu, 0x800A3078u, 'w'}, {"TEST.BIN", 0x800A2E84u, 0x800A3038u, 'w'},   /* the doors' messages */
+    {"TEST.BIN", 0x800A2EF4u, 0x800A30D8u, 'w'}, {"TEST.BIN", 0x800A2F14u, 0x800A30A4u, 'w'},
+};
+#define PAL_OPTION_BASE 0x800C4008u   /* where the Spanish OPTION.BIN loads */
+
+/* A Spanish font cell as the USA small font's code (ASCII - 0x20), accents dropped. */
+static uint8_t narrow_code(uint8_t g) {
+    static const char accents[] = "AaIiOoUu?!Nn" "eEe" "oa\"\"Uu" "OoUuUuCc";   /* cells 87..114 */
+    char c = ' ';
+    if (g >= 87 && g <= 114) c = accents[g - 87];
+    else if (g == 120) c = '"';
+    else if (g == 60 || g == 121 || g == 122) c = '.';
+    else if (g < 128 && es_glyph[g][0] && !es_glyph[g][1] && es_glyph[g][0] != '{') c = es_glyph[g][0];
+    return (uint8_t)(c - 0x20);
+}
+
 typedef struct { char name[64]; uint32_t lba, size; } DFile;
 typedef struct { FILE *f; DFile *files; int n, cap; } Disc;
 
@@ -200,6 +232,17 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
     int sles = 0;
     for (int i = 0; i < d.n; i++) sles |= !strcmp(d.files[i].name, "SLES_027.32");
     if (!sles) { snprintf(why, wn, "that isn't the Spanish disc (SLES-02732)"); goto done; }
+    uint32_t tsize;
+    test = disc_read(&d, "TEST.BIN", &tsize);
+    if (!test || tsize < PAL_NAME_PTRS + 112 * 4) { snprintf(why, wn, "couldn't read TEST.BIN"); goto done; }
+    {   /* the translated disc's, not the English PAL one's */
+        uint64_t h = 0xCBF29CE484222325ull;
+        for (uint32_t k = 0; k < tsize; k++) h = (h ^ test[k]) * 0x100000001B3ull;
+        if (h != 0x4DAF01E260EF3EA0ull) {
+            snprintf(why, wn, "this PAL disc doesn't have the Tio Victor Spanish translation (v1.0.1) applied");
+            goto done;
+        }
+    }
     char path[1100];
     for (size_t i = 0; i < sizeof data_files / sizeof *data_files; i++) {
         uint32_t n;
@@ -209,9 +252,6 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
         free(b);
         if (!w) { snprintf(why, wn, "couldn't copy %s", data_files[i]); goto done; }
     }
-    uint32_t tsize;
-    test = disc_read(&d, "TEST.BIN", &tsize);
-    if (!test || tsize < PAL_NAME_PTRS + 112 * 4) { snprintf(why, wn, "couldn't read TEST.BIN"); goto done; }
     snprintf(path, sizeof path, "%s/text/GAME.txt", out_dir);
     mkdirs(path);
     FILE *f = fopen(path, "wb");
@@ -223,6 +263,33 @@ int pal_spanish_build(const char *disc_path, const char *out_dir, char *why, siz
         if (o < tsize) put_name(f, test, tsize, o); else fprintf(f, "\n");
     }
     fclose(f);
+    {   /* the menus' strings */
+        uint32_t osize;
+        uint8_t *opt = disc_read(&d, "OPTION.BIN", &osize);
+        snprintf(path, sizeof path, "%s/text/SCREENS.txt", out_dir);
+        f = opt ? fopen(path, "wb") : NULL;
+        if (!f) { free(opt); snprintf(why, wn, "couldn't write %s", path); goto done; }
+        fprintf(f, "# The menus' strings from the Spanish disc: @address (USA), then the bytes the game reads.\n");
+        for (size_t i = 0; i < sizeof screens / sizeof *screens; i++) {
+            int test_file = !strcmp(screens[i].file, "TEST.BIN");
+            const uint8_t *b = test_file ? test : opt;
+            uint32_t n = test_file ? tsize : osize, o = screens[i].es - (test_file ? PAL_TEST_BASE : PAL_OPTION_BASE), e = o;
+            if (o >= n) continue;
+            fprintf(f, "@%08X\n", screens[i].usa);
+            if (screens[i].kind == 'b') { fprintf(f, "0000ffff\n"); continue; }
+            if (screens[i].kind == 'n') {
+                while (e < n && b[e] != 0xFF) e++;
+                for (uint32_t k = o; k < e; k++) fprintf(f, "%02x", b[k] >= 0xF0 ? b[k] : narrow_code(b[k]));
+                fprintf(f, "ff\n");
+            } else {
+                while (e + 1 < n && rd16(b + e) != 0xFFFF) e += 2;
+                for (uint32_t k = o; k < e + 2 && k < n; k++) fprintf(f, "%02x", b[k]);
+                fprintf(f, "\n");
+            }
+        }
+        fclose(f);
+        free(opt);
+    }
     snprintf(path, sizeof path, "%s/text/CHARS.txt", out_dir);
     f = fopen(path, "wb");
     if (!f) { snprintf(why, wn, "couldn't write %s", path); goto done; }

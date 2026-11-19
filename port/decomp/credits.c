@@ -25,6 +25,7 @@
  * with tools/eq). */
 #include "libgs.h"
 #include "poll.h"
+u32 modfs_screen_text(u32 original, int tag);   /* modfs: text/SCREENS.txt's version of a menu string */
 
 void n_credits_Init(void);
 void n_credits_Flip(void);
@@ -208,7 +209,7 @@ void n_credits_Scroll(void) {
  * row offset). */
 void n_credits_DrawText(void) {
     FRAME(0x40);
-    u32 y = A0, text = A3;
+    u32 y = A0, text = modfs_screen_text(A3, 6);
     GS(u16, sp + 0x10) = (u16)A1;
     u32 b = BUF_INDEX;
     u32 s = SPRITES + b * 0x5DC0 + (u32)g_sprites * 0x14;

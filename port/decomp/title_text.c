@@ -9,6 +9,7 @@
  * Decompiled from the game's code; RAM-identical to the originals (checked
  * with tools/eq). */
 #include "title.h"
+u32 modfs_screen_text(u32 original, int tag);   /* modfs: text/SCREENS.txt's version of a menu string */
 
 #define PACKETS        0x800F8000u
 #define F_T_TEXT_A     0x80070254u   /* other text styles (flags 0x20, 0x40) */
@@ -200,7 +201,7 @@ void n_title_Text(void) {
     u32 args = R[29] + 0x10;
     FRAME(0x58);
     u32 pp = GS(u32, args), mode = GS(u32, args + 8), scale = GS(u32, args + 0xC);
-    u32 t = A0;
+    u32 t = modfs_screen_text(A0, 4);
     s32 fade = (s32)A1;
     s32 color = 0x80;
     GS(u32, sp + 0x60) = A2;
