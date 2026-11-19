@@ -5,6 +5,7 @@
 #include "rt.h"
 #include "savestate.h"
 #include "render.h"
+#include "captions.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -167,6 +168,26 @@ static int vertex_pos(int k, float *x, float *y, float *z) {
     return got != 0;
 }
 
+/* A 2D textured primitive, for the captions (captions.c) and RT_PRIMLOG
+ * (each one's texture page, texels and screen place, to find a word's). */
+static void disp_size(int *w, int *h) {
+    static const int widths[4] = {256, 320, 512, 640};
+    uint32_t m = g.disp_mode;
+    *w = (m & 0x40) ? 368 : widths[m & 3];
+    *h = ((m >> 2) & 1) && ((m >> 5) & 1) ? 480 : 240;
+}
+static void prim_2d(const RPrim *p, int umin, int vmin, int umax, int vmax, float x0, float y0, float x1, float y1, int bright) {
+    static int log = -1;
+    if (log < 0) log = getenv("RT_PRIMLOG") != NULL;
+    if (!log && !caption_sources()) return;
+    int dw, dh;
+    disp_size(&dw, &dh);
+    if (log) rt_log("prim: page %d,%d d%d uv %d,%d-%d,%d at %.0f,%.0f-%.0f,%.0f (area %d,%d) bright %d",
+                    p->tx, p->ty, p->depth, umin, vmin, umax, vmax, x0 - g.da_x1, y0 - g.da_y1, x1 - g.da_x1, y1 - g.da_y1,
+                    g.da_x1, g.da_y1, bright);
+    caption_prim(p->tx, p->ty, p->depth, umin, vmin, umax, vmax, x0, y0, x1, y1, bright, g.da_x1, g.da_y1, dw, dh);
+}
+
 static void exec_poly(void) {
     uint32_t c = g.cmd[0];
     int quad = (c >> 27) & 1, gour = (c >> 28) & 1, tex = (c >> 26) & 1;
@@ -226,6 +247,17 @@ static void exec_poly(void) {
             rt_log("mix: nv %d ngte %d tex %d tp %d,%d%s", nv, ngte, tex, p.tx, p.ty, b);
         }
     }
+    if (tex && ngte == 0) {                          /* 2D: a caption over it? */
+        int umin = 255, umax = 0, vmin = 255, vmax = 0, br = 0;
+        float x0 = v[0].x, x1 = v[0].x, y0 = v[0].y, y1 = v[0].y;
+        for (int i = 0; i < nv; i++) {
+            umin = v[i].u < umin ? v[i].u : umin; umax = v[i].u > umax ? v[i].u : umax;
+            vmin = v[i].v < vmin ? v[i].v : vmin; vmax = v[i].v > vmax ? v[i].v : vmax;
+            x0 = fminf(x0, v[i].x); x1 = fmaxf(x1, v[i].x); y0 = fminf(y0, v[i].y); y1 = fmaxf(y1, v[i].y);
+            br += (v[i].r + v[i].g + v[i].b) / 3;
+        }
+        prim_2d(&p, umin, vmin, umax, vmax, x0, y0, x1, y1, p.raw ? 128 : br / nv);
+    }
     /* every corner projected by the GTE, with a depth: 3D, depth-tested */
     p.zt = ngte == nv;
     for (int i = 0; i < nv; i++) if (v[i].z <= 0) p.zt = 0;
@@ -270,6 +302,13 @@ static void exec_rect(void) {
     }
     p.flipx = g.rect_flip_x;
     p.flipy = g.rect_flip_y;
+    if (tex) {
+        int sq = squeeze_2d() && !corner_stored(1) && !full_width(p.v[0].x, p.v[0].x + (float)p.w - 1) &&
+                 !samples_screen(&p, p.v[0].u, p.v[0].u + p.w - 1, p.v[0].v, p.v[0].v + p.h - 1);
+        float x0 = sq ? squeeze_x(p.v[0].x) : p.v[0].x, x1 = sq ? squeeze_x(p.v[0].x + (float)p.w) : p.v[0].x + (float)p.w;
+        prim_2d(&p, p.v[0].u, p.v[0].v, p.v[0].u + p.w, p.v[0].v + p.h, x0, p.v[0].y, x1, p.v[0].y + (float)p.h,
+                p.raw ? 128 : (p.v[0].r + p.v[0].g + p.v[0].b) / 3);
+    }
     if (!squeeze_2d() || corner_stored(1) || full_width(p.v[0].x, p.v[0].x + (float)p.w - 1) ||
         samples_screen(&p, p.v[0].u, p.v[0].u + p.w - 1, p.v[0].v, p.v[0].v + p.h - 1)) {
         render_prim(&p);
@@ -301,6 +340,7 @@ static void fill(void) {
     int x = p & 0x3F0, y = (p >> 16) & 0x1FF;
     int w = ((s & 0x3FF) + 15) & ~15, h = (s >> 16) & 0x1FF;
     render_fill(x, y, w, h, rgb15(c));
+    { int dw, dh; disp_size(&dw, &dh); caption_fill(x, y, w, h, dw, dh); }
 }
 
 static void vram_copy(void) {
@@ -463,7 +503,7 @@ void gpu_write_gp1(uint32_t v) {
     case 0x02: g.irq = 0; break;
     case 0x03: g.disp_enabled = !(p & 1); break;
     case 0x04: g.dma_dir = p & 3; break;
-    case 0x05: g.disp_x = p & 0x3FE; g.disp_y = (p >> 10) & 0x1FF;
+    case 0x05: g.disp_x = p & 0x3FE; g.disp_y = (p >> 10) & 0x1FF; caption_display(g.disp_x, g.disp_y);
         { static int dl = -1; if (dl < 0) dl = getenv("RT_DISPLOG") != NULL; if (dl) rt_log("disp y %d", g.disp_y); }
         break;
     case 0x06: g.disp_x1 = p & 0xFFF; g.disp_x2 = (p >> 12) & 0xFFF; break;

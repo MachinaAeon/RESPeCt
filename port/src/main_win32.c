@@ -21,6 +21,7 @@
 #include "render_gpu.h"
 #include "texpack.h"
 #include "savestate.h"
+#include "captions.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -495,6 +496,45 @@ static void draw_overlays(HDC dc) {
             DrawTextA(dc, hint, -1, &sh, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             SetTextColor(dc, RGB(240, 220, 160));
             DrawTextA(dc, hint, -1, &hr, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(dc, of);
+            DeleteObject(f);
+        }
+    }
+    {   /* the mods' captions over the game's picture words (captions.c) */
+        GpuDisplay gd;
+        gpu_display(&gd);
+        const Caption *cs;
+        int n = caption_shown(gd.x, gd.y, &cs);
+        for (int i = 0; i < n; i++) {
+            const Caption *c = &cs[i];
+            int a = c->bright > 128 ? 128 : c->bright;
+            if (a < 40) continue;                    /* faded out with the menu */
+            RECT box = {dx + (int)(c->x * dw) - 1, dy + (int)(c->y * dh) - 1,
+                        dx + (int)((c->x + c->w) * dw) + 1, dy + (int)((c->y + c->h) * dh) + 1};
+            if (box.right <= box.left || box.bottom <= box.top) continue;
+            int shade = 12 * a / 128;
+            HBRUSH bg = CreateSolidBrush(RGB(shade, shade, shade + 4));
+            FillRect(dc, &box, bg);                  /* over the English word */
+            DeleteObject(bg);
+            wchar_t w[128];
+            int wl = MultiByteToWideChar(CP_UTF8, 0, c->text, -1, w, 128);
+            if (wl <= 1) continue;
+            int fh = (box.bottom - box.top) * 9 / 10;
+            HFONT f = NULL;
+            for (; fh >= 6; fh -= fh / 10 + 1) {     /* as big as fits */
+                if (f) DeleteObject(f);
+                f = CreateFontA(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, "Segoe UI");
+                HGDIOBJ o = SelectObject(dc, f);
+                SIZE sz;
+                GetTextExtentPoint32W(dc, w, wl - 1, &sz);
+                SelectObject(dc, o);
+                if (sz.cx <= box.right - box.left) break;
+            }
+            HGDIOBJ of = SelectObject(dc, f);
+            SetBkMode(dc, TRANSPARENT);
+            int lv = 235 * a / 128;
+            SetTextColor(dc, RGB(lv, lv, lv));
+            DrawTextW(dc, w, wl - 1, &box, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
             SelectObject(dc, of);
             DeleteObject(f);
         }

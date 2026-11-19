@@ -42,7 +42,7 @@ typedef struct { char *tok; uint16_t code; } CharMap;
 static CharMap *charmap;                         /* the mods' CHARS.txt */
 static int ncharmap;
 
-typedef struct { int kind; uint8_t *d; long n; char what[600]; } TextFile;   /* kind: 0 rooms, 1 game, 2 items, 3 chars, 4 UI, 5 list, 6 screens */
+typedef struct { int kind; uint8_t *d; long n; char what[600]; } TextFile;   /* kind: 0 rooms, 1 game, 2 items, 3 chars, 4 UI, 5 list, 6 screens, 7 captions */
 static TextFile *textfiles;
 static int ntextfiles;
 
@@ -172,7 +172,7 @@ static int text_entries(const uint8_t *d, long n, TextEntry **out, char **buf) {
 static int text_apply(const char *mod, const char *rel, const char *up, const char *path) {
     int kind = !strcmp(up, "TEXT/ROOMS.TXT") ? 0 : !strcmp(up, "TEXT/GAME.TXT") ? 1 : !strcmp(up, "TEXT/ITEMS.TXT") ? 2 :
                !strcmp(up, "TEXT/CHARS.TXT") ? 3 : !strcmp(up, "TEXT/UI.TXT") ? 4 : !strcmp(up, "TEXT/LIST.TXT") ? 5 :
-               !strcmp(up, "TEXT/SCREENS.TXT") ? 6 : -1;
+               !strcmp(up, "TEXT/SCREENS.TXT") ? 6 : !strcmp(up, "TEXT/CAPTIONS.TXT") ? 7 : -1;
     if (kind < 0) return 0;
     long n = 0;
     uint8_t *d = load(path, &n);
@@ -347,6 +347,32 @@ static void texts_screens_done(void) {
         note("mods: %s: %d menu strings, in mod RAM", textfiles[i].what, got);
     }
 }
+/* text/CAPTIONS.txt: words drawn over parts of the game's pictures (a menu
+ * word that is an image), where and while the game draws them (captions.c):
+ * "@depth x0 y0 x1 y1 hash" (the picture's colour depth 0/1/2, its texels
+ * from VRAM's corner, and the FNV-1a of the VRAM there, 0 for any), then
+ * the words. */
+static void texts_captions_done(void) {
+    for (int i = 0; i < ntextfiles; i++) {
+        if (textfiles[i].kind != 7) continue;
+        char *s = malloc((size_t)textfiles[i].n + 1);
+        if (!s) continue;
+        memcpy(s, textfiles[i].d, (size_t)textfiles[i].n);
+        s[textfiles[i].n] = 0;
+        int got = 0, have = 0, depth = 0, x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+        unsigned hash = 0;
+        for (char *line = strtok(s, "\r\n"); line; line = strtok(NULL, "\r\n")) {
+            if (line[0] == '#') continue;
+            if (line[0] == '@') { hash = 0; have = sscanf(line + 1, "%d %d %d %d %d %x", &depth, &x0, &y0, &x1, &y1, &hash) >= 5; continue; }
+            if (!have) continue;
+            caption_add(depth, x0, y0, x1, y1, hash, line);
+            got++;
+            have = 0;
+        }
+        free(s);
+        note("mods: %s: %d captions", textfiles[i].what, got);
+    }
+}
 static void texts_ui_done(void) {
     for (int i = 0; i < ntextfiles; i++) {
         if (textfiles[i].kind != 4) continue;
@@ -439,6 +465,7 @@ static void texts_done(void) {
     }
     texts_ui_done();
     texts_screens_done();
+    texts_captions_done();
     Touched *test = touch(disc_index("TEST.BIN"));
     static uint16_t codes[4096];
     char why[160];

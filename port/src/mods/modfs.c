@@ -27,6 +27,7 @@
  * the rooms' music by sequence (NOISE/236/music1.seq, or .wav for a
  * recording). What is and isn't used is in the log. */
 #ifdef _WIN32
+#include "captions.h"
 #include <windows.h>
 #endif
 #include "rt.h"
