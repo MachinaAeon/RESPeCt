@@ -82,9 +82,10 @@ inventory's Return / NO ITEM labels, and words the Spanish disc draws as
 pictures or with its own letters (EXIT, BGM, KEY CONFIG...).
 
 The Spanish translation is the work of Tío Victor (see CREDITS). They are
-not affiliated with RESPeCt in any way and have not endorsed it. Please
-report any problem with the Spanish mod in RESPeCt to us
-(github.com/MachinaAeon/RESPeCt/issues), never to them.
+not affiliated with RESPeCt in any way and have not endorsed it. Their
+translation was made for the PlayStation, so if something in the Spanish
+mod goes wrong in RESPeCt, it's our side: please report it on our GitHub
+(github.com/MachinaAeon/RESPeCt/issues).
 
 CONTROLS
 --------

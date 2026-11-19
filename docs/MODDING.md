@@ -271,7 +271,8 @@ TEST.BIN into `text/GAME.txt`, its menu and door strings into
 « » Ü ü, in the cells the USA font uses for German and French ones) in
 `text/CHARS.txt`. Everything comes from the player's own disc; the builder
 only knows where to look. The translation is Tío Victor's work; they are
-not affiliated with RESPeCt, so problems go to RESPeCt's issues, not to them.
+not affiliated with RESPeCt; problems with the mod in RESPeCt are ours, so
+report them in RESPeCt's issues.
 
 `text/SCREENS.txt` replaces strings the menus draw (options, title, results,
 credits, doors): `@address` (the string's USA RAM address), then the bytes
