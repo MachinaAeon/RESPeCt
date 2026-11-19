@@ -153,11 +153,34 @@ static void audio_init(void) {
     f.wBitsPerSample = 16;
     f.nBlockAlign = 4;
     f.nAvgBytesPerSec = 44100 * 4;
-    if (waveOutOpen(&wave, WAVE_MAPPER, &f, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR) {
-        rt_log("audio: waveOutOpen failed, no sound");
+    /* Windows' default device first, then each device by itself (the
+     * default can be missing or refuse while another works). The reason
+     * each one gave goes to the log. */
+    static int logged;
+    UINT ndev = waveOutGetNumDevs();
+    MMRESULT r = waveOutOpen(&wave, WAVE_MAPPER, &f, 0, 0, CALLBACK_NULL);
+    if (r != MMSYSERR_NOERROR) {
+        char why[128];
+        waveOutGetErrorTextA(r, why, sizeof why);
+        if (!logged) rt_log("audio: the default sound device didn't open (error %u: %s); %u devices", (unsigned)r, why, (unsigned)ndev);
         wave = NULL;
-        return;
+        for (UINT d = 0; d < ndev && !wave; d++) {
+            WAVEOUTCAPSA caps;
+            if (waveOutGetDevCapsA(d, &caps, sizeof caps) != MMSYSERR_NOERROR) continue;
+            r = waveOutOpen(&wave, d, &f, 0, 0, CALLBACK_NULL);
+            if (r == MMSYSERR_NOERROR) rt_log("audio: playing on device %u, %s", (unsigned)d, caps.szPname);
+            else {
+                wave = NULL;
+                if (!logged) { waveOutGetErrorTextA(r, why, sizeof why); rt_log("audio: device %u (%s) didn't open (error %u: %s)", (unsigned)d, caps.szPname, (unsigned)r, why); }
+            }
+        }
+        if (!wave) {
+            if (!logged) rt_log("audio: no sound device opened: trying again every few seconds");
+            logged = 1;
+            return;
+        }
     }
+    if (logged) rt_log("audio: sound device opened");
     for (int i = 0; i < AUDIO_BUFS; i++) {
         whdr[i].lpData = (LPSTR)wbuf[i];
         whdr[i].dwBufferLength = AUDIO_BLOCK * 4;
@@ -182,6 +205,8 @@ static void audio_pump_to(int limit) {
     if (!wave) {
         int16_t junk[1024 * 2];
         while (spu_take_samples(junk, 1024) > 0) {}
+        static uint32_t retry;                     /* a device plugged in or freed later */
+        if (g_frame - retry >= 300) { retry = g_frame; audio_init(); }
         return;
     }
     /* The device ran dry (it played everything we gave it): a gap, heard as
